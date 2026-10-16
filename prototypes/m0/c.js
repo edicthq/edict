@@ -199,7 +199,15 @@
         <div class="c-rail-sec">
           <h2 class="c-rail-h">Humans</h2>
           <ul class="c-mates">${humans}</ul>
-        </div>`;
+        </div>
+        ${S.dir === 'C2' ? `<div class="c-appearance">
+          <h2 class="c-rail-h">Appearance</h2>
+          <div class="c-appearance-row">Theme<button type="button" class="c-theme-btn" data-act="theme">${S.theme === 'light' ? 'Light' : 'Dark'}</button></div>
+          <div class="c-appearance-row">Accent
+            <div class="c-swatches" role="radiogroup" aria-label="Accent color">${E.ACCENTS.map((a) =>
+              `<button type="button" class="c-swatch" role="radio" aria-checked="${S.accent === a}" aria-label="${E.ACCENT_NAMES[a]}" title="${E.ACCENT_NAMES[a]}" data-act="accent" data-v="${a}"><span class="c2-swatch" data-accent="${a}"></span></button>`).join('')}</div>
+          </div>
+        </div>` : ''}`;
     },
 
     top(E) {
@@ -267,9 +275,9 @@
     },
 
     paletteFrame(E) {
-      const p = E.S.palette, i = E.issue(p.target);
-      const mode = { status: 'Change status', assignee: 'Assign to a human', delegate: 'Delegate to an agent' }[p.mode];
-      const ph = { root: 'Type a command, or search issues', status: 'Pick a status', assignee: 'Pick who answers for it', delegate: 'Pick the agent that does the work' }[p.mode];
+      const p = E.S.palette, i = p.mode === 'accent' ? null : E.issue(p.target);
+      const mode = { status: 'Change status', assignee: 'Assign to a human', delegate: 'Delegate to an agent', accent: 'Accent color' }[p.mode];
+      const ph = { root: 'Type a command, or search issues', status: 'Pick a status', assignee: 'Pick who answers for it', delegate: 'Pick the agent that does the work', accent: 'Pick the color agents show in' }[p.mode];
       return `<div class="c-scrim" data-act="backdrop"><div class="c-pal ${p.mode === 'delegate' ? 'is-agent' : ''}" role="dialog" aria-modal="true" aria-label="Command palette">
         ${i ? `<div class="c-pal-ctx">${mode ? `<span class="c-pal-mode">${mode}</span>` : ''}<span class="c-id">${i.id}</span><span class="c-pal-ctx-t">${E.mdInline(i.title)}</span></div>` : ''}
         <input class="c-pal-input" data-palette-input role="combobox" aria-expanded="true" aria-controls="pal-list" aria-autocomplete="list"

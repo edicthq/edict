@@ -6,7 +6,7 @@
    - no hatch texture; agent surfaces get a quiet tint instead
    - sentence-case labels, soft badges, amber for "needs input", red for "blocked"
    - labels get a colored dot
-   The agent color is switchable (violet, lime, blue) to pick the accent.
+   The accent (the agent color) is violet by default and users can pick another.
    Don'ts: the agent color never marks human actions, links or static
    state; no status color except amber/red for an agent waiting on a human. */
 
@@ -71,31 +71,51 @@
   color-scheme: dark;
 }
 
-/* ---------- agent color options ---------- */
-:root[data-dir="C2"][data-theme="light"][data-agent="violet"] {
-  --agent: oklch(0.55 0.22 293); --on-agent: oklch(0.99 0.01 293); --agent-ink: oklch(0.5 0.21 293);
-  --agent-wash: oklch(0.55 0.22 293 / 0.09); --agent-edge: oklch(0.55 0.22 293 / 0.45); --lane: oklch(0.978 0.008 293);
+/* ---------- accent (the agent color) ----------
+   An accent is a hue and a chroma. Every agent role derives from them, so a
+   user-chosen accent is one attribute: data-accent on the root (or on a
+   swatch, which then previews itself). Violet is the default. */
+[data-accent="violet"] { --a-h: 293; --a-c: 0.22; --a-l: 0.56; }
+[data-accent="blue"]   { --a-h: 257; --a-c: 0.19; --a-l: 0.56; }
+[data-accent="teal"]   { --a-h: 195; --a-c: 0.12; --a-l: 0.52; }
+[data-accent="pink"]   { --a-h: 350; --a-c: 0.2; --a-l: 0.56; }
+[data-accent="lime"]   { --a-h: 128; --a-c: 0.2; --a-l: 0.56; }
+
+:root[data-dir="C2"][data-theme="light"], :root[data-dir="C2"][data-theme="light"] [data-accent] {
+  --agent: oklch(var(--a-l) var(--a-c) var(--a-h));
+  --on-agent: oklch(0.99 0.01 var(--a-h));
+  --agent-ink: oklch(calc(var(--a-l) - 0.06) var(--a-c) var(--a-h));
+  --agent-wash: oklch(var(--a-l) var(--a-c) var(--a-h) / 0.09);
+  --agent-edge: oklch(var(--a-l) var(--a-c) var(--a-h) / 0.45);
+  --lane: oklch(0.978 0.008 var(--a-h));
 }
-:root[data-dir="C2"][data-theme="dark"][data-agent="violet"] {
-  --agent: oklch(0.66 0.19 293); --on-agent: oklch(0.99 0.01 293); --agent-ink: oklch(0.79 0.13 293);
-  --agent-wash: oklch(0.66 0.19 293 / 0.15); --agent-edge: oklch(0.66 0.19 293 / 0.55); --lane: oklch(0.185 0.016 293);
+:root[data-dir="C2"][data-theme="dark"], :root[data-dir="C2"][data-theme="dark"] [data-accent] {
+  --agent: oklch(0.64 calc(var(--a-c) * 0.85) var(--a-h));
+  --on-agent: oklch(0.17 0.02 var(--a-h));
+  --agent-ink: oklch(0.8 calc(var(--a-c) * 0.6) var(--a-h));
+  --agent-wash: oklch(0.64 calc(var(--a-c) * 0.85) var(--a-h) / 0.15);
+  --agent-edge: oklch(0.64 calc(var(--a-c) * 0.85) var(--a-h) / 0.55);
+  --lane: oklch(0.185 0.016 var(--a-h));
 }
-:root[data-dir="C2"][data-theme="light"][data-agent="lime"] {
-  --agent: oklch(0.86 0.2 127); --on-agent: oklch(0.25 0.06 130); --agent-ink: oklch(0.47 0.13 135);
-  --agent-wash: oklch(0.86 0.2 127 / 0.22); --agent-edge: oklch(0.72 0.17 130); --lane: oklch(0.978 0.012 125);
+/* Lime keeps its bright fill, so it needs dark text on it. */
+:root[data-dir="C2"][data-theme="light"][data-accent="lime"], :root[data-dir="C2"][data-theme="light"] [data-accent="lime"] {
+  --agent: oklch(0.86 0.2 128); --on-agent: oklch(0.25 0.06 130); --agent-ink: oklch(0.47 0.13 135);
+  --agent-wash: oklch(0.86 0.2 128 / 0.22); --agent-edge: oklch(0.72 0.17 130);
 }
-:root[data-dir="C2"][data-theme="dark"][data-agent="lime"] {
-  --agent: oklch(0.88 0.2 127); --on-agent: oklch(0.22 0.05 130); --agent-ink: oklch(0.87 0.19 127);
-  --agent-wash: oklch(0.88 0.2 127 / 0.11); --agent-edge: oklch(0.88 0.2 127 / 0.6); --lane: oklch(0.18 0.014 135);
+:root[data-dir="C2"][data-theme="dark"][data-accent="lime"], :root[data-dir="C2"][data-theme="dark"] [data-accent="lime"] {
+  --agent: oklch(0.88 0.2 128); --on-agent: oklch(0.22 0.05 130); --agent-ink: oklch(0.87 0.19 128);
+  --agent-wash: oklch(0.88 0.2 128 / 0.11); --agent-edge: oklch(0.88 0.2 128 / 0.6);
 }
-:root[data-dir="C2"][data-theme="light"][data-agent="blue"] {
-  --agent: oklch(0.56 0.19 257); --on-agent: oklch(0.99 0.01 257); --agent-ink: oklch(0.5 0.18 257);
-  --agent-wash: oklch(0.56 0.19 257 / 0.09); --agent-edge: oklch(0.56 0.19 257 / 0.45); --lane: oklch(0.978 0.008 257);
-}
-:root[data-dir="C2"][data-theme="dark"][data-agent="blue"] {
-  --agent: oklch(0.67 0.16 257); --on-agent: oklch(0.99 0.01 257); --agent-ink: oklch(0.79 0.12 257);
-  --agent-wash: oklch(0.67 0.16 257 / 0.15); --agent-edge: oklch(0.67 0.16 257 / 0.55); --lane: oklch(0.185 0.016 257);
-}
+
+/* ---------- appearance (rail footer) ---------- */
+.c2-swatch { display: inline-block; width: 14px; height: 14px; border-radius: var(--r-pill); background: var(--agent); flex: none; }
+.c-appearance { margin-top: auto; display: flex; flex-direction: column; gap: var(--s-2); padding-top: var(--s-3); border-top: 1px solid var(--line); }
+.c-appearance-row { display: flex; align-items: center; gap: var(--s-2); padding: 0 var(--s-1); font-size: var(--t-12); color: var(--ink-2); }
+.c-swatches { display: flex; gap: 6px; margin-inline-start: auto; }
+.c-swatch { width: 20px; height: 20px; border-radius: var(--r-pill); display: grid; place-items: center; }
+.c-swatch .c2-swatch { width: 14px; height: 14px; }
+.c-swatch[aria-checked="true"] { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--agent); }
+.c-theme-btn { margin-inline-start: auto; height: 24px; padding: 0 8px; border-radius: var(--r-1); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink); }
 
 /* ---------- one sans, normal width ---------- */
 [data-dir="C2"] *, [data-dir="C2"] *::before { font-stretch: 100% !important; }
@@ -184,3 +204,6 @@
 [data-dir="C2"] .c-dots i { width: 6px; height: 6px; border-radius: var(--r-pill); clip-path: none; }
 [data-dir="C2"] .c-lane-agent b { font: 600 var(--t-13)/1.3 var(--font-sans); }
 [data-dir="C2"] .c-pal.is-agent .c-pal-mode { font: 600 var(--t-12)/1 var(--font-sans); }
+
+[data-dir="C2"] ::placeholder { color: var(--ink-2); }
+[data-dir="C2"] .c-row { padding-block: 8px; min-height: 40px; justify-content: center; }

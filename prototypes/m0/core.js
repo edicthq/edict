@@ -14,8 +14,8 @@
   D.progress.forEach((p) => (p.id = nextId()));
 
   const S = {
-    dir: ['A', 'C', 'C2'].includes(params.get('d')) ? params.get('d') : 'A',
-    hue: ['violet', 'lime', 'blue'].includes(params.get('hue')) ? params.get('hue') : 'violet',
+    dir: ['A', 'C', 'C2'].includes(params.get('d')) ? params.get('d') : 'C2',
+    accent: ['violet', 'blue', 'teal', 'pink', 'lime'].includes(params.get('accent')) ? params.get('accent') : 'violet',
     theme: params.get('theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
     view: params.get('view') === 'board' ? 'board' : 'list',
     team: params.get('team') === 'OPS' ? 'OPS' : 'ENG',
@@ -35,6 +35,8 @@
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const allStatuses = Object.values(D.statuses).flat();
   const PRIORITY = ['No priority', 'Urgent', 'High', 'Medium', 'Low'];
+  const ACCENTS = ['violet', 'blue', 'teal', 'pink', 'lime'];
+  const ACCENT_NAMES = { violet: 'Violet', blue: 'Blue', teal: 'Teal', pink: 'Pink', lime: 'Lime' };
   const prioRank = (p) => (p === 0 ? 5 : p);
   const sortIssues = (a, b) => prioRank(a.priority) - prioRank(b.priority) || b.number - a.number;
   const LIST_ORDER = [3, 2, 1, 0, 4, 5]; // In Review, In Progress, Todo, Backlog, Done, Canceled
@@ -42,7 +44,7 @@
   const E = {
     S, D, esc, isMac,
     mod: isMac ? '⌘' : 'Ctrl ',
-    PRIORITY,
+    PRIORITY, ACCENTS, ACCENT_NAMES,
     md: (s) => window.md(s),
     mdInline: (s) => window.mdInline(s),
     member: (id) => D.members.find((m) => m.id === id) || null,
@@ -310,7 +312,7 @@
     const html = document.documentElement;
     html.dataset.dir = S.dir;
     html.dataset.theme = S.theme;
-    html.dataset.agent = S.hue;
+    html.dataset.accent = S.accent;
     document.title = `ENG issues · Edict M0 · ${S.dir}`;
     $('#app').innerHTML = V().shell(E);
     paint();
@@ -390,7 +392,7 @@
 
   function syncUrl() {
     const q = new URLSearchParams({ d: S.dir, theme: S.theme, view: S.view });
-    if (S.dir === 'C2') q.set('hue', S.hue);
+    if (S.dir === 'C2') q.set('accent', S.accent);
     if (S.team !== 'ENG') q.set('team', S.team);
     if (S.peekId) q.set('issue', S.peekId);
     history.replaceState(null, '', `?${q}`);
@@ -464,6 +466,7 @@
     document.documentElement.dataset.theme = S.theme;
     renderBar();
     syncUrl();
+    paint('side');
     requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.classList.remove('no-tx')));
   }
 
@@ -514,6 +517,11 @@
         run: () => act(setAssignee(issue.id, m.id), `${issue.id} assigned to ${m.short}`),
       }));
       add('Assignee', { label: 'Unassigned', current: !issue.assignee, run: () => act(setAssignee(issue.id, null), `${issue.id} unassigned`) });
+    } else if (p.mode === 'accent') {
+      ACCENTS.forEach((a) => add('Accent color', {
+        label: ACCENT_NAMES[a], icon: `<span class="c2-swatch" data-accent="${a}"></span>`, current: S.accent === a,
+        sub: a === 'violet' ? 'Default' : '', run: () => setAccent(a),
+      }));
     } else if (p.mode === 'delegate') {
       E.agents().forEach((m) => add('Delegate to an agent', {
         label: m.name, sub: m.about, member: m, agent: true, current: issue.delegate === m.id,
@@ -533,8 +541,9 @@
       add('View', { label: S.view === 'list' ? 'Switch to board view' : 'Switch to list view', kbd: 'V', run: () => setView() });
       add('View', { label: `Go to ${S.team === 'ENG' ? 'OPS' : 'ENG'} issues`, run: () => setTeam() });
       add('View', { label: S.theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme', kbd: 'T', run: () => setTheme() });
+      if (S.dir === 'C2') add('View', { label: 'Change accent color…', sub: ACCENT_NAMES[S.accent], kbd: 'G', to: 'accent' });
       Object.entries(DIRS).filter(([k]) => k !== S.dir).forEach(([k, name]) => add('Prototype', { label: `Show direction ${k} · ${name}`, run: () => setDir(k) }));
-      if (S.dir === 'C2') add('Prototype', { label: `Next agent color (now ${S.hue})`, kbd: 'G', run: () => setHue() });
+
       if (p.query) {
         D.issues.map((i) => ({ i, s: Math.max(fuzzy(p.query, i.id), fuzzy(p.query, i.title)) }))
           
@@ -552,7 +561,7 @@
 
   function openPalette(mode = 'root', targetId) {
     const target = targetId || S.peekId || S.focusId;
-    if (mode !== 'root' && !E.issue(target)) return;
+    if (!['root', 'accent'].includes(mode) && !E.issue(target)) return;
     S.palette = { mode, query: '', idx: 0, target, from: mode };
     renderPaletteFrame();
   }
@@ -679,13 +688,13 @@
   }
 
   // ---------- switcher bar ----------
-  const DIRS = { A: 'Calm precision', C: 'Agent-native', C2: 'Agent-native, conventional' };
-  const HUES = ['violet', 'lime', 'blue'];
-  function setHue(h) {
-    S.hue = h || HUES[(HUES.indexOf(S.hue) + 1) % HUES.length];
-    document.documentElement.dataset.agent = S.hue;
+  const DIRS = { C2: 'Agent-native, conventional (chosen)', A: 'Calm precision', C: 'Agent-native' };
+  function setAccent(a) {
+    S.accent = a || ACCENTS[(ACCENTS.indexOf(S.accent) + 1) % ACCENTS.length];
+    document.documentElement.dataset.accent = S.accent;
     renderBar();
     syncUrl();
+    paint('side');
   }
   function renderBar() {
     $('#proto-bar').innerHTML = `
@@ -695,8 +704,8 @@
       <button type="button" data-act="dir" data-v="next" aria-label="Next direction">›</button>
       <span class="pb-sep" aria-hidden="true"></span>
       <button type="button" data-act="theme" class="pb-theme">${S.theme === 'light' ? 'Light' : 'Dark'}</button>
-      ${S.dir === 'C2' ? `<button type="button" data-act="hue" class="pb-theme"><i class="pb-swatch" aria-hidden="true"></i>Agent color: ${S.hue}</button>` : ''}
-      <span class="pb-keys"><kbd>\\</kbd> direction <kbd>T</kbd> theme${S.dir === 'C2' ? ' <kbd>G</kbd> color' : ''}</span>`;
+      ${S.dir === 'C2' ? `<button type="button" data-act="accent" class="pb-theme"><i class="pb-swatch" aria-hidden="true"></i>${ACCENT_NAMES[S.accent]}</button>` : ''}
+      <span class="pb-keys"><kbd>\\</kbd> direction <kbd>T</kbd> theme${S.dir === 'C2' ? ' <kbd>G</kbd> accent' : ''}</span>`;
   }
 
   // ---------- input ----------
@@ -732,7 +741,7 @@
       v: () => setView(),
       t: () => setTheme(),
       '\\': () => setDir(),
-      g: () => S.dir === 'C2' && setHue(),
+      g: () => S.dir === 'C2' && setAccent(),
     };
     const fn = keys[e.key];
     if (!fn) return;
@@ -759,7 +768,7 @@
       team: () => setTeam(v),
       theme: () => setTheme(),
       dir: () => setDir(v),
-      hue: () => setHue(),
+      accent: () => setAccent(v),
       undo,
       replay: () => replay(id),
       comment: postComment,
@@ -787,5 +796,5 @@
     setTimeout(() => startRun('ENG-142', 'ferro', 'amirali'), 2500);
   });
 
-  window.EDICT = { S, replay, startRun, open, setDir, setTheme, setView, setHue, openPalette };
+  window.EDICT = { S, replay, startRun, open, setDir, setTheme, setView, setAccent, openPalette };
 })();

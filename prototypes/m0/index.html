@@ -1,12 +1,14 @@
 <!doctype html>
 <!--
-  PROTOTYPE (M0). Throwaway. Answers one question: which visual direction does
-  Edict take, A "Calm precision" or C "Agent-native"? Same three screens in both
-  (issue list/board, issue peek with a live agent run, command palette),
-  switchable with the bar at the bottom or ?d=A|C&theme=light|dark.
+  PROTOTYPE (M0). Throwaway. Answered: which visual direction does Edict take?
+  Chosen: C2 "Agent-native, conventional" with a violet accent that users can
+  change (docs/design/tokens.md). Opens on C2; A and C stay in the switcher
+  for reference. Same three screens in each (issue list/board, issue peek with
+  a live agent run, command palette).
+  ?d=C2|A|C&theme=light|dark&accent=violet|blue|teal|pink|lime
   No backend, no persistence. Reload to reset.
 -->
-<html lang="en" data-dir="A" data-theme="light">
+<html lang="en" data-dir="C2" data-theme="light" data-accent="violet">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
