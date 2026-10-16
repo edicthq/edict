@@ -67,7 +67,7 @@ Invites go out as email links, or as copyable links when SMTP is off. An optiona
 - My issues and an inbox for mentions, assignments, delegations and agent progress.
 - Issue peek panel that opens without leaving the list.
 - Bulk select and edit.
-- Light and dark themes.
+- Light and dark themes, and a per-user accent color (violet, blue, teal, pink, lime); admins set the organization default that new members start from.
 - Project overview with progress by status category.
 - Full organization export (JSON plus an attachments zip).
 
@@ -77,11 +77,26 @@ After v1: importers (Linear first, then GitHub Issues and Jira), email notificat
 
 ### Agents are members
 
-An agent is a member of an organization with kind `agent`. An admin creates it with a name, avatar and description, and it gets its own team access.
+An agent is a member of an organization with kind `agent`. Edict never runs agents. It tracks their work and shows it. See [ADR 0008](./adr/0008-agents-are-members.md).
 
-On an issue, the **assignee** is the human who answers for it. The **delegate** is the agent doing the work. Delegating an issue to an agent sends a webhook to that agent's endpoint, which is how agent runners wake up.
+An agent joins an organization in one of two ways ([ADR 0015](./adr/0015-oauth-connections-create-agents.md)):
 
-The event log records every action as "Agent X on behalf of Y" when a human triggered it through OAuth, or "Agent X" when the agent acted on its own with an API key.
+- **Connected agent.** A human connects an MCP client (Claude Code, Codex, OpenCode, T3 Code) to `/mcp` and approves it through OAuth. Edict creates an agent for that connection, named after the client and the human: "Claude Code (Amirali)". It can never do more than its human, so its team access is the human's, narrowed by the guardrails below. Reconnecting the same client as the same human reuses the agent. When the human leaves the organization, their connected agents are paused.
+- **Admin-created agent.** An admin creates it with a name, avatar, description and its own team access, and gives it API keys. Agent runners (a server running Claude Code headless or the Agent SDK, a GitHub Action, CI) use these.
+
+Admins can rename, pause and merge any agent. A merge leaves the event log untouched, and the merged agent becomes an alias of the one it merged into.
+
+The event log records every action as "Agent X on behalf of Y" when a human approved the agent through OAuth ("Claude Code (Amirali) on behalf of Amirali"), or "Agent X" when the agent acted with an API key.
+
+### Delegation
+
+On an issue, the **assignee** is the human who answers for it. The **delegate** is the agent doing the work.
+
+Delegating an issue to an agent puts it in that agent's queue, and `my_work` returns it. The everyday flow is a human telling their own agent "work on ENG-142", or "do my Edict work" to pick up everything in its queue. The agent then works the issue through `get_issue`, `update_issue`, `post_progress` and `link`.
+
+A webhook only wakes an agent sooner. Delegating to an agent with a webhook subscription sends it a delivery, which is how agent runners start right away. A connected agent has no webhook, so it picks the issue up the next time its human asks. Until then the issue shows "Waiting for Claude Code to pick it up". Wherever you choose a delegate, the UI shows how each agent connects and when it will start ("connected by Amirali · picks up work when asked", or "runner · starts right away").
+
+Edict ships no agent runner in v1. The "Connect your agent" docs show how to connect each MCP client and how to point a runner at a webhook.
 
 ### Progress updates
 
@@ -91,15 +106,15 @@ MCP tool descriptions steer agents toward progress updates and comments, and awa
 
 ### Authentication
 
-- OAuth 2.1 for MCP clients, as the MCP spec requires for remote servers. A human approves the connection and the agent acts on their behalf.
-- API keys for headless agents (CI, scripts, custom runners). Each key belongs to one agent and is scoped to teams.
+- OAuth 2.1 for MCP clients, as the MCP spec requires for remote servers. A human approves the connection, Edict creates or reuses that human's connected agent for the client, and the agent acts on the human's behalf.
+- API keys for admin-created agents (agent runners, CI, scripts). Each key belongs to one agent and is scoped to teams.
 
 ### Guardrails
 
 - By default agents can create, read and update issues, comment, post progress, link, relate and change status in teams they can access.
 - By default agents cannot delete anything, change team or organization settings, manage members or create agents. An admin can grant each of these per agent.
 - Rate limits: 600 requests per minute per token, and 60 issues created per hour per agent. Both are configurable.
-- The pause switch revokes every token an agent holds and stops its webhooks in one click.
+- The pause switch revokes every token an agent holds, OAuth grants included, and stops its webhooks in one click.
 - Per-agent revert ("undo everything Agent X did in the last hour") comes right after v1, built on the event log.
 
 ### MCP server
@@ -127,7 +142,7 @@ Resources: `edict://issue/ENG-123`, `edict://project/<slug>`. Prompts: "triage m
 
 ### Webhooks
 
-- Subscriptions at the organization level and per agent. An agent automatically receives events for issues delegated to it.
+- Subscriptions at the organization level and per agent. An agent with a subscription automatically receives events for issues delegated to it. This is how agent runners wake up. Connected agents have none.
 - HMAC-SHA256 signature header on every delivery.
 - At-least-once delivery. Each payload carries an event ID for deduplication.
 - Exponential backoff for about 24 hours, then the subscription disables itself and alerts admins.
@@ -229,7 +244,7 @@ Linear is the bar for polish, not a look to copy. M0 prototypes two directions o
 - **Calm precision.** Quiet neutrals, one confident accent, dense rows, almost no decoration.
 - **Agent-native.** The human and agent split is part of the visual language. Agents get their own color and texture, and live agent work streams and pulses.
 
-The chosen direction becomes design tokens in `packages/ui` before any product UI is built. Light and dark ship together.
+The chosen direction becomes design tokens in `packages/ui` before any product UI is built. Light and dark ship together. Each user picks the accent color; an admin can set the organization default. The tokens with their presets live in [`docs/design/tokens.md`](./design/tokens.md).
 
 ## Quality
 
@@ -267,7 +282,7 @@ Week 1 starts Monday 2026-10-19. Estimates assume one developer working with AI 
 | M0 | Prototype | 1 | Clickable prototype of the three core screens in both directions | A direction is picked and its tokens are written down |
 | M1 | Foundations | 2–3 | Monorepo, Docker Compose, Postgres and Drizzle, migrations on boot, Better Auth, organizations, teams, members, roles, invites, instance admin, event log, CI | `docker compose up`, sign up, create an organization and a team, invite someone |
 | M2 | Core issues and API | 4–6 | Issues, identifiers and redirects, statuses and categories, labels, priority, estimates, sub-issues, relations, markdown comments, attachments, soft delete, undo, optimistic versioning, `/api/v1`, OpenAPI, generated client, plain functional UI | The full issue lifecycle works through the UI and the API |
-| M3 | Agents | 7–8 | Agent members, API keys, OAuth for MCP, `/mcp` tools, resources and prompts, delegate, progress updates, webhooks and delivery log, guardrails, pause switch | Claude Code connects by URL and works an issue from start to finish. Release v0.1 "agent preview". Edict's own work moves into Edict |
+| M3 | Agents | 7–8 | Agent members, connected agents created on OAuth for MCP, API keys, `/mcp` tools, resources and prompts, delegate, progress updates, webhooks and delivery log, guardrails, pause switch | Claude Code connects by URL and works an issue from start to finish. Release v0.1 "agent preview". Edict's own work moves into Edict |
 | M4 | The feel | 9–11 | TanStack DB collections, realtime, list and board, filter, group, sort, saved views, ⌘K, shortcuts, peek panel, bulk edit, themes, final visual design | Feels faster than Linear on the dogfood data |
 | M5 | Workflow | 12–13 | Projects and overview, My issues, inbox, templates, export | A small team runs on it every day |
 | M6 | v1.0 | 14–15 | Tauri shell and unsigned distribution, docs site with "Connect your agent" pages, telemetry, update check, release pipeline | v1.0 is public, around 2027-01-29 |
