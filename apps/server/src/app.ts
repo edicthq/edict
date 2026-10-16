@@ -1,14 +1,9 @@
 import { serve, type ServerType } from "@hono/node-server";
 import { Hono } from "hono";
-import {
-  createDatabase,
-  createPool,
-  migrateToLatest,
-  type Database,
-  type Pool,
-} from "@edict/db";
-import { createAuth, type AuthConfig, type EdictAuth } from "./auth.js";
+import { createDatabase, createPool, migrateToLatest } from "@edicthq/db";
+import { createAuth, type EdictAuth } from "./auth.js";
 import type { ServerConfig } from "./env.js";
+import { instanceAuthSecret } from "./instance.js";
 
 export interface App {
   app: Hono;
@@ -20,50 +15,41 @@ export interface App {
   shutdown: () => Promise<void>;
 }
 
-export interface AppOptions {
-  auth?: AuthConfig;
-  server?: ServerType;
-}
+export function createApp(config: ServerConfig): App {
+  const pool = createPool(config.databaseUrl);
+  const db = createDatabase(pool);
 
-export function createApp(config: ServerConfig, options: AppOptions = {}): App {
-  const pool: Pool = createPool(config.databaseUrl);
-  const db: Database = createDatabase(pool);
-
+  // Built in start(): the auth secret may live in the database.
   let auth: EdictAuth | undefined;
-  if (options.auth) {
-    auth = createAuth(options.auth, db);
-  }
 
   const app = new Hono();
   app.get("/health", (c) => c.json({ ok: true }));
-  if (auth) {
-    app.on(["POST", "GET"], "/api/auth/*", (c) => auth!.handler(c.req.raw));
-  }
+  app.on(["POST", "GET"], "/api/auth/*", (c) =>
+    auth ? auth.handler(c.req.raw) : c.json({ error: "starting" }, 503),
+  );
 
-  let server: ServerType | undefined = options.server;
-  let migrated = false;
+  let server: ServerType | undefined;
+  let poolEnded = false;
 
   const state: App = {
     app,
     port: 0,
     start: async () => {
       await migrateToLatest(pool);
-      migrated = true;
+      const secret = config.authSecret ?? (await instanceAuthSecret(db));
+      auth = createAuth({ secret, baseURL: config.baseUrl }, db);
 
-      if (!server) {
-        server = await listen(app, config.port);
-      }
+      server = await listen(app, config.port);
       state.port = boundPort(server);
     },
     shutdown: async () => {
-      await new Promise<void>((resolve) => {
-        if (!server) {
-          resolve();
-          return;
-        }
-        server.close(() => resolve());
-      });
-      if (migrated) {
+      if (server) {
+        const closing = server;
+        server = undefined;
+        await new Promise<void>((resolve) => closing.close(() => resolve()));
+      }
+      if (!poolEnded) {
+        poolEnded = true;
         await pool.end();
       }
     },

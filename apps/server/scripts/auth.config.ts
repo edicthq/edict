@@ -1,4 +1,4 @@
-import { createDatabase, createPool } from "@edict/db";
+import { createDatabase, createPool } from "@edicthq/db";
 import { createAuth } from "../src/auth.js";
 
 const pool = createPool("postgres://localhost/generate-only");

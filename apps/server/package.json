@@ -1,5 +1,5 @@
 {
-  "name": "@edict/server",
+  "name": "@edicthq/server",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -14,7 +14,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@edict/db": "workspace:*",
+    "@edicthq/db": "workspace:*",
     "@hono/node-server": "^1.19.0",
     "better-auth": "^1.7.10",
     "drizzle-orm": "^0.44.7",

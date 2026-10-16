@@ -15,6 +15,13 @@
       "when": 1792189872638,
       "tag": "0001_brainy_nekra",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792191465239,
+      "tag": "0002_dear_nova",
+      "breakpoints": true
     }
   ]
 }

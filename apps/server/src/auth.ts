@@ -2,8 +2,7 @@ import { betterAuth } from "better-auth";
 import { admin } from "better-auth/plugins";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { count, eq } from "drizzle-orm";
-import * as schema from "@edict/db";
-import type { Database } from "@edict/db";
+import { schema, type Database } from "@edicthq/db";
 
 export interface AuthConfig {
   secret: string;

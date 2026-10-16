@@ -12,8 +12,8 @@ COPY packages/db/package.json packages/db/
 RUN pnpm install --frozen-lockfile
 COPY apps ./apps
 COPY packages ./packages
-RUN pnpm turbo run build --filter=@edict/server
-RUN pnpm deploy --filter=@edict/server --prod /srv
+RUN pnpm turbo run build --filter=@edicthq/server
+RUN pnpm deploy --filter=@edicthq/server --prod /srv
 
 FROM node:22-slim AS app
 WORKDIR /srv

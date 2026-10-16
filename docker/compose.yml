@@ -20,7 +20,10 @@ services:
       dockerfile: docker/Dockerfile
     environment:
       DATABASE_URL: postgres://edict:edict@db:5432/edict
-      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-insecure-default-change-me}
+      # Optional. Without it, Edict generates a secret on first boot and keeps it in Postgres.
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-}
+      # The URL people reach Edict at, when it differs from http://localhost:3000.
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-}
     depends_on:
       db:
         condition: service_healthy
