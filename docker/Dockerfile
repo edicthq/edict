@@ -9,6 +9,7 @@ FROM base AS build
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
 COPY apps/server/package.json apps/server/
 COPY packages/db/package.json packages/db/
+COPY packages/schema/package.json packages/schema/
 RUN pnpm install --frozen-lockfile
 COPY apps ./apps
 COPY packages ./packages

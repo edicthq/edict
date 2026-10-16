@@ -1,6 +1,7 @@
 import { serve, type ServerType } from "@hono/node-server";
 import { Hono } from "hono";
 import { createDatabase, createPool, migrateToLatest } from "@edicthq/db";
+import { createApi } from "./api/index.js";
 import { createAuth, type EdictAuth } from "./auth.js";
 import type { ServerConfig } from "./env.js";
 import { instanceAuthSecret } from "./instance.js";
@@ -26,6 +27,21 @@ export function createApp(config: ServerConfig): App {
   app.get("/health", (c) => c.json({ ok: true }));
   app.on(["POST", "GET"], "/api/auth/*", (c) =>
     auth ? auth.handler(c.req.raw) : c.json({ error: "starting" }, 503),
+  );
+  app.route(
+    "/api/v1",
+    createApi({
+      db,
+      publicUrl: config.baseUrl,
+      getUser: async (headers) => {
+        const session = await auth?.api.getSession({ headers });
+        if (!session) {
+          return null;
+        }
+        const { id, email, name } = session.user;
+        return { id, email, name };
+      },
+    }),
   );
 
   let server: ServerType | undefined;

@@ -58,6 +58,10 @@ _Avoid_: Permission level, access level
 A member who can see only the teams they were invited to.
 _Avoid_: External, viewer, collaborator
 
+**Invite**:
+An offer to join an organization with a role and teams, made to one email address and accepted through a link.
+_Avoid_: Invitation, join link, referral
+
 ## Work
 
 **Issue**:

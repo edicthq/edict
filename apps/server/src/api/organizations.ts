@@ -1,0 +1,242 @@
+import { createRoute, z } from "@hono/zod-openapi";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import {
+  emit,
+  enterOrg,
+  inScope,
+  members,
+  organizations,
+  teamMembers,
+  user as userTable,
+  type Transaction,
+} from "@edicthq/db";
+import {
+  CreateOrganization,
+  Id,
+  Member,
+  Membership,
+  UpdateMember,
+  type Organization,
+} from "@edicthq/schema";
+import {
+  activeMember,
+  atLeast,
+  loadMember,
+  memberColumns,
+  memberWithUser,
+  requireRole,
+  toMember,
+} from "./access.js";
+import {
+  OrgParams,
+  body,
+  errors,
+  inOrg,
+  json,
+  noContent,
+  router,
+  signedIn,
+  type ApiDeps,
+} from "./context.js";
+import { conflict, forbidden, invalid, isUniqueViolation } from "./errors.js";
+
+type OrganizationRow = typeof organizations.$inferSelect;
+
+export function toOrganization(row: OrganizationRow): Organization {
+  return { id: row.id, name: row.name, slug: row.slug, createdAt: row.createdAt.toISOString() };
+}
+
+const MemberParams = OrgParams.extend({ memberId: Id });
+
+const createOrganization = createRoute({
+  method: "post",
+  path: "/organizations",
+  tags: ["Organizations"],
+  summary: "Create an organization. The caller becomes its Owner.",
+  request: body(CreateOrganization),
+  responses: {
+    201: json(Membership, "The new organization and the caller's member in it"),
+    ...errors("invalid_request", "unauthorized", "conflict"),
+  },
+});
+
+const listOrganizations = createRoute({
+  method: "get",
+  path: "/organizations",
+  tags: ["Organizations"],
+  summary: "Organizations the caller is a member of",
+  responses: {
+    200: json(z.array(Membership), "The caller's memberships"),
+    ...errors("unauthorized"),
+  },
+});
+
+const listMembers = createRoute({
+  method: "get",
+  path: "/organizations/{orgId}/members",
+  tags: ["Members"],
+  summary: "Members of an organization",
+  request: { params: OrgParams },
+  responses: {
+    200: json(z.array(Member), "Current members, humans and agents"),
+    ...errors("unauthorized", "not_found"),
+  },
+});
+
+const updateMember = createRoute({
+  method: "patch",
+  path: "/organizations/{orgId}/members/{memberId}",
+  tags: ["Members"],
+  summary: "Change a member's role",
+  description:
+    "Admins and Owners change roles. Only Owners grant or take away the Owner role, and the last Owner stays an Owner.",
+  request: { params: MemberParams, ...body(UpdateMember) },
+  responses: {
+    200: json(Member, "The member with the new role"),
+    ...errors("invalid_request", "unauthorized", "forbidden", "not_found", "conflict"),
+  },
+});
+
+const removeMember = createRoute({
+  method: "delete",
+  path: "/organizations/{orgId}/members/{memberId}",
+  tags: ["Members"],
+  summary: "Remove a member, or leave the organization",
+  description:
+    "Admins and Owners remove members, and anyone can remove themselves. Only Owners remove an Owner, and the last Owner cannot leave. The member's history stays.",
+  request: { params: MemberParams },
+  responses: {
+    ...noContent,
+    ...errors("unauthorized", "forbidden", "not_found", "conflict"),
+  },
+});
+
+export function organizationRoutes(deps: ApiDeps) {
+  const app = router();
+
+  app.openapi(createOrganization, async (c) => {
+    const user = signedIn(c);
+    const input = c.req.valid("json");
+    try {
+      const result = await inScope(deps.db, { userId: user.id }, async (tx) => {
+        // The insert policy only admits the organization the scope is in.
+        const { rows } = await tx.execute<{ id: string }>(sql`SELECT uuidv7() AS id`);
+        const id = rows[0]!.id;
+        await enterOrg(tx, id);
+        const [organization] = await tx
+          .insert(organizations)
+          .values({ id, name: input.name, slug: input.slug })
+          .returning();
+        const [owner] = await tx
+          .insert(members)
+          .values({ orgId: id, kind: "human", userId: user.id, role: "owner" })
+          .returning();
+        await emit(tx, id, {
+          type: "organization.created",
+          actorId: owner!.id,
+          subjectId: id,
+          data: { name: input.name, slug: input.slug },
+        });
+        return { organization: toOrganization(organization!), member: await loadMember(tx, id, owner!.id) };
+      });
+      return c.json(result, 201);
+    } catch (error) {
+      if (isUniqueViolation(error, "organizations_slug_unique")) {
+        throw conflict(`The slug "${input.slug}" is taken.`);
+      }
+      throw error;
+    }
+  });
+
+  app.openapi(listOrganizations, async (c) => {
+    const user = signedIn(c);
+    const rows = await inScope(deps.db, { userId: user.id }, (tx) =>
+      tx
+        .select({ organization: organizations, ...memberColumns })
+        .from(members)
+        .innerJoin(organizations, eq(organizations.id, members.orgId))
+        .leftJoin(userTable, eq(userTable.id, members.userId))
+        .where(and(eq(members.userId, user.id), isNull(members.removedAt)))
+        .orderBy(asc(organizations.name)),
+    );
+    return c.json(
+      rows.map((row) => ({ organization: toOrganization(row.organization), member: toMember(row) })),
+      200,
+    );
+  });
+
+  app.openapi(listMembers, async (c) => {
+    const { orgId } = c.req.valid("param");
+    const rows = await inOrg(deps, c, orgId, (tx) =>
+      memberWithUser(tx)
+        .where(and(eq(members.orgId, orgId), isNull(members.removedAt)))
+        .orderBy(asc(members.createdAt)),
+    );
+    return c.json(rows.map(toMember), 200);
+  });
+
+  app.openapi(updateMember, async (c) => {
+    const { orgId, memberId } = c.req.valid("param");
+    const { role } = c.req.valid("json");
+    const member = await inOrg(deps, c, orgId, async (tx, caller) => {
+      requireRole(caller, "admin", "change roles");
+      const target = await activeMember(tx, orgId, memberId);
+      if ((target.role === "owner" || role === "owner") && caller.role !== "owner") {
+        throw forbidden("Only Owners can grant or take away the Owner role.");
+      }
+      if (target.kind === "agent" && atLeast(role, "admin")) {
+        throw invalid("An agent can only be a Member or a Guest.");
+      }
+      if (target.role === role) {
+        return loadMember(tx, orgId, memberId);
+      }
+      if (target.role === "owner") {
+        await requireAnotherOwner(tx, orgId, target.id);
+      }
+      await tx.update(members).set({ role }).where(eq(members.id, target.id));
+      await emit(tx, orgId, {
+        type: "member.role_changed",
+        actorId: caller.id,
+        subjectId: target.id,
+        data: { from: target.role, to: role },
+      });
+      return loadMember(tx, orgId, memberId);
+    });
+    return c.json(member, 200);
+  });
+
+  app.openapi(removeMember, async (c) => {
+    const { orgId, memberId } = c.req.valid("param");
+    await inOrg(deps, c, orgId, async (tx, caller) => {
+      const target = await activeMember(tx, orgId, memberId);
+      if (target.id !== caller.id) {
+        requireRole(caller, "admin", "remove members");
+        if (target.role === "owner" && caller.role !== "owner") {
+          throw forbidden("Only Owners can remove an Owner.");
+        }
+      }
+      if (target.role === "owner") {
+        await requireAnotherOwner(tx, orgId, target.id);
+      }
+      await tx.update(members).set({ removedAt: new Date() }).where(eq(members.id, target.id));
+      await tx.delete(teamMembers).where(eq(teamMembers.memberId, target.id));
+      await emit(tx, orgId, { type: "member.removed", actorId: caller.id, subjectId: target.id });
+    });
+    return c.body(null, 204);
+  });
+
+  return app;
+}
+
+// Locks the Owners' rows, so two Owners demoting each other at once cannot
+// leave the organization without one.
+async function requireAnotherOwner(tx: Transaction, orgId: string, ownerId: string) {
+  const owners = await tx
+    .select({ id: members.id })
+    .from(members)
+    .where(and(eq(members.orgId, orgId), eq(members.role, "owner"), isNull(members.removedAt)))
+    .for("update");
+  if (!owners.some((owner) => owner.id !== ownerId)) {
+    throw conflict("An organization needs at least one Owner. Make someone else an Owner first.");
+  }
+}

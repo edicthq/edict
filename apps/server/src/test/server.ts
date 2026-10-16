@@ -63,3 +63,49 @@ async function adminQuery(adminUrl: string, sql: string): Promise<void> {
 export function cookieHeader(response: Response): string {
   return response.headers.getSetCookie().map((entry) => entry.split(";")[0]).join("; ");
 }
+
+export interface ApiResponse<T = any> {
+  status: number;
+  body: T;
+}
+
+// A caller of /api/v1, signed in when given a cookie.
+export function apiClient(baseUrl: string, cookie?: string) {
+  const call = async <T = any>(method: string, path: string, body?: unknown): Promise<ApiResponse<T>> => {
+    const headers: Record<string, string> = {};
+    if (cookie) headers.cookie = cookie;
+    if (body !== undefined) headers["content-type"] = "application/json";
+    const res = await fetch(`${baseUrl}/api/v1${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const text = await res.text();
+    return { status: res.status, body: text ? JSON.parse(text) : undefined };
+  };
+  return {
+    get: <T = any>(path: string) => call<T>("GET", path),
+    post: <T = any>(path: string, body?: unknown) => call<T>("POST", path, body ?? {}),
+    patch: <T = any>(path: string, body: unknown) => call<T>("PATCH", path, body),
+    delete: <T = any>(path: string) => call<T>("DELETE", path),
+  };
+}
+
+export type ApiClient = ReturnType<typeof apiClient>;
+
+// Signs a new user up and returns an API client acting as them.
+export async function signUpAs(
+  baseUrl: string,
+  name: string,
+  email = `${name.toLowerCase()}@example.com`,
+): Promise<ApiClient> {
+  const res = await fetch(`${baseUrl}/api/auth/sign-up/email`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name, email, password: "correct-horse-battery" }),
+  });
+  if (res.status !== 200) {
+    throw new Error(`sign-up failed for ${email}: ${res.status} ${await res.text()}`);
+  }
+  return apiClient(baseUrl, cookieHeader(res));
+}
