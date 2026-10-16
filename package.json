@@ -1,0 +1,19 @@
+{
+  "name": "edict",
+  "private": true,
+  "packageManager": "pnpm@12.4.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "dev": "turbo run dev --parallel",
+    "db:generate": "pnpm --filter @edict/db generate"
+  },
+  "devDependencies": {
+    "turbo": "^2.11.8"
+  }
+}
