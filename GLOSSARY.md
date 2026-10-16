@@ -35,8 +35,16 @@ A human's sign-in identity on an instance. One user can be a member of many orga
 _Avoid_: Account, login
 
 **Agent**:
-A member that is software, created by an admin, with its own name, team access and tokens.
+A member that is software, with its own name, team access and tokens. Created by an admin, or by Edict when a human connects an MCP client.
 _Avoid_: Bot, integration, app, AI user
+
+**Connected agent**:
+An agent Edict creates when a human connects an MCP client through OAuth, named after the client and the human. It can never do more than the human who connected it.
+_Avoid_: OAuth agent, linked agent, personal agent
+
+**Agent runner**:
+A server or automated job outside Edict that operates a client or API key on an agent's behalf, waking on a webhook.
+_Avoid_: Bot server, agent host, runner host
 
 **Actor**:
 The member who performed an event, human or agent.
