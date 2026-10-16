@@ -14,7 +14,8 @@
   D.progress.forEach((p) => (p.id = nextId()));
 
   const S = {
-    dir: params.get('d') === 'C' ? 'C' : 'A',
+    dir: ['A', 'C', 'C2'].includes(params.get('d')) ? params.get('d') : 'A',
+    hue: ['violet', 'lime', 'blue'].includes(params.get('hue')) ? params.get('hue') : 'violet',
     theme: params.get('theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
     view: params.get('view') === 'board' ? 'board' : 'list',
     team: params.get('team') === 'OPS' ? 'OPS' : 'ENG',
@@ -309,6 +310,7 @@
     const html = document.documentElement;
     html.dataset.dir = S.dir;
     html.dataset.theme = S.theme;
+    html.dataset.agent = S.hue;
     document.title = `ENG issues · Edict M0 · ${S.dir}`;
     $('#app').innerHTML = V().shell(E);
     paint();
@@ -388,6 +390,7 @@
 
   function syncUrl() {
     const q = new URLSearchParams({ d: S.dir, theme: S.theme, view: S.view });
+    if (S.dir === 'C2') q.set('hue', S.hue);
     if (S.team !== 'ENG') q.set('team', S.team);
     if (S.peekId) q.set('issue', S.peekId);
     history.replaceState(null, '', `?${q}`);
@@ -465,7 +468,8 @@
   }
 
   function setDir(v) {
-    S.dir = v === 'prev' || v === 'next' || !v ? (S.dir === 'A' ? 'C' : 'A') : v;
+    const order = Object.keys(DIRS), at = order.indexOf(S.dir);
+    S.dir = v === 'prev' ? order[(at + order.length - 1) % order.length] : v === 'next' || !v ? order[(at + 1) % order.length] : v;
     document.documentElement.classList.add('no-tx');
     mount();
     requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.classList.remove('no-tx')));
@@ -529,7 +533,8 @@
       add('View', { label: S.view === 'list' ? 'Switch to board view' : 'Switch to list view', kbd: 'V', run: () => setView() });
       add('View', { label: `Go to ${S.team === 'ENG' ? 'OPS' : 'ENG'} issues`, run: () => setTeam() });
       add('View', { label: S.theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme', kbd: 'T', run: () => setTheme() });
-      add('Prototype', { label: `Show direction ${S.dir === 'A' ? 'C · Agent-native' : 'A · Calm precision'}`, kbd: '\\', run: () => setDir() });
+      Object.entries(DIRS).filter(([k]) => k !== S.dir).forEach(([k, name]) => add('Prototype', { label: `Show direction ${k} · ${name}`, run: () => setDir(k) }));
+      if (S.dir === 'C2') add('Prototype', { label: `Next agent color (now ${S.hue})`, kbd: 'G', run: () => setHue() });
       if (p.query) {
         D.issues.map((i) => ({ i, s: Math.max(fuzzy(p.query, i.id), fuzzy(p.query, i.title)) }))
           
@@ -674,7 +679,14 @@
   }
 
   // ---------- switcher bar ----------
-  const DIRS = { A: 'Calm precision', C: 'Agent-native' };
+  const DIRS = { A: 'Calm precision', C: 'Agent-native', C2: 'Agent-native, conventional' };
+  const HUES = ['violet', 'lime', 'blue'];
+  function setHue(h) {
+    S.hue = h || HUES[(HUES.indexOf(S.hue) + 1) % HUES.length];
+    document.documentElement.dataset.agent = S.hue;
+    renderBar();
+    syncUrl();
+  }
   function renderBar() {
     $('#proto-bar').innerHTML = `
       <span class="pb-tag">M0 prototype</span>
@@ -683,7 +695,8 @@
       <button type="button" data-act="dir" data-v="next" aria-label="Next direction">›</button>
       <span class="pb-sep" aria-hidden="true"></span>
       <button type="button" data-act="theme" class="pb-theme">${S.theme === 'light' ? 'Light' : 'Dark'}</button>
-      <span class="pb-keys"><kbd>\\</kbd> direction <kbd>T</kbd> theme</span>`;
+      ${S.dir === 'C2' ? `<button type="button" data-act="hue" class="pb-theme"><i class="pb-swatch" aria-hidden="true"></i>Agent color: ${S.hue}</button>` : ''}
+      <span class="pb-keys"><kbd>\\</kbd> direction <kbd>T</kbd> theme${S.dir === 'C2' ? ' <kbd>G</kbd> color' : ''}</span>`;
   }
 
   // ---------- input ----------
@@ -719,6 +732,7 @@
       v: () => setView(),
       t: () => setTheme(),
       '\\': () => setDir(),
+      g: () => S.dir === 'C2' && setHue(),
     };
     const fn = keys[e.key];
     if (!fn) return;
@@ -745,6 +759,7 @@
       team: () => setTeam(v),
       theme: () => setTheme(),
       dir: () => setDir(v),
+      hue: () => setHue(),
       undo,
       replay: () => replay(id),
       comment: postComment,
@@ -772,5 +787,5 @@
     setTimeout(() => startRun('ENG-142', 'ferro', 'amirali'), 2500);
   });
 
-  window.EDICT = { S, replay, startRun, open, setDir, setTheme, setView, openPalette };
+  window.EDICT = { S, replay, startRun, open, setDir, setTheme, setView, setHue, openPalette };
 })();

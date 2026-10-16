@@ -4,7 +4,7 @@
    anything an agent didn't do; no motion except live agent work; no radius
    outside 6/12/999. */
 
-:root[data-dir="C"] {
+:root:is([data-dir="C"], [data-dir="C2"]) {
   --font-sans: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-agent: "Martian Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
@@ -68,9 +68,9 @@
   color-scheme: dark;
 }
 
-[data-dir="C"] body { font: 400 var(--t-13)/1.45 var(--font-sans); color: var(--ink); background: var(--bg); --caret: var(--agent); }
-[data-dir="C"] :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: var(--r-1); }
-[data-dir="C"] kbd {
+:is([data-dir="C"], [data-dir="C2"]) body { font: 400 var(--t-13)/1.45 var(--font-sans); color: var(--ink); background: var(--bg); --caret: var(--agent); }
+:is([data-dir="C"], [data-dir="C2"]) :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: var(--r-1); }
+:is([data-dir="C"], [data-dir="C2"]) kbd {
   font: 500 10px/1 var(--font-sans); color: var(--ink-2); background: var(--hover);
   border-radius: 4px; padding: 3px 5px; min-width: 18px; text-align: center; display: inline-block;
 }
@@ -79,11 +79,11 @@
 .c-id { font-size: var(--t-12); font-weight: 500; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .c-key { font: 600 10.5px/1 var(--font-sans); letter-spacing: 0.06em; padding: 4px 6px; border-radius: 4px; background: var(--hover); color: var(--ink); }
 .c-count { font-size: var(--t-12); color: var(--ink-2); font-variant-numeric: tabular-nums; }
-[data-dir="C"] .st { color: var(--ink-3); display: inline-flex; }
-[data-dir="C"] .st-started, [data-dir="C"] .st-done { color: var(--ink); }
-[data-dir="C"] .pri { color: var(--ink-2); display: inline-flex; }
-[data-dir="C"] .pri-0 { color: var(--ink-3); }
-[data-dir="C"] .pri-1 { color: var(--ink); }
+:is([data-dir="C"], [data-dir="C2"]) .st { color: var(--ink-3); display: inline-flex; }
+:is([data-dir="C"], [data-dir="C2"]) .st-started, :is([data-dir="C"], [data-dir="C2"]) .st-done { color: var(--ink); }
+:is([data-dir="C"], [data-dir="C2"]) .pri { color: var(--ink-2); display: inline-flex; }
+:is([data-dir="C"], [data-dir="C2"]) .pri-0 { color: var(--ink-3); }
+:is([data-dir="C"], [data-dir="C2"]) .pri-1 { color: var(--ink); }
 
 /* The agent texture: a fine diagonal hatch. */
 .c-hatch, .c-row.is-live, .c-band, .c-lane, .c-pal.is-agent .c-pal-ctx, .c-mate.is-live {
@@ -123,6 +123,8 @@
   font: 500 10px/1 var(--font-agent); font-stretch: 87.5%; white-space: nowrap;
   color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--line-strong);
 }
+.c-pill { text-transform: lowercase; }
+.c-label i { display: none; }
 .c-pill[data-live] { background: var(--agent); color: var(--on-agent); box-shadow: none; }
 .c-pill[data-live] i { width: 5px; height: 5px; border-radius: var(--r-pill); background: currentColor; }
 @media (prefers-reduced-motion: no-preference) { .c-pill[data-live] i { animation: c-blink 1.2s steps(2) infinite; } }
@@ -142,7 +144,7 @@
 }
 .c-rail-sec { display: flex; flex-direction: column; gap: 2px; }
 .c-rail-h { display: flex; align-items: center; gap: var(--s-2); padding: 0 var(--s-1) var(--s-1); font-size: var(--t-11); font-weight: 600; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.08em; }
-.c-rail-live { margin-inline-start: auto; font: 500 10px/1 var(--font-agent); font-stretch: 87.5%; letter-spacing: 0; text-transform: none; color: var(--agent-ink); }
+.c-rail-live { margin-inline-start: auto; text-transform: none !important; font: 500 10px/1 var(--font-agent); font-stretch: 87.5%; letter-spacing: 0; text-transform: none; color: var(--agent-ink); }
 .c-teamlink { display: flex; align-items: center; gap: var(--s-2); height: 30px; padding: 0 var(--s-2); border-radius: var(--r-1); color: var(--ink-2); }
 .c-teamlink[aria-current="true"] { background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); font-weight: 500; }
 @media (hover: hover) { .c-teamlink:hover { color: var(--ink); } .c-search:hover { color: var(--ink); } }
@@ -214,7 +216,7 @@
 .c-r2 { display: flex; align-items: center; gap: var(--s-2); padding-inline-start: 94px; min-width: 0; }
 .c-r2-name { font: 600 var(--t-11)/1 var(--font-agent); font-stretch: 87.5%; color: var(--agent-ink); }
 .c-r2-msg { font: 400 var(--t-11)/1.3 var(--font-agent); font-stretch: 87.5%; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-[data-dir="C"] [data-flash] { animation: c-flash 1.6s var(--ease); }
+:is([data-dir="C"], [data-dir="C2"]) [data-flash] { animation: c-flash 1.6s var(--ease); }
 @keyframes c-flash { from { background-color: var(--agent-wash); } }
 
 /* ---------- board ---------- */
@@ -265,10 +267,10 @@ button.c-chip:focus-visible kbd { display: inline-block; }
 .c-chips .c-label { font-size: var(--t-12); padding: 5px 10px; }
 
 .c-desc { font-size: var(--t-14); line-height: 1.62; max-width: 68ch; }
-[data-dir="C"] .md code { font: 600 0.86em var(--font-sans); background: var(--hover); padding: 1px 5px; border-radius: 4px; }
-[data-dir="C"] .md h3, [data-dir="C"] .md h4, [data-dir="C"] .md h5 { font-size: var(--t-16); font-weight: 600; letter-spacing: -0.01em; margin-top: 1.3em; }
-[data-dir="C"] .md-mention { font-weight: 600; }
-[data-dir="C"] .md-ref { font-weight: 600; }
+:is([data-dir="C"], [data-dir="C2"]) .md code { font: 600 0.86em var(--font-sans); background: var(--hover); padding: 1px 5px; border-radius: 4px; }
+:is([data-dir="C"], [data-dir="C2"]) .md h3, :is([data-dir="C"], [data-dir="C2"]) .md h4, :is([data-dir="C"], [data-dir="C2"]) .md h5 { font-size: var(--t-16); font-weight: 600; letter-spacing: -0.01em; margin-top: 1.3em; }
+:is([data-dir="C"], [data-dir="C2"]) .md-mention { font-weight: 600; }
+:is([data-dir="C"], [data-dir="C2"]) .md-ref { font-weight: 600; }
 
 .c-sec { margin-top: var(--s-8); }
 .c-sec > h2 { display: flex; gap: var(--s-2); align-items: baseline; font-size: var(--t-14); font-weight: 600; margin-bottom: var(--s-2); }
@@ -363,10 +365,10 @@ button.c-chip:focus-visible kbd { display: inline-block; }
 .c-create-foot { display: flex; align-items: center; gap: var(--s-2); padding: 10px var(--s-3) 10px var(--s-4); border-top: 1px solid var(--line); }
 
 /* ---------- toast ---------- */
-[data-dir="C"] #toast { position: fixed; right: var(--s-5); bottom: var(--s-5); z-index: 60; }
-[data-dir="C"] .toast {
+:is([data-dir="C"], [data-dir="C2"]) #toast { position: fixed; right: var(--s-5); bottom: var(--s-5); z-index: 60; }
+:is([data-dir="C"], [data-dir="C2"]) .toast {
   display: flex; align-items: center; gap: var(--s-3); padding: 10px 10px 10px 14px; border-radius: var(--r-2);
   background: var(--surface); box-shadow: var(--overlay-shadow); outline: 1px solid var(--line); font-size: var(--t-13);
 }
-[data-dir="C"] .toast button { padding: 4px 8px; border-radius: var(--r-1); font-weight: 600; display: inline-flex; gap: 6px; align-items: center; background: var(--hover); }
-@media (prefers-reduced-motion: no-preference) { [data-dir="C"] .toast { animation: c-rise var(--d-2) var(--ease); } }
+:is([data-dir="C"], [data-dir="C2"]) .toast button { padding: 4px 8px; border-radius: var(--r-1); font-weight: 600; display: inline-flex; gap: 6px; align-items: center; background: var(--hover); }
+@media (prefers-reduced-motion: no-preference) { :is([data-dir="C"], [data-dir="C2"]) .toast { animation: c-rise var(--d-2) var(--ease); } }

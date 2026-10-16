@@ -6,7 +6,7 @@
 (() => {
   const esc = (s) => window.E.esc(s);
   const slug = (s) => String(s || 'idle').replace(/\s+/g, '-');
-  const STATE = { working: 'working', blocked: 'blocked', 'needs input': 'needs input', done: 'done', null: 'delegated' };
+  const STATE = { working: 'Working', blocked: 'Blocked', 'needs input': 'Needs input', done: 'Done', null: 'Delegated' };
 
   const human = (m, cls = '') => !m
     ? `<span class="c-av c-av-none ${cls}" title="Unassigned" aria-label="Unassigned"></span>`
@@ -20,7 +20,7 @@
   const prIcon = `<svg viewBox="0 0 14 14" width="13" height="13" aria-hidden="true"><circle cx="3.5" cy="3" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="3.5" cy="11" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="10.5" cy="11" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M3.5 4.6v4.8M10.5 9.4V6.5A2 2 0 0 0 8.5 4.5H6.5M7.8 3 6.3 4.5 7.8 6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const links = (p) => (p.links || []).map((l) => `<a class="c-prchip" href="#pr">${prIcon}<span>${esc(l.title)}</span></a>`).join('');
 
-  const labelsHtml = (E, i) => E.labels(i).map((l) => `<span class="c-label">${esc(l.name)}</span>`).join('');
+  const labelsHtml = (E, i) => E.labels(i).map((l) => `<span class="c-label" style="--h:${l.hue}"><i aria-hidden="true"></i>${esc(l.name)}</span>`).join('');
 
   const people = (E, i, info) => `<span class="c-people">${human(E.member(i.assignee))}${info ? hex(info.agent, info.live) : ''}</span>`;
 
@@ -175,7 +175,7 @@
         return `<li class="c-mate is-agent ${live ? 'is-live' : ''}">
           <div class="c-mate-h">${hex(a, live)}<b>${a.name}</b><span class="c-sp"></span>${live ? pill('working', true) : now.waiting.length ? pill(now.waiting[0].info.state) : '<span class="c-idle">idle</span>'}</div>
           ${now.live.map((i) => `<button type="button" class="c-mate-issue" data-act="open" data-id="${i.id}"><span class="c-id">${i.id}</span><span class="c-t">${E.mdInline(i.title)}</span></button>`).join('')}
-          ${now.waiting.map((x) => `<button type="button" class="c-mate-issue is-waiting" data-act="open" data-id="${x.issue.id}"><span class="c-id">${x.issue.id}</span><span class="c-t">${x.info.state}</span></button>`).join('')}
+          ${now.waiting.map((x) => `<button type="button" class="c-mate-issue is-waiting" data-act="open" data-id="${x.issue.id}"><span class="c-id">${x.issue.id}</span><span class="c-t">${STATE[x.info.state]}</span></button>`).join('')}
           ${latest ? `<p class="c-mate-msg" data-reveal="${latest.id}:rail">${E.mdInline(firstLine(latest.msg))}</p>` : ''}
         </li>`;
       }).join('');
@@ -317,6 +317,9 @@
       </form></div>`;
     },
   };
+
+  // C2: the same structure, restyled to be more conventional (see c2.css).
+  window.VARIANTS.C2 = { ...window.VARIANTS.C, name: 'Agent-native, conventional' };
 
   const D = () => window.EDICT_DATA;
 })();

@@ -59,3 +59,4 @@ svg { display: block; flex: none; }
 #proto-bar .pb-theme { background: #222; }
 #proto-bar .pb-keys { color: #9a9a9a; padding: 0 8px; white-space: nowrap; }
 #proto-bar kbd { color: #d4d4d4; background: #262626; border-radius: 4px; padding: 2px 5px; margin: 0 2px; }
+#proto-bar .pb-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-inline-end: 6px; background: var(--agent); vertical-align: -1px; }
