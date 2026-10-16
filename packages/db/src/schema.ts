@@ -1,6 +1,8 @@
 import { sql } from "drizzle-orm";
 import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
+export * from "./auth-schema.js";
+
 // The tenant root. Tables owned by an organization carry org_id and rely on
 // row-level security; that enforcement arrives with its own migration.
 export const organizations = pgTable("organizations", {

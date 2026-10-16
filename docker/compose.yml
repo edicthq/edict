@@ -20,6 +20,7 @@ services:
       dockerfile: docker/Dockerfile
     environment:
       DATABASE_URL: postgres://edict:edict@db:5432/edict
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-insecure-default-change-me}
     depends_on:
       db:
         condition: service_healthy
