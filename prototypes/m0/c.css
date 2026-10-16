@@ -153,10 +153,14 @@
 .c-mate.is-agent { flex-direction: column; align-items: stretch; gap: 6px; padding: var(--s-2); border-radius: var(--r-2); box-shadow: inset 0 0 0 1px var(--line); background-color: var(--surface); }
 .c-mate.is-live { box-shadow: inset 0 0 0 1px var(--agent-edge); }
 .c-mate-h { display: flex; align-items: center; gap: var(--s-2); }
-.c-mate-h b { font: 600 var(--t-12)/1 var(--font-agent); font-stretch: 87.5%; }
+.c-mate-h b { font: 600 var(--t-12)/1 var(--font-agent); font-stretch: 87.5%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.c-mate-conn { margin-top: -2px; }
+.c-mate-conn .c-id { font-size: 10.5px; }
+.c-mate-pick { font: 400 10.5px/1.4 var(--font-agent); font-stretch: 87.5%; color: var(--ink-2); }
 .c-idle { font: 400 10px/1 var(--font-agent); color: var(--ink-3); }
 .c-mate-issue { display: flex; gap: 6px; align-items: baseline; min-width: 0; font-size: var(--t-12); padding: 2px 0; }
 .c-mate-issue .c-t { font-size: var(--t-12); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+.c-mate-issue.is-queued .c-t { color: var(--ink-2); }
 .c-mate-issue.is-waiting .c-t { color: var(--ink); font-weight: 600; }
 .c-mate-msg {
   font: 400 10.5px/1.5 var(--font-agent); font-stretch: 87.5%; color: var(--ink-2);
@@ -296,7 +300,7 @@ button.c-chip:focus-visible kbd { display: inline-block; }
 .c-lane-h { display: flex; align-items: center; gap: 10px; padding: var(--s-4) var(--s-4) var(--s-2); }
 .c-lane-who { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .c-lane-who b { font: 600 var(--t-14)/1 var(--font-agent); font-stretch: 87.5%; }
-.c-lane-who span { font-size: var(--t-12); color: var(--ink-2); }
+.c-lane-who span { font-size: var(--t-12); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .c-lane-sub { display: flex; align-items: center; gap: 4px; padding: 0 var(--s-3) var(--s-2) var(--s-4); font-size: var(--t-12); color: var(--ink-2); border-bottom: 1px solid var(--line); }
 .c-stream { flex: 1; overflow-y: auto; padding: var(--s-4) var(--s-4) var(--s-6); display: flex; flex-direction: column; gap: var(--s-4); position: relative; }
 .c-pu, .c-pu-ev, .c-thinking { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 10px; position: relative; }
@@ -325,6 +329,20 @@ button.c-chip:focus-visible kbd { display: inline-block; }
 .c-lane.is-empty { justify-content: center; }
 .c-lane-empty { padding: var(--s-6); display: flex; flex-direction: column; gap: var(--s-3); color: var(--ink-2); }
 .c-lane-kicker { font: 600 10px/1 var(--font-agent); text-transform: uppercase; letter-spacing: 0.08em; color: var(--agent-ink); }
+/* The prompt to copy into any connected MCP client. */
+.c-ask { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: var(--r-2); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
+.c-ask-label { font-size: var(--t-12); color: var(--ink-2); }
+.c-ask-line { display: flex; align-items: center; gap: 6px; }
+.c-ask-line code {
+  flex: 1 1 auto; font: 500 var(--t-12)/1 var(--font-code, ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace);
+  color: var(--ink); background: var(--hover); border-radius: 4px; padding: 5px 7px; white-space: nowrap; overflow: hidden;
+}
+.c-ask-line .c-ghost { flex: none; }
+.c-connect {
+  width: fit-content; font-size: var(--t-12); color: var(--ink); font-weight: 500;
+  text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line-strong);
+}
+@media (hover: hover) { .c-connect:hover { text-decoration-color: var(--ink); } }
 .c-lane-agents { display: flex; flex-direction: column; gap: var(--s-2); }
 .c-lane-agent { display: flex; gap: 10px; align-items: center; padding: 10px; border-radius: var(--r-2); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); text-align: start; }
 .c-lane-agent b { display: block; font: 600 var(--t-12)/1.3 var(--font-agent); font-stretch: 87.5%; color: var(--ink); }

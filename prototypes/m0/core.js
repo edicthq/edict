@@ -50,6 +50,11 @@
     member: (id) => D.members.find((m) => m.id === id) || null,
     humans: () => D.members.filter((m) => m.kind === 'human'),
     agents: () => D.members.filter((m) => m.kind === 'agent'),
+    // How an agent connects: an MCP client the human connected, or a runner
+    // with an API key and a webhook that starts work right away.
+    connect: (m) => m.connected
+      ? { kind: 'connected', label: `connected by ${E.member(m.connectedBy).short}`, start: 'picks up work when asked' }
+      : { kind: 'runner', label: 'runner', start: 'starts right away' },
     team: (key) => D.teams.find((t) => t.key === key),
     issue: (id) => D.issues.find((i) => i.id === id) || null,
     status: (issue) => allStatuses.find((s) => s.id === issue.status),
@@ -103,11 +108,16 @@
     },
     liveIssues: () => D.issues.filter((i) => S.runs[i.id] && S.runs[i.id].active),
     agentNow(agentId) {
+      const agent = E.member(agentId);
       const live = E.liveIssues().filter((i) => i.delegate === agentId);
-      const waiting = D.issues.filter((i) => i.delegate === agentId && !live.includes(i))
-        .map((i) => ({ issue: i, info: E.agentInfo(i) }))
-        .filter((x) => x.info.state === 'needs input' || x.info.state === 'blocked');
-      return { live, waiting };
+      const mine = D.issues.filter((i) => i.delegate === agentId && !live.includes(i))
+        .map((i) => ({ issue: i, info: E.agentInfo(i) }));
+      const waiting = mine.filter((x) => x.info.state === 'needs input' || x.info.state === 'blocked');
+      // Queued: delegated but never picked up. Only its human asking wakes a
+      // connected agent, so connected agents show their queue; runners start
+      // right away, so they have none.
+      const queued = agent.connected ? mine.filter((x) => !waiting.includes(x) && !x.info.latest) : [];
+      return { live, waiting, queued };
     },
     flashing: (id) => S.flash[id] && Date.now() - S.flash[id] < 1600,
     ago(ts) {
@@ -183,7 +193,10 @@
     stopRun(id);
     issue.delegate = agentId;
     addEvent(id, 'amirali', agentId ? `delegated to ${E.member(agentId).short}` : 'removed the delegate');
-    if (agentId) setTimeout(() => startRun(id, agentId, 'amirali'), 900);
+    // Delegating puts the issue in the agent's queue. Only a runner with a
+    // webhook starts right away; a connected agent picks it up when its human
+    // asks, so nothing runs until then.
+    if (agentId && !E.member(agentId).connected) setTimeout(() => startRun(id, agentId, 'amirali'), 900);
     return () => { stopRun(id); issue.delegate = prev; };
   }
 
@@ -295,10 +308,13 @@
       const first = D.progress.filter((p) => p.issueId === id)[0];
       const run = (S.runs[id] = { agent: a.agent, startedAt: first ? first.at : Date.now(), active: true, timers: [], ambient: true });
       let n = 0;
+      // One pass through the message list, then the run goes quiet.
       run.interval = setInterval(() => {
+        if (n >= a.msgs.length) { clearInterval(run.interval); run.interval = null; run.active = false; return; }
         const issue = E.issue(id);
         if (issue.delegate !== a.agent || E.status(issue).category !== 'started') return;
-        D.progress.push({ id: nextId(), issueId: id, agent: a.agent, state: 'working', msg: a.msgs[n++ % a.msgs.length], at: Date.now(), live: true });
+        D.progress.push({ id: nextId(), issueId: id, agent: a.agent, state: 'working', msg: a.msgs[n++], at: Date.now(), live: true });
+        if (n >= a.msgs.length) { clearInterval(run.interval); run.interval = null; run.active = false; }
         paint();
       }, a.every + Math.random() * 2000);
     }
@@ -523,10 +539,13 @@
         sub: a === 'violet' ? 'Default' : '', run: () => setAccent(a),
       }));
     } else if (p.mode === 'delegate') {
-      E.agents().forEach((m) => add('Delegate to an agent', {
-        label: m.name, sub: m.about, member: m, agent: true, current: issue.delegate === m.id,
-        run: () => act(setDelegate(issue.id, m.id), `${issue.id} delegated to ${m.name}`),
-      }));
+      E.agents().forEach((m) => {
+        const c = E.connect(m);
+        add('Delegate to an agent', {
+          label: m.name, sub: `${c.label} · ${c.start}`, member: m, agent: true, current: issue.delegate === m.id,
+          run: () => act(setDelegate(issue.id, m.id), `${issue.id} delegated to ${m.name}`),
+        });
+      });
       if (issue.delegate) add('Delegate to an agent', { label: 'Remove delegate', run: () => act(setDelegate(issue.id, null), `Removed the delegate from ${issue.id}`) });
     } else {
       if (issue) {
@@ -773,6 +792,14 @@
       replay: () => replay(id),
       comment: postComment,
       'pal-item': () => runItem(+ix),
+      'copy-ask': () => {
+        const ask = `work on ${id}`;
+        const done = () => toast(`Copied “${ask}” — paste it into any agent connected to Edict`);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(ask).then(done, () => toast('Could not copy — select the text instead'));
+        } else done();
+      },
+      'connect-docs': () => toast('The “Connect your agent” docs ship with v1 (stub)'),
       backdrop: () => { if (e.target === el) { S.palette ? closePalette() : closeCreate(); } },
     };
     if (!actions[a]) return;

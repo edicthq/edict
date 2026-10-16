@@ -23,7 +23,11 @@ URL params: `?d=C2|A|C&theme=light|dark&accent=violet|blue|teal|pink|lime&view=l
 
 ## The agent run
 
-Ferro starts working on ENG-142 2.5 seconds after load. It posts progress updates, closes sub-issue ENG-143, links PR #318 and moves the issue to In Review after about 26 seconds. Choose "Replay agent run" in the peek or the palette to watch it again. Delegating any other issue with `d` starts a shorter run. ENG-141 (Ferro) and OPS-31 (Sable) post slow background updates the whole time.
+Ferro (a runner agent) starts working on ENG-142 2.5 seconds after load. It posts progress updates, closes sub-issue ENG-143, links PR #318 and moves the issue to In Review after about 26 seconds. Choose "Replay agent run" in the peek or the palette to watch it again. Delegating any other issue to a runner agent with `d` starts a shorter run.
+
+**Claude Code (Amirali)** is an OAuth-connected agent (see the "Agents are members" section of the plan). Delegating `d` to it queues the issue and shows "Waiting for Claude Code to pick it up" in the row's second line, its rail card and the agent lane; no run starts until you ask the agent. Delegating to Ferro or Sable still starts the scripted run, since they are runner agents. Wherever you pick a delegate, each agent reads "connected by Amirali · picks up work when asked" or "runner · starts right away".
+
+An issue with no agent shows the lane's empty state: "Ask any agent connected to Edict: *work on ENG-129*", a copy button for that phrase and a "Connect your agent" link (stub). ENG-141 (Ferro) and OPS-31 (Sable) post slow background updates — one pass each, then their runs go quiet.
 
 ## Directions
 
@@ -32,4 +36,4 @@ Ferro starts working on ENG-142 2.5 seconds after load. It posts progress update
 
 - **C2, Agent-native, conventional.** C's structure (agents in the rail, the agent's latest words on rows, the agent lane) restyled for business users: one sans, monospace only for code, rounded-square agent avatars, no hatch, sentence case, soft badges with amber for "needs input" and red for "blocked", colored label dots. Violet is the default accent. Users can switch to blue, teal, pink or lime under Appearance in the sidebar or with "Change accent color…" in `⌘K`.
 
-`screenshots/` has both directions side by side in light and dark for each screen (`compare-*`), C2 in each agent color (`c2-*`), and the chosen design (`chosen-*`).
+`screenshots/` has both directions side by side in light and dark for each screen (`compare-*`), C2 in each agent color (`c2-*`), the chosen design (`chosen-*`), and the connected-agent queue in light and dark, plus the empty lane and the delegate picker (`c2-connected-*`).

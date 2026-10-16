@@ -4,13 +4,19 @@
   const now = Date.now();
   const ago = (ms) => now - ms;
 
+  // kind 'agent': `connected` means a human connected an MCP client through OAuth
+  // (seeded here as "Claude Code (Amirali)"). Runner agents (a server running
+  // Claude Code headless here) get admin-issued API keys and a webhook.
   const members = [
     { id: 'amirali', kind: 'human', name: 'Amirali Beigi', short: 'Amirali', initials: 'AB', hue: 250 },
     { id: 'noor', kind: 'human', name: 'Noor Haddad', short: 'Noor', initials: 'NH', hue: 20 },
     { id: 'theo', kind: 'human', name: 'Theo Lindqvist', short: 'Theo', initials: 'TL', hue: 160 },
-    { id: 'ferro', kind: 'agent', name: 'Ferro', short: 'Ferro', initials: 'Fe', glyph: 'Fe',
+    { id: 'claude-code', kind: 'agent', name: 'Claude Code (Amirali)', short: 'Claude Code', initials: 'CC', glyph: 'CC',
+      connected: true, connectedBy: 'amirali', client: 'Claude Code',
+      about: 'MCP client connected by Amirali. Picks up delegated work when asked.' },
+    { id: 'ferro', kind: 'agent', name: 'Ferro', short: 'Ferro', initials: 'Fe', glyph: 'Fe', runner: true,
       about: 'Coding agent. Works ENG issues end to end and opens pull requests.' },
-    { id: 'sable', kind: 'agent', name: 'Sable', short: 'Sable', initials: 'Sa', glyph: 'Sa',
+    { id: 'sable', kind: 'agent', name: 'Sable', short: 'Sable', initials: 'Sa', glyph: 'Sa', runner: true,
       about: 'Ops agent. Runs runbooks, watches deploys and triages alerts.' },
   ];
 
@@ -177,7 +183,8 @@ Plan:
     ],
   };
 
-  // Slow background updates so the rest of the world stays alive.
+  // Slow background updates so the rest of the world stays alive. Each issue
+  // runs through its messages once, then stops (core.js drains the list).
   const ambient = {
     'ENG-141': { agent: 'ferro', every: 11000, msgs: [
       'Added `resolveStatus(team, value)` that accepts a name or a category.',

@@ -26,12 +26,20 @@
 
   // Second line of a delegated row: the agent's voice, live.
   function agentLine(E, info) {
-    if (!info || !(info.live || info.state === 'needs input' || info.state === 'blocked')) return '';
+    if (!info) return '';
+    const live = !!info.live;
+    const holding = info.state === 'needs input' || info.state === 'blocked';
+    // Queued: delegated to a connected agent that its human has not asked yet.
+    const queued = !live && !holding && info.agent.connected && (!info.latest || info.latest.state === 'done');
+    if (!live && !holding && !queued) return '';
     const p = info.latest;
+    const msg = queued
+      ? `Waiting for ${info.agent.client} to pick it up`
+      : p ? E.mdInline(firstLine(p.msg)) : 'Starting…';
     return `<span class="c-r2">
-      <span class="c-r2-name">${info.agent.name}</span>${pill(info.state, info.live)}
-      ${info.live ? `<span class="c-clock" data-since="${info.since}">${E.clock(info.since)}</span>` : ''}
-      ${p ? `<span class="c-r2-msg" data-reveal="${p.id}:row">${E.mdInline(firstLine(p.msg))}</span>` : '<span class="c-r2-msg">Starting…</span>'}
+      <span class="c-r2-name">${info.agent.short}</span>${pill(info.state, live)}
+      ${live ? `<span class="c-clock" data-since="${info.since}">${E.clock(info.since)}</span>` : ''}
+      <span class="c-r2-msg" ${!queued && p ? `data-reveal="${p.id}:row"` : ''}>${msg}</span>
     </span>`;
   }
 
@@ -96,14 +104,27 @@
       return `<aside class="c-lane is-empty" aria-label="Agent lane">
         <div class="c-lane-empty">
           <p class="c-lane-kicker">Agent lane</p>
-          <p>No agent on this issue. Delegate it and the agent's progress streams here, live, while ${E.member(i.assignee) ? E.member(i.assignee).short : 'the assignee'} stays accountable.</p>
-          <div class="c-lane-agents">${E.agents().map((a) => `<button type="button" class="c-lane-agent" data-act="delegate" data-id="${i.id}">${hex(a, false)}<span><b>${a.name}</b><small>${esc(a.about)}</small></span></button>`).join('')}</div>
+          <p>No agent on this issue yet. Delegate it and the agent's progress streams here, live, while ${E.member(i.assignee) ? E.member(i.assignee).short : 'the assignee'} stays accountable.</p>
+          <div class="c-ask">
+            <p class="c-ask-label">Ask any agent connected to Edict:</p>
+            <div class="c-ask-line">
+              <code>work on ${i.id}</code>
+              <button type="button" class="c-ghost" data-act="copy-ask" data-id="${i.id}">Copy</button>
+            </div>
+          </div>
+          <a class="c-connect" href="#" data-act="connect-docs">Connect your agent</a>
+          <div class="c-lane-agents">${E.agents().map((a) => {
+            const c = E.connect(a);
+            return `<button type="button" class="c-lane-agent" data-act="delegate" data-id="${i.id}">${hex(a, false)}<span><b>${a.name}</b><small>${c.label} · ${c.start}</small></span></button>`;
+          }).join('')}</div>
           <p class="c-hint">Press <kbd>D</kbd> to delegate</p>
         </div>
       </aside>`;
     }
     const { agent, live, state } = info;
+    const conn = E.connect(agent);
     const obo = info.onBehalfOf && E.member(info.onBehalfOf);
+    const queued = !live && info.agent.connected && (!info.latest || info.latest.state === 'done');
     const items = [
       ...E.progress(i).map((p) => ({ kind: 'p', ...p })),
       ...E.events(i).filter((e) => E.member(e.actor).kind === 'agent').map((e) => ({ kind: 'e', ...e })),
@@ -113,13 +134,15 @@
         ${hex(agent, live, 'is-lg')}
         <div class="c-lane-who">
           <b>${agent.name}</b>
-          <span>${obo ? `on behalf of ${obo.short}` : esc(agent.about.split('.')[0])}</span>
+          <span>${obo ? `on behalf of ${obo.short}` : conn.kind === 'connected' ? `${agent.client}, connected by ${E.member(agent.connectedBy).short}` : esc(agent.about.split('.')[0])}</span>
         </div>
         <span class="c-sp"></span>
         ${pill(state, live)}
       </header>
       <div class="c-lane-sub">
-        ${live ? `<span>run time <span class="c-clock" data-since="${info.since}">${E.clock(info.since)}</span></span>` : `<span>${info.latest ? `last update ${E.ago(info.latest.at)} ago` : 'waiting for the runner'}</span>`}
+        ${live ? `<span>run time <span class="c-clock" data-since="${info.since}">${E.clock(info.since)}</span></span>`
+          : queued ? `<span>Waiting for ${agent.client} to pick it up</span>`
+          : info.latest ? `<span>last update ${E.ago(info.latest.at)} ago</span>` : `<span>waiting for the runner</span>`}
         <span class="c-sp"></span>
         ${info.hasScript ? `<button type="button" class="c-ghost" data-act="replay" data-id="${i.id}">Replay run</button>` : ''}
         <button type="button" class="c-ghost" data-act="delegate" data-id="${i.id}">Change <kbd>D</kbd></button>
@@ -172,9 +195,13 @@
         const now = E.agentNow(a.id);
         const latest = now.live.flatMap((i) => E.progress(i)).sort((x, y) => y.at - x.at)[0];
         const live = now.live.length > 0;
+        const conn = E.connect(a);
         return `<li class="c-mate is-agent ${live ? 'is-live' : ''}">
-          <div class="c-mate-h">${hex(a, live)}<b>${a.name}</b><span class="c-sp"></span>${live ? pill('working', true) : now.waiting.length ? pill(now.waiting[0].info.state) : '<span class="c-idle">idle</span>'}</div>
+          <div class="c-mate-h">${hex(a, live)}<b title="${a.name}">${a.name}</b><span class="c-sp"></span>${live ? pill('working', true) : now.waiting.length ? pill(now.waiting[0].info.state) : '<span class="c-idle">idle</span>'}</div>
+          <div class="c-mate-conn"><span class="c-id">${conn.label}</span></div>
+          ${live ? '' : `<p class="c-mate-pick">${conn.start}</p>`}
           ${now.live.map((i) => `<button type="button" class="c-mate-issue" data-act="open" data-id="${i.id}"><span class="c-id">${i.id}</span><span class="c-t">${E.mdInline(i.title)}</span></button>`).join('')}
+          ${now.queued.map((x) => `<button type="button" class="c-mate-issue is-queued" data-act="open" data-id="${x.issue.id}"><span class="c-id">${x.issue.id}</span><span class="c-t">Waiting for ${a.client} to pick it up</span></button>`).join('')}
           ${now.waiting.map((x) => `<button type="button" class="c-mate-issue is-waiting" data-act="open" data-id="${x.issue.id}"><span class="c-id">${x.issue.id}</span><span class="c-t">${STATE[x.info.state]}</span></button>`).join('')}
           ${latest ? `<p class="c-mate-msg" data-reveal="${latest.id}:rail">${E.mdInline(firstLine(latest.msg))}</p>` : ''}
         </li>`;
