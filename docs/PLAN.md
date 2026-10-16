@@ -253,7 +253,7 @@ The chosen direction becomes design tokens in `packages/ui` before any product U
 |---|---|---|
 | GitHub org | `edicthq` | Free, reserve now |
 | Domain | `edict.dev` | Free, reserve now |
-| npm scope | `@edict` | Free, reserve now. The unscoped `edict` package is taken |
+| npm scope | `@edicthq` | Free, reserve now. `@edict` belongs to an unrelated reactive-programming library, and the unscoped `edict` package is taken |
 | Docker image | `ghcr.io/edicthq/edict` | Comes with the org |
 | CLI command | `edict` | |
 | MCP resource scheme | `edict://` | |
