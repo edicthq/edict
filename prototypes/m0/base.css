@@ -1,0 +1,61 @@
+/* PROTOTYPE (M0). Resets shared by both directions, plus the switcher bar,
+   which is deliberately styled unlike either direction. */
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body { overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: inherit; }
+input, textarea { font: inherit; color: inherit; }
+h1, h2, h3, h4, h5, p, ol, ul, dl, dd { margin: 0; padding: 0; }
+ol, ul { list-style: none; }
+kbd { font-family: inherit; }
+svg { display: block; flex: none; }
+[hidden] { display: none !important; }
+.no-tx *, .no-tx *::before, .no-tx *::after { transition: none !important; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.skip { position: absolute; left: 8px; top: -40px; z-index: 100; padding: 8px 12px; background: #000; color: #fff; border-radius: 6px; }
+.skip:focus { top: 8px; }
+
+#app { height: 100%; }
+
+/* Markdown, shared structure. Directions set the type. */
+.md > * + * { margin-top: 0.7em; }
+.md ul, .md ol { padding-inline-start: 1.3em; }
+.md ul { list-style: disc; }
+.md ol { list-style: decimal; }
+.md li + li { margin-top: 0.2em; }
+.md ul.md-tasks { list-style: none; padding-inline-start: 0; }
+.md-tasks li { display: flex; gap: 8px; align-items: baseline; }
+.md-check { flex: none; width: 12px; height: 12px; border: 1.5px solid currentColor; border-radius: 3px; opacity: .5; transform: translateY(1px); }
+.md-tasks li.is-done { color: var(--ink-2); text-decoration: line-through; text-decoration-thickness: 1px; }
+.md-tasks li.is-done .md-check { background: currentColor; }
+.md pre { overflow-x: auto; }
+.md a { color: inherit; text-underline-offset: 2px; text-decoration-thickness: 1px; }
+
+/* Typing caret for streaming progress updates. */
+.is-typing > :last-child::after, .is-typing:not(:has(> *))::after {
+  content: ""; display: inline-block; width: 0.5em; height: 1em; margin-inline-start: 2px;
+  vertical-align: -0.15em; background: var(--caret, currentColor); animation: caret 1s steps(1) infinite;
+}
+@keyframes caret { 50% { opacity: 0; } }
+
+/* ---------- switcher bar (not part of either design) ---------- */
+#proto-bar {
+  position: fixed; left: 50%; bottom: 44px; transform: translateX(-50%); z-index: 90;
+  display: flex; align-items: center; gap: 4px; padding: 4px 6px 4px 12px;
+  font: 500 12px/1 ui-sans-serif, -apple-system, system-ui, sans-serif; letter-spacing: 0;
+  color: #f5f5f5; background: #111; border-radius: 999px;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / .12), 0 6px 20px rgb(0 0 0 / .3);
+}
+#proto-bar .pb-tag { color: #fde047; margin-inline-end: 6px; text-transform: uppercase; letter-spacing: .06em; font-size: 10px; }
+#proto-bar button { min-width: 28px; height: 28px; border-radius: 999px; padding: 0 10px; color: #f5f5f5; }
+#proto-bar button:hover { background: #2a2a2a; }
+#proto-bar button:focus-visible { outline: 2px solid #fde047; outline-offset: 1px; }
+#proto-bar .pb-label { min-width: 132px; text-align: center; }
+#proto-bar .pb-label b { color: #fde047; margin-inline-end: 4px; }
+#proto-bar .pb-sep { width: 1px; height: 16px; background: #333; margin: 0 4px; }
+#proto-bar .pb-theme { background: #222; }
+#proto-bar .pb-keys { color: #9a9a9a; padding: 0 8px; white-space: nowrap; }
+#proto-bar kbd { color: #d4d4d4; background: #262626; border-radius: 4px; padding: 2px 5px; margin: 0 2px; }

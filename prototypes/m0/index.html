@@ -1,0 +1,35 @@
+<!doctype html>
+<!--
+  PROTOTYPE (M0). Throwaway. Answers one question: which visual direction does
+  Edict take, A "Calm precision" or C "Agent-native"? Same three screens in both
+  (issue list/board, issue peek with a live agent run, command palette),
+  switchable with the bar at the bottom or ?d=A|C&theme=light|dark.
+  No backend, no persistence. Reload to reset.
+-->
+<html lang="en" data-dir="A" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Edict M0 prototype</title>
+  <link rel="icon" href="data:,">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Instrument+Sans:wdth,wght@75..100,400..700&family=Martian+Mono:wdth,wght@75..112.5,300..600&display=swap">
+  <link rel="stylesheet" href="base.css">
+  <link rel="stylesheet" href="a.css">
+  <link rel="stylesheet" href="c.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to issues</a>
+  <div id="app"></div>
+  <div id="palette" hidden></div>
+  <div id="modal" hidden></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <div id="proto-bar" role="toolbar" aria-label="Prototype switcher"></div>
+  <script src="data.js"></script>
+  <script src="md.js"></script>
+  <script src="core.js"></script>
+  <script src="a.js"></script>
+  <script src="c.js"></script>
+</body>
+</html>
