@@ -83,6 +83,8 @@ export const issues = pgTable(
     priority: priority("priority").notNull().default("none"),
     estimate: integer("estimate"),
     assigneeId: uuid("assignee_id"),
+    // Makes this a sub-issue. The parent can be in any team.
+    parentId: uuid("parent_id"),
     creatorId: uuid("creator_id").notNull(),
     version: version(),
     // The version that last changed each field. A field missing here has not
@@ -95,6 +97,8 @@ export const issues = pgTable(
     unique("issues_org_id_id_unique").on(table.orgId, table.id),
     unique("issues_team_id_number_unique").on(table.teamId, table.number),
     index("issues_assignee_id_idx").on(table.assigneeId),
+    index("issues_parent_id_idx").on(table.parentId),
+    check("issues_not_own_parent", sql`${table.parentId} <> ${table.id}`),
     check("issues_estimate_not_negative", sql`${table.estimate} >= 0`),
     foreignKey({
       name: "issues_team_fk",
@@ -111,6 +115,11 @@ export const issues = pgTable(
       name: "issues_assignee_fk",
       columns: [table.orgId, table.assigneeId],
       foreignColumns: [members.orgId, members.id],
+    }),
+    foreignKey({
+      name: "issues_parent_fk",
+      columns: [table.orgId, table.parentId],
+      foreignColumns: [table.orgId, table.id],
     }),
     foreignKey({
       name: "issues_creator_fk",
@@ -140,5 +149,100 @@ export const issueNumbers = pgTable(
       columns: [table.orgId, table.teamId],
       foreignColumns: [teams.orgId, teams.id],
     }).onDelete("cascade"),
+  ],
+);
+
+// A label for the whole organization (no team) or for one team. One name means
+// one label: a team label never shares its name with an organization label,
+// so "bug" is never ambiguous for an agent.
+export const labels = pgTable(
+  "labels",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull(),
+    teamId: uuid("team_id"),
+    name: text("name").notNull(),
+    // The dot's hue, 0 to 359 (docs/design/tokens.md).
+    hue: integer("hue").notNull(),
+    version: version(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    unique("labels_org_id_id_unique").on(table.orgId, table.id),
+    uniqueIndex("labels_org_name_unique")
+      .on(table.orgId, sql`lower(${table.name})`)
+      .where(sql`${table.teamId} IS NULL`),
+    uniqueIndex("labels_team_name_unique")
+      .on(table.teamId, sql`lower(${table.name})`)
+      .where(sql`${table.teamId} IS NOT NULL`),
+    check("labels_hue", sql`${table.hue} BETWEEN 0 AND 359`),
+    foreignKey({
+      name: "labels_team_fk",
+      columns: [table.orgId, table.teamId],
+      foreignColumns: [teams.orgId, teams.id],
+    }).onDelete("cascade"),
+  ],
+);
+
+export const issueLabels = pgTable(
+  "issue_labels",
+  {
+    orgId: uuid("org_id").notNull(),
+    issueId: uuid("issue_id").notNull(),
+    labelId: uuid("label_id").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.issueId, table.labelId] }),
+    index("issue_labels_label_id_idx").on(table.labelId),
+    foreignKey({
+      name: "issue_labels_issue_fk",
+      columns: [table.orgId, table.issueId],
+      foreignColumns: [issues.orgId, issues.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "issue_labels_label_fk",
+      columns: [table.orgId, table.labelId],
+      foreignColumns: [labels.orgId, labels.id],
+    }).onDelete("cascade"),
+  ],
+);
+
+// Stored one way: issue_id blocks, or is a duplicate of, related_issue_id.
+// "Blocked by" and "duplicated by" are the same rows read from the other end.
+// A related pair is stored with the lower id first, so it exists once.
+export const relationType = pgEnum("relation_type", ["blocks", "related", "duplicate_of"]);
+
+export const issueRelations = pgTable(
+  "issue_relations",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull(),
+    type: relationType("type").notNull(),
+    issueId: uuid("issue_id").notNull(),
+    relatedIssueId: uuid("related_issue_id").notNull(),
+    creatorId: uuid("creator_id").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    unique("issue_relations_pair_unique").on(table.issueId, table.relatedIssueId, table.type),
+    index("issue_relations_related_issue_id_idx").on(table.relatedIssueId),
+    check("issue_relations_not_self", sql`${table.issueId} <> ${table.relatedIssueId}`),
+    check("issue_relations_related_ordered", sql`${table.type} <> 'related' OR ${table.issueId} < ${table.relatedIssueId}`),
+    foreignKey({
+      name: "issue_relations_issue_fk",
+      columns: [table.orgId, table.issueId],
+      foreignColumns: [issues.orgId, issues.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "issue_relations_related_issue_fk",
+      columns: [table.orgId, table.relatedIssueId],
+      foreignColumns: [issues.orgId, issues.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "issue_relations_creator_fk",
+      columns: [table.orgId, table.creatorId],
+      foreignColumns: [members.orgId, members.id],
+    }),
   ],
 );

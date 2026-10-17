@@ -406,6 +406,20 @@
             ],
             "format": "uuid"
           },
+          "labelIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
           "creatorId": {
             "type": "string",
             "format": "uuid"
@@ -434,6 +448,8 @@
           "priority",
           "estimate",
           "assigneeId",
+          "labelIds",
+          "parentId",
           "creatorId",
           "version",
           "createdAt",
@@ -486,10 +502,86 @@
             ],
             "format": "uuid",
             "default": null
+          },
+          "labelIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 50,
+            "default": []
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "default": null
           }
         },
         "required": [
           "title"
+        ]
+      },
+      "LinkedIssue": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "identifier": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9]{1,6}-[1-9][0-9]*$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "category": {
+                "$ref": "#/components/schemas/StatusCategory"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "category"
+            ]
+          },
+          "priority": {
+            "$ref": "#/components/schemas/Priority"
+          },
+          "assigneeId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id",
+          "identifier",
+          "title",
+          "teamId",
+          "status",
+          "priority",
+          "assigneeId"
         ]
       },
       "IssueConflict": {
@@ -566,10 +658,162 @@
               "null"
             ],
             "format": "uuid"
+          },
+          "labelIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 50
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "required": [
           "version"
+        ]
+      },
+      "Label": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "hue": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 359
+          },
+          "teamId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "hue",
+          "teamId",
+          "version",
+          "createdAt"
+        ]
+      },
+      "CreateLabel": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "hue": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 359
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateLabel": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "hue": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 359
+          }
+        },
+        "required": [
+          "version"
+        ]
+      },
+      "Relation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "$ref": "#/components/schemas/RelationType"
+          },
+          "issue": {
+            "$ref": "#/components/schemas/LinkedIssue"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "issue",
+          "createdAt"
+        ]
+      },
+      "RelationType": {
+        "type": "string",
+        "enum": [
+          "blocks",
+          "blocked_by",
+          "related",
+          "duplicate_of",
+          "duplicated_by"
+        ]
+      },
+      "CreateRelation": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/RelationType"
+          },
+          "issue": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The issue's id or any identifier it has had, like ENG-123"
+          }
+        },
+        "required": [
+          "type",
+          "issue"
         ]
       },
       "CreatedInvite": {
@@ -2164,7 +2408,7 @@
         "tags": [
           "Issues"
         ],
-        "summary": "Change an issue's fields",
+        "summary": "Change an issue's fields, or move it to another team",
         "description": "Send the version you read and only the fields to change. If any of those fields changed after that version, the update is refused with 409 and the current issue: read it again and retry. Changes to other fields since then do not conflict.",
         "parameters": [
           {
@@ -2246,6 +2490,761 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/IssueConflict"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{orgId}/issues/{issueRef}/sub-issues": {
+      "get": {
+        "tags": [
+          "Issues"
+        ],
+        "summary": "An issue's sub-issues, oldest first",
+        "description": "Sub-issues in teams the caller cannot see are left out.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "The issue's id or any identifier it has had, like ENG-123"
+            },
+            "required": true,
+            "description": "The issue's id or any identifier it has had, like ENG-123",
+            "name": "issueRef",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sub-issues",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LinkedIssue"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{orgId}/labels": {
+      "get": {
+        "tags": [
+          "Labels"
+        ],
+        "summary": "The organization's labels, which every team can use",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Labels by name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Label"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Labels"
+        ],
+        "summary": "Create an organization label",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLabel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new label",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Label"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the schema",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller's role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{orgId}/teams/{teamId}/labels": {
+      "get": {
+        "tags": [
+          "Labels"
+        ],
+        "summary": "Labels a team's issues can have: the organization's and the team's own",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "teamId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Labels by name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Label"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Labels"
+        ],
+        "summary": "Create a label for one team",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "teamId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLabel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new label",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Label"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the schema",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller's role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{orgId}/labels/{labelId}": {
+      "patch": {
+        "tags": [
+          "Labels"
+        ],
+        "summary": "Rename or recolor a label",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "labelId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLabel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The label",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Label"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the schema",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller's role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Labels"
+        ],
+        "summary": "Delete a label and take it off every issue",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "labelId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller's role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{orgId}/issues/{issueRef}/relations": {
+      "get": {
+        "tags": [
+          "Relations"
+        ],
+        "summary": "An issue's relations, read from that issue",
+        "description": "Relations to issues in teams the caller cannot see are left out.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "The issue's id or any identifier it has had, like ENG-123"
+            },
+            "required": true,
+            "description": "The issue's id or any identifier it has had, like ENG-123",
+            "name": "issueRef",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Relations, oldest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Relation"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Relations"
+        ],
+        "summary": "Relate an issue to another: blocks, blocked by, related, duplicate of",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "The issue's id or any identifier it has had, like ENG-123"
+            },
+            "required": true,
+            "description": "The issue's id or any identifier it has had, like ENG-123",
+            "name": "issueRef",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRelation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The relation, read from the issue in the path",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Relation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the schema",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{orgId}/issues/{issueRef}/relations/{relationId}": {
+      "delete": {
+        "tags": [
+          "Relations"
+        ],
+        "summary": "Remove a relation",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "The issue's id or any identifier it has had, like ENG-123"
+            },
+            "required": true,
+            "description": "The issue's id or any identifier it has had, like ENG-123",
+            "name": "issueRef",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "relationId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }

@@ -3,7 +3,9 @@ import { eventRoutes } from "./events.js";
 import { instanceRoutes } from "./instance.js";
 import { inviteRoutes } from "./invites.js";
 import { issueRoutes } from "./issues.js";
+import { labelRoutes } from "./labels.js";
 import { organizationRoutes } from "./organizations.js";
+import { relationRoutes } from "./relations.js";
 import { statusRoutes } from "./statuses.js";
 import { teamRoutes } from "./teams.js";
 
@@ -23,6 +25,8 @@ export function createApi(deps: ApiDeps) {
   api.route("/", teamRoutes(deps));
   api.route("/", statusRoutes(deps));
   api.route("/", issueRoutes(deps));
+  api.route("/", labelRoutes(deps));
+  api.route("/", relationRoutes(deps));
   api.route("/", inviteRoutes(deps));
   api.route("/", eventRoutes(deps));
   api.route("/", instanceRoutes(deps));

@@ -249,6 +249,7 @@ export const IssueRef = z.string().min(1).max(64).meta({
 });
 
 const IssueTitle = z.string().trim().min(1).max(255);
+const LabelIds = z.array(Id).max(50);
 const Description = z.string().max(100_000);
 const Estimate = z.number().int().min(0).max(1000);
 
@@ -267,6 +268,10 @@ export const Issue = z
     estimate: z.number().int().nullable(),
     // The human who answers for the issue.
     assigneeId: Id.nullable(),
+    // Organization labels and labels of the issue's team.
+    labelIds: z.array(Id),
+    // Set on a sub-issue. The parent can be in any team.
+    parentId: Id.nullable(),
     creatorId: Id,
     version: Version,
     createdAt: z.iso.datetime(),
@@ -284,6 +289,8 @@ export const CreateIssue = z
     priority: Priority.default("none"),
     estimate: Estimate.nullable().default(null),
     assigneeId: Id.nullable().default(null),
+    labelIds: LabelIds.default([]),
+    parentId: Id.nullable().default(null),
   })
   .meta({ id: "CreateIssue" });
 
@@ -297,6 +304,14 @@ export const UpdateIssue = z
     priority: Priority.optional(),
     estimate: Estimate.nullable().optional(),
     assigneeId: Id.nullable().optional(),
+    // Replaces the whole set.
+    labelIds: LabelIds.optional(),
+    parentId: Id.nullable().optional(),
+    // Moves the issue to another team: it gets that team's next number, and its
+    // old identifier keeps resolving. Its status maps to the status with the
+    // same name there, or else the first one in the same category; send
+    // statusId to choose. The old team's labels come off.
+    teamId: Id.optional(),
   })
   .meta({ id: "UpdateIssue" });
 export type UpdateIssue = z.infer<typeof UpdateIssue>;
@@ -313,3 +328,71 @@ export const IssueConflict = z
     }),
   })
   .meta({ id: "IssueConflict" });
+
+const LabelName = z.string().trim().min(1).max(40);
+// The label dot's hue on the color wheel.
+const Hue = z.number().int().min(0).max(359);
+
+export const Label = z
+  .object({
+    id: Id,
+    name: z.string(),
+    hue: Hue,
+    // Null for an organization label, which every team can use.
+    teamId: Id.nullable(),
+    version: Version,
+    createdAt: z.iso.datetime(),
+  })
+  .meta({ id: "Label" });
+export type Label = z.infer<typeof Label>;
+
+export const CreateLabel = z
+  .object({
+    name: LabelName,
+    // Picked from the name when left out.
+    hue: Hue.optional(),
+  })
+  .meta({ id: "CreateLabel" });
+
+export const UpdateLabel = z
+  .object({ version: Version, name: LabelName.optional(), hue: Hue.optional() })
+  .meta({ id: "UpdateLabel" });
+
+// Another issue as a sub-issue or relation shows it: enough to draw a row.
+export const LinkedIssue = z
+  .object({
+    id: Id,
+    identifier: Identifier,
+    title: z.string(),
+    teamId: Id,
+    status: z.object({ id: Id, name: z.string(), category: StatusCategory }),
+    priority: Priority,
+    assigneeId: Id.nullable(),
+  })
+  .meta({ id: "LinkedIssue" });
+export type LinkedIssue = z.infer<typeof LinkedIssue>;
+
+// Read from the issue in the path: "blocks" means it blocks the other issue,
+// "blocked_by" that the other issue blocks it.
+export const RelationType = z
+  .enum(["blocks", "blocked_by", "related", "duplicate_of", "duplicated_by"])
+  .meta({ id: "RelationType" });
+export type RelationType = z.infer<typeof RelationType>;
+
+export const Relation = z
+  .object({
+    id: Id,
+    type: RelationType,
+    issue: LinkedIssue,
+    createdAt: z.iso.datetime(),
+  })
+  .meta({ id: "Relation" });
+export type Relation = z.infer<typeof Relation>;
+
+export const CreateRelation = z
+  .object({
+    type: RelationType,
+    // The other issue's id or identifier.
+    issue: IssueRef,
+  })
+  .meta({ id: "CreateRelation" });

@@ -57,14 +57,22 @@ export function requireVersion(current: number, sent: number, what: string): voi
 }
 
 // The fields of input whose value differs from current, as from/to pairs for
-// the event log. Fields input leaves out are unchanged.
+// the event log. Fields input leaves out are unchanged. Arrays compare by
+// their items, so pass sets already sorted.
 export function changesOf<T extends object>(current: T, input: Partial<T>): Partial<Record<keyof T, { from: unknown; to: unknown }>> {
   const changes: Partial<Record<keyof T, { from: unknown; to: unknown }>> = {};
   for (const field of Object.keys(input) as (keyof T)[]) {
     const to = input[field];
-    if (to !== undefined && to !== current[field]) {
+    if (to !== undefined && !same(to, current[field])) {
       changes[field] = { from: current[field], to };
     }
   }
   return changes;
+}
+
+function same(a: unknown, b: unknown): boolean {
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((item, i) => item === b[i]);
+  }
+  return a === b;
 }
