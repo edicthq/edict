@@ -133,8 +133,12 @@ _Avoid_: Disable, suspend, kill switch
 ## Record
 
 **Event**:
-An append-only record of one change, with its actor and time.
+An append-only record of one part of a change, with its actor and time.
 _Avoid_: Activity, audit entry, log line
+
+**Change**:
+Everything one action did, such as creating an issue or a bulk edit, recorded as one or more events. Undo reverts a whole change.
+_Avoid_: Transaction, batch, operation
 
 **Inbox**:
 A member's list of notifications about work that involves them.
