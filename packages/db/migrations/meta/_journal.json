@@ -78,6 +78,20 @@
       "when": 1792212624890,
       "tag": "0010_labels_and_relations_row_level_security",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792243244497,
+      "tag": "0011_comments_and_attachments",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792243271033,
+      "tag": "0012_comments_and_attachments_row_level_security",
+      "breakpoints": true
     }
   ]
 }

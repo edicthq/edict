@@ -10,6 +10,8 @@ export const ErrorCode = z.enum([
   "conflict",
   "gone",
   "invalid_request",
+  // An upload is larger than ATTACHMENT_MAX_BYTES (ADR 0020).
+  "too_large",
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;
 
@@ -396,3 +398,55 @@ export const CreateRelation = z
     issue: IssueRef,
   })
   .meta({ id: "CreateRelation" });
+
+// A markdown comment on an issue (ADR 0009). Agents read and write it in
+// markdown; the web shows it rendered.
+const CommentBody = z.string().trim().min(1).max(10_000);
+
+export const Comment = z
+  .object({
+    id: Id,
+    issueId: Id,
+    creatorId: Id,
+    // Markdown (ADR 0009).
+    body: z.string(),
+    version: Version,
+    createdAt: z.iso.datetime(),
+    updatedAt: z.iso.datetime(),
+  })
+  .meta({ id: "Comment" });
+export type Comment = z.infer<typeof Comment>;
+
+export const CreateComment = z.object({ body: CommentBody }).meta({ id: "CreateComment" });
+
+// A comment compares the whole version (ADR 0018): it is small, and two people
+// rarely edit one at once.
+export const UpdateComment = z.object({ version: Version, body: CommentBody }).meta({ id: "UpdateComment" });
+
+// A stale comment update. Re-read, then retry.
+export const CommentConflict = z
+  .object({
+    error: z.object({
+      code: z.literal("conflict"),
+      message: z.string(),
+      current: Comment,
+    }),
+  })
+  .meta({ id: "CommentConflict" });
+
+// A file attached to an issue (ADR 0020). The bytes live outside Postgres,
+// under the attachment's id; this row is what the data-access layer guards.
+export const Attachment = z
+  .object({
+    id: Id,
+    issueId: Id,
+    name: z.string(),
+    // The relative path descriptions and comments link to.
+    path: z.string().startsWith("/files/"),
+    contentType: z.string(),
+    sizeBytes: z.number().int().positive(),
+    creatorId: Id,
+    createdAt: z.iso.datetime(),
+  })
+  .meta({ id: "Attachment" });
+export type Attachment = z.infer<typeof Attachment>;

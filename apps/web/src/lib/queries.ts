@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Issue, Label, paths, RelationType, Role, SignUpMode } from "@edicthq/client";
+import type { Attachment, Comment, Issue, Label, paths, RelationType, Role, SignUpMode } from "@edicthq/client";
 import { ApiFailure, api, unwrap } from "./api.js";
 
 export const keys = {
@@ -16,6 +16,8 @@ export const keys = {
   teamLabels: (orgId: string, teamId: string) => ["org", orgId, "teams", teamId, "labels"] as const,
   subIssues: (orgId: string, issueId: string) => ["org", orgId, "issue", issueId, "sub-issues"] as const,
   relations: (orgId: string, issueId: string) => ["org", orgId, "issue", issueId, "relations"] as const,
+  comments: (orgId: string, issueId: string) => ["org", orgId, "issue", issueId, "comments"] as const,
+  attachments: (orgId: string, issueId: string) => ["org", orgId, "issue", issueId, "attachments"] as const,
 };
 
 const org = (orgId: string) => ({ params: { path: { orgId } } });
@@ -351,5 +353,91 @@ export function useDeleteRelation(orgId: string, issueId: string) {
         }),
       ),
     onSuccess: () => client.invalidateQueries({ queryKey: ["org", orgId, "issue"] }),
+  });
+}
+
+// ---------- comments and attachments ----------
+
+export function useComments(orgId: string, issueId: string) {
+  return useQuery({
+    queryKey: keys.comments(orgId, issueId),
+    queryFn: () =>
+      unwrap(
+        api.GET("/organizations/{orgId}/issues/{issueRef}/comments", { params: { path: { orgId, issueRef: issueId } } }),
+      ),
+  });
+}
+
+export function useCreateComment(orgId: string, issueId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { body: string }) =>
+      unwrap(
+        api.POST("/organizations/{orgId}/issues/{issueRef}/comments", {
+          params: { path: { orgId, issueRef: issueId } },
+          body,
+        }),
+      ),
+    onSuccess: (comment) => client.setQueryData(keys.comments(orgId, issueId), (list: Comment[] | undefined) => [...(list ?? []), comment]),
+  });
+}
+
+// A comment compares the whole version (ADR 0018). A conflict carries the
+// current comment, which goes into the cache, so saving again replaces it.
+export function useUpdateComment(orgId: string, issueId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ comment, body }: { comment: Comment; body: string }) =>
+      unwrap(
+        api.PATCH("/organizations/{orgId}/comments/{commentId}", {
+          params: { path: { orgId, commentId: comment.id } },
+          body: { version: comment.version, body },
+        }),
+      ),
+    onSuccess: (updated) => replaceComment(updated),
+    onError: (error) => {
+      if (error instanceof ApiFailure && error.code === "conflict") {
+        replaceComment(error.details.current as Comment);
+      }
+    },
+  });
+
+  function replaceComment(updated: Comment) {
+    client.setQueryData(keys.comments(orgId, issueId), (list: Comment[] | undefined) =>
+      list?.map((item) => (item.id === updated.id ? updated : item)),
+    );
+  }
+}
+
+export function useAttachments(orgId: string, issueId: string) {
+  return useQuery({
+    queryKey: keys.attachments(orgId, issueId),
+    queryFn: () =>
+      unwrap(
+        api.GET("/organizations/{orgId}/issues/{issueRef}/attachments", { params: { path: { orgId, issueRef: issueId } } }),
+      ),
+  });
+}
+
+// openapi-fetch passes a FormData body untouched, so the upload goes out as
+// multipart with the browser's boundary. The generated type says the field is
+// a string ("format: binary"); FormData satisfies it at the call.
+type AttachmentForm = NonNullable<paths["/organizations/{orgId}/issues/{issueRef}/attachments"]["post"]["requestBody"]>["content"]["multipart/form-data"];
+
+export function useCreateAttachment(orgId: string, issueId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      return unwrap(
+        api.POST("/organizations/{orgId}/issues/{issueRef}/attachments", {
+          params: { path: { orgId, issueRef: issueId } },
+          body: form as unknown as AttachmentForm,
+        }),
+      );
+    },
+    onSuccess: (attachment) =>
+      client.setQueryData(keys.attachments(orgId, issueId), (list: Attachment[] | undefined) => [...(list ?? []), attachment]),
   });
 }

@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { onTestFinished } from "vitest";
 import { Pool } from "pg";
 import { createApp } from "../app.js";
+import { DEFAULT_MAX_ATTACHMENT_BYTES } from "../env.js";
 import type { Mailer } from "../email.js";
 
 export interface TestDatabase {
@@ -39,15 +43,23 @@ export async function startTestServer(
     trustedProxies?: string[];
     webDir?: string;
     mailer?: Mailer;
+    // Where attachments are stored (ADR 0020). A fresh directory each test.
+    dataDir?: string;
+    // The attachment size limit. Defaults to production's.
+    maxAttachmentBytes?: number;
   } = {},
 ): Promise<TestServer> {
   const database = options.database ?? (await createTestDatabase());
+  const dataDir = options.dataDir ?? (await mkdtemp(join(tmpdir(), "edict-files-")));
+  onTestFinished(() => rm(dataDir, { recursive: true, force: true }));
   const app = createApp({
     port: 0,
     databaseUrl: database.url,
     authSecret: options.authSecret,
     trustedProxies: options.trustedProxies ?? [],
     webDir: options.webDir,
+    dataDir,
+    maxAttachmentBytes: options.maxAttachmentBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES,
   }, { mailer: options.mailer });
   await app.start();
 
@@ -84,23 +96,32 @@ export interface ApiResponse<T = any> {
 
 // A caller of /api/v1, signed in when given a cookie.
 export function apiClient(baseUrl: string, cookie?: string) {
+  const headers = (): Record<string, string> => (cookie ? { cookie } : {});
   const call = async <T = any>(method: string, path: string, body?: unknown): Promise<ApiResponse<T>> => {
-    const headers: Record<string, string> = {};
-    if (cookie) headers.cookie = cookie;
-    if (body !== undefined) headers["content-type"] = "application/json";
+    const send: Record<string, string> = headers();
+    if (body !== undefined) send["content-type"] = "application/json";
     const res = await fetch(`${baseUrl}/api/v1${path}`, {
       method,
-      headers,
+      headers: send,
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    const text = await res.text();
+    return { status: res.status, body: text ? JSON.parse(text) : undefined };
+  };
+  const callForm = async <T = any>(method: string, path: string, form: FormData): Promise<ApiResponse<T>> => {
+    const res = await fetch(`${baseUrl}/api/v1${path}`, { method, headers: headers(), body: form });
     const text = await res.text();
     return { status: res.status, body: text ? JSON.parse(text) : undefined };
   };
   return {
     get: <T = any>(path: string) => call<T>("GET", path),
     post: <T = any>(path: string, body?: unknown) => call<T>("POST", path, body ?? {}),
+    postForm: <T = any>(path: string, form: FormData) => callForm<T>("POST", path, form),
     patch: <T = any>(path: string, body: unknown) => call<T>("PATCH", path, body),
     delete: <T = any>(path: string) => call<T>("DELETE", path),
+    // The signed-in session cookie, for calls outside /api/v1.
+    cookie,
+    baseUrl,
   };
 }
 

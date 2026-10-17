@@ -13,6 +13,8 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/api": toApi,
+      // Attachment bytes (ADR 0020), fetched during image preview.
+      "/files": toApi,
       "/health": toApi,
     },
   },

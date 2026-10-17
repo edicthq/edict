@@ -73,6 +73,7 @@ const errorDescriptions: Record<ErrorCode, string> = {
   not_found: "Not found, or not visible to the caller",
   conflict: "Conflicts with the current state",
   gone: "No longer valid",
+  too_large: "Larger than the attachment limit (ATTACHMENT_MAX_BYTES)",
 };
 
 const errorStatus = {
@@ -82,6 +83,7 @@ const errorStatus = {
   not_found: 404,
   conflict: 409,
   gone: 410,
+  too_large: 413,
 } as const;
 
 export function errors(...codes: ErrorCode[]) {

@@ -246,3 +246,68 @@ export const issueRelations = pgTable(
     }),
   ],
 );
+
+// A markdown comment on an issue (ADR 0009). Compares the whole version
+// (ADR 0018): it is small, and two people rarely edit one at once.
+export const comments = pgTable(
+  "comments",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull(),
+    issueId: uuid("issue_id").notNull(),
+    // Markdown (ADR 0009).
+    body: text("body").notNull(),
+    creatorId: uuid("creator_id").notNull(),
+    version: version(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index("comments_issue_id_idx").on(table.issueId),
+    check("comments_body_not_empty", sql`${table.body} <> ''`),
+    foreignKey({
+      name: "comments_issue_fk",
+      columns: [table.orgId, table.issueId],
+      foreignColumns: [issues.orgId, issues.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "comments_creator_fk",
+      columns: [table.orgId, table.creatorId],
+      foreignColumns: [members.orgId, members.id],
+    }),
+  ],
+);
+
+// A file attached to an issue (ADR 0020). The bytes live in storage under
+// `${orgId}/${id}`; this row is what the data-access layer guards, so the
+// visibility of the issue decides who sees the file. Attachment rows are
+// immutable: deletions wait for the trash (M2d).
+export const attachments = pgTable(
+  "attachments",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull(),
+    issueId: uuid("issue_id").notNull(),
+    name: text("name").notNull(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    // sha-256, hex.
+    checksum: text("checksum").notNull(),
+    creatorId: uuid("creator_id").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("attachments_issue_id_idx").on(table.issueId),
+    check("attachments_size_positive", sql`${table.sizeBytes} > 0`),
+    foreignKey({
+      name: "attachments_issue_fk",
+      columns: [table.orgId, table.issueId],
+      foreignColumns: [issues.orgId, issues.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "attachments_creator_fk",
+      columns: [table.orgId, table.creatorId],
+      foreignColumns: [members.orgId, members.id],
+    }),
+  ],
+);

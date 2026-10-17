@@ -33,6 +33,12 @@ services:
       # invites are links you share yourself.
       SMTP_URL: ${SMTP_URL:-}
       EMAIL_FROM: ${EMAIL_FROM:-}
+      # The largest attachment accepted, in bytes. 25 MB by default.
+      ATTACHMENT_MAX_BYTES: ${ATTACHMENT_MAX_BYTES:-}
+    volumes:
+      # Attached files. Running several app replicas needs a shared volume
+      # here, or S3 once it is supported.
+      - app-data:/srv/data
     depends_on:
       db:
         condition: service_healthy
@@ -41,3 +47,4 @@ services:
 
 volumes:
   db-data:
+  app-data:

@@ -1,3 +1,5 @@
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { test as base } from "@playwright/test";
@@ -13,6 +15,8 @@ export const test = base.extend<{}, { instanceUrl: string }>({
       const port = 3100 + workerInfo.parallelIndex;
       const url = `http://localhost:${port}`;
       const root = join(import.meta.dirname, "../..");
+      // Attachment bytes (ADR 0020) go under their own temp dir.
+      const dataDir = await mkdtemp(join(tmpdir(), "edict-e2e-"));
       const server = spawn("node", [join(root, "server/dist/index.js")], {
         env: {
           ...process.env,
@@ -26,6 +30,7 @@ export const test = base.extend<{}, { instanceUrl: string }>({
           // production rate limiter would turn away.
           AUTH_RATE_LIMIT: "off",
           SMTP_URL: "",
+          DATA_DIR: dataDir,
         },
         stdio: ["ignore", "inherit", "inherit"],
       });

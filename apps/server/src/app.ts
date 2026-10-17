@@ -5,11 +5,12 @@ import { getConnInfo } from "@hono/node-server/conninfo";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono, type Context } from "hono";
 import { createDatabase, createPool, migrateToLatest } from "@edicthq/db";
-import { createApi } from "./api/index.js";
+import { createApi, fileRoutes } from "./api/index.js";
 import { createAuth, type EdictAuth } from "./auth.js";
 import { createSmtpMailer, type Mailer } from "./email.js";
 import type { ServerConfig } from "./env.js";
 import { ensureInstanceSettings } from "./instance.js";
+import { localDiskStorage } from "./storage.js";
 
 export interface App {
   app: Hono;
@@ -41,22 +42,26 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
   app.on(["POST", "GET"], "/api/auth/*", (c) =>
     auth ? auth.handler(withClientIp(c, config.trustedProxies)) : c.json({ error: "starting" }, 503),
   );
-  app.route(
-    "/api/v1",
-    createApi({
-      db,
-      mailer,
-      publicUrl: config.baseUrl,
-      getUser: async (headers) => {
-        const session = await auth?.api.getSession({ headers });
-        if (!session) {
-          return null;
-        }
-        const { id, email, name, role, emailVerified } = session.user;
-        return { id, email, name, emailVerified, instanceAdmin: role === "admin" };
-      },
-    }),
-  );
+  const deps = {
+    db,
+    mailer,
+    publicUrl: config.baseUrl,
+    // Attached files live on disk (ADR 0020); the routes read these together.
+    maxAttachmentBytes: config.maxAttachmentBytes,
+    storage: localDiskStorage(config.dataDir),
+    getUser: async (headers: Headers) => {
+      const session = await auth?.api.getSession({ headers });
+      if (!session) {
+        return null;
+      }
+      const { id, email, name, role, emailVerified } = session.user;
+      return { id, email, name, emailVerified, instanceAdmin: role === "admin" };
+    },
+  };
+  app.route("/api/v1", createApi(deps));
+  // Attachment bytes live under /files, not /api/v1 (ADR 0020). The default
+  // resolver uses cookies; use e.g. `curl -b` or an Authorization header.
+  app.route("/", fileRoutes(deps));
 
   if (config.webDir) {
     serveWeb(app, config.webDir);

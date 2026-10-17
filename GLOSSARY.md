@@ -100,6 +100,14 @@ _Avoid_: Tag, category
 A goal with a lead and target date that groups issues from any number of teams.
 _Avoid_: Epic, initiative, milestone
 
+**Comment**:
+A markdown message a member posts on an issue. Only its creator can edit it.
+_Avoid_: Record, note, reply
+
+**Attachment**:
+A file uploaded to an issue, linked from descriptions and comments by its `/files` path.
+_Avoid_: Upload, asset, document
+
 **Template**:
 A team's prefilled starting point for a new issue.
 _Avoid_: Preset, blueprint

@@ -15,6 +15,9 @@ export interface Scope {
   // Lets the invites for one lowercase email be read, but not changed, across
   // organizations. Invite-only sign-up uses it.
   inviteEmail?: string;
+  // Lets one attachment be read by its id before its organization is known,
+  // so the /files path can find it and check the caller can see its issue.
+  attachmentId?: string;
 }
 
 // The data-access layer's entry point for tenant data (ADR 0006). Runs fn in
@@ -29,6 +32,7 @@ export function inScope<T>(db: Database, scope: Scope, fn: (tx: Transaction) => 
       set_config('edict.user_id', ${scope.userId ?? ""}, true),
       set_config('edict.invite_token_hash', ${scope.inviteTokenHash ?? ""}, true),
       set_config('edict.invite_email', ${scope.inviteEmail ?? ""}, true),
+      set_config('edict.attachment_id', ${scope.attachmentId ?? ""}, true),
       set_config('edict.change_id', uuidv7()::text, true)`);
     return fn(tx);
   });

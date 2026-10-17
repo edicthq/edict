@@ -1,20 +1,26 @@
-import { useEffect, useRef, useState } from "react";
-import type { Issue, Label, LinkedIssue, Member, RelationType, Status, Team } from "@edicthq/client";
+import { useEffect, useId, useRef, useState } from "react";
+import type { Attachment, Comment, Issue, Label, LinkedIssue, Member, RelationType, Status, Team } from "@edicthq/client";
 import { Avatar, Button, Dialog, Kbd, Menu, PriorityIcon, Select, StatusIcon, TeamKey } from "@edicthq/ui";
-import { CornerLeftUp, Plus, X } from "lucide-react";
+import { CornerLeftUp, Paperclip, Plus, X } from "lucide-react";
 import { ApiFailure } from "../lib/api.js";
 import { ago } from "../lib/issues.js";
 import {
+  useAttachments,
+  useComments,
+  useCreateAttachment,
+  useCreateComment,
   useCreateLabel,
   useCreateRelation,
   useDeleteRelation,
   useIssue,
   useRelations,
   useSubIssues,
+  useUpdateComment,
   useUpdateIssue,
   type IssueChanges,
 } from "../lib/queries.js";
 import { AssigneePicker, EstimatePicker, LabelPicker, NoAssignee, PriorityPicker, StatusPicker } from "./issue-fields.js";
+import { Markdown } from "./markdown.js";
 import { useToast } from "./toast.js";
 
 export type PeekMenu = "status" | "priority" | "assignee" | null;
@@ -23,6 +29,7 @@ export type PeekMenu = "status" | "priority" | "assignee" | null;
 // put behind it, and J/K move the peek through it.
 export function IssuePeek({
   orgId,
+  myId,
   issue,
   statuses,
   members,
@@ -36,6 +43,8 @@ export function IssuePeek({
   onAddSubIssue,
 }: {
   orgId: string;
+  // The signed-in member, so the peek knows which comments are theirs.
+  myId: string;
   issue: Issue;
   statuses: Status[];
   // Who can be the assignee.
@@ -58,7 +67,6 @@ export function IssuePeek({
   const parent = useIssue(orgId, issue.parentId);
   const toast = useToast();
   const [merge, setMerge] = useState<{ field: "title" | "description"; mine: string; theirs: Issue } | null>(null);
-  const creator = orgMembers.find((m) => m.id === issue.creatorId);
 
   const save = (changes: IssueChanges) =>
     update.mutate(
@@ -171,21 +179,8 @@ export function IssuePeek({
 
         <SubIssues orgId={orgId} issue={issue} orgMembers={orgMembers} onOpen={onOpen} onAdd={onAddSubIssue} />
         <Relations orgId={orgId} issue={issue} orgMembers={orgMembers} onOpen={onOpen} />
-
-        <section className="mt-10" aria-labelledby="peek-activity">
-          <h2 id="peek-activity" className="mb-3 text-body font-semibold">
-            Activity
-          </h2>
-          <p className="flex items-center gap-2 text-sm text-ink-2">
-            <Avatar name={creator?.name ?? "?"} kind={creator?.kind} size={18} />
-            <span>
-              <b className="font-semibold text-ink">{creator?.name ?? "Someone"}</b> created the issue
-            </span>
-            <time dateTime={issue.createdAt} className="ms-auto" title={new Date(issue.createdAt).toLocaleString()}>
-              {ago(issue.createdAt)}
-            </time>
-          </p>
-        </section>
+        <Attachments orgId={orgId} issue={issue} />
+        <Discussion orgId={orgId} myId={myId} issue={issue} orgMembers={orgMembers} />
       </div>
       {merge ? (
         <MergeDialog
@@ -534,5 +529,348 @@ function Relations({
         </form>
       ) : null}
     </section>
+  );
+}
+
+// Attached files (ADR 0020). Uploading keeps the bytes under the issue, so
+// descriptions and comments can link at /files paths, and markdown shows
+// images by their path.
+function Attachments({ orgId, issue }: { orgId: string; issue: Issue }) {
+  const attachments = useAttachments(orgId, issue.id);
+  const create = useCreateAttachment(orgId, issue.id);
+  const toast = useToast();
+  const input = useRef<HTMLInputElement>(null);
+  const list = attachments.data ?? [];
+
+  const upload = (files: FileList | null) => {
+    for (const file of Array.from(files ?? [])) {
+      if (file.size === 0) {
+        toast(`${file.name} is empty.`);
+        continue;
+      }
+      create.mutateAsync(file).catch((error: Error) => toast(`${file.name}: ${error.message}`));
+    }
+    if (input.current) input.current.value = "";
+  };
+
+  return (
+    <section className="mt-8" aria-labelledby="peek-attachments">
+      <SectionHeading
+        id="peek-attachments"
+        aside={
+          <Button variant="ghost" className="ms-auto" onClick={() => input.current?.click()}>
+            <Paperclip aria-hidden="true" className="size-3.5" strokeWidth={2} />
+            Attach file
+          </Button>
+        }
+      >
+        Files
+      </SectionHeading>
+      <input
+        ref={input}
+        type="file"
+        multiple
+        className="sr-only"
+        aria-hidden="true"
+        tabIndex={-1}
+        onChange={(event) => {
+          if (create.isPending) {
+            event.target.value = "";
+            toast("Finish uploading first.");
+            return;
+          }
+          upload(event.target.files);
+        }}
+      />
+      {create.isPending ? <p className="text-sm text-ink-2">Uploading…</p> : null}
+      {list.length ? (
+        <ul className="flex flex-col gap-1.5">
+          {list.map((attachment) => (
+            <li key={attachment.id}>
+              <FileRow attachment={attachment} />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-ink-2">No files.</p>
+      )}
+    </section>
+  );
+}
+
+function FileRow({ attachment }: { attachment: Attachment }) {
+  const image = attachment.contentType.startsWith("image/");
+  return (
+    <a
+      href={attachment.path}
+      target="_blank"
+      rel="noreferrer"
+      title={attachment.name}
+      className="group grid max-w-[min(24rem,100%)] grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-3 rounded-sm p-1.5 ps-2 text-start hover:bg-hover"
+    >
+      <span className="size-12 overflow-hidden rounded-[4px] bg-bg shadow-[inset_0_0_0_1px_var(--line)]">
+        {image ? (
+          <img src={attachment.path} alt="" loading="lazy" className="size-full object-cover" />
+        ) : (
+          <span className="grid size-full place-items-center font-mono text-[10px] text-ink-2 uppercase">
+            {extension(attachment)}
+          </span>
+        )}
+      </span>
+      <span className="min-w-0 truncate text-ui text-ink">{attachment.name}</span>
+      <span className="text-sm text-ink-2 tabular-nums">{size(attachment.sizeBytes)}</span>
+    </a>
+  );
+}
+
+function extension(attachment: Attachment): string {
+  const subtype = attachment.contentType.split("/")[1];
+  if (!subtype) return "file";
+  return subtype.split("+")[0]!.slice(0, 6);
+}
+
+function size(bytes: number): string {
+  // One decimal below 10 units ("4.2 MB"), none above ("56 KB").
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB"] as const;
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return `${value >= 10 ? Math.round(value) : Math.round(value * 10) / 10} ${units[unit]}`;
+}
+
+// Who created the issue, then each comment in order, then the composer.
+// Agents' progress updates join this lane in M3.
+function Discussion({
+  orgId,
+  myId,
+  issue,
+  orgMembers,
+}: {
+  orgId: string;
+  myId: string;
+  issue: Issue;
+  orgMembers: Member[];
+}) {
+  const comments = useComments(orgId, issue.id);
+  const create = useCreateComment(orgId, issue.id);
+  const update = useUpdateComment(orgId, issue.id);
+  const [draft, setDraft] = useState("");
+  const toast = useToast();
+  const creator = orgMembers.find((m) => m.id === issue.creatorId);
+
+  const send = () => {
+    const body = draft.trim();
+    if (!body) return;
+    create.mutate(
+      { body },
+      {
+        onSuccess: () => setDraft(""),
+        onError: (error) => toast(error.message),
+      },
+    );
+  };
+
+  return (
+    <section className="mt-10" aria-labelledby="peek-discussion">
+      <h2 id="peek-discussion" className="mb-3 text-body font-semibold">
+        Discussion
+      </h2>
+      <div className="flex flex-col gap-5">
+        <p className="flex items-center gap-2 text-sm text-ink-2">
+          <Avatar name={creator?.name ?? "?"} kind={creator?.kind} size={22} />
+          <span>
+            <b className="font-semibold text-ink">{creator?.name ?? "Someone"}</b> created the issue
+          </span>
+          <time dateTime={issue.createdAt} className="ms-auto" title={new Date(issue.createdAt).toLocaleString()}>
+            {ago(issue.createdAt)}
+          </time>
+        </p>
+        {(comments.data ?? []).map((comment) => (
+          <CommentRow
+            key={comment.id}
+            myId={myId}
+            comment={comment}
+            orgMembers={orgMembers}
+            onUpdate={async (body) => {
+              await update.mutateAsync({ comment, body });
+            }}
+          />
+        ))}
+        <Composer value={draft} onChange={setDraft} onSend={send} pending={create.isPending} />
+      </div>
+    </section>
+  );
+}
+
+// One comment: avatar, name, time, markdown body (the concept's grid), and
+// an Edit button for its creator, the only one the server lets edit it.
+function CommentRow({
+  comment,
+  myId,
+  orgMembers,
+  onUpdate,
+}: {
+  comment: Comment;
+  myId: string;
+  orgMembers: Member[];
+  onUpdate: (body: string) => Promise<void>;
+}) {
+  const author = orgMembers.find((m) => m.id === comment.creatorId);
+  const mine = comment.creatorId === myId;
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(comment.body);
+  const [saving, setSaving] = useState(false);
+  const editId = useId();
+  const toast = useToast();
+
+  if (editing) {
+    return (
+      <form
+        className="grid grid-cols-[22px_minmax(0,1fr)] gap-x-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const body = draft.trim();
+          if (!body || saving) return;
+          setSaving(true);
+          onUpdate(body)
+            .then(() => setEditing(false))
+            .catch((error: Error) =>
+              // On a conflict the newer comment is already in place; the
+              // draft stays, and saving again replaces it.
+              toast(
+                error instanceof ApiFailure && error.code === "conflict"
+                  ? "This comment changed somewhere else. Save again to replace it with yours."
+                  : error.message,
+              ),
+            )
+            .finally(() => setSaving(false));
+        }}
+      >
+        <div />
+        <div className="rounded-md p-2.5 shadow-[inset_0_0_0_1px_var(--line-strong)] focus-within:shadow-[inset_0_0_0_1px_var(--ink)]">
+          <label htmlFor={editId} className="sr-only">
+            Edit your comment
+          </label>
+          <textarea
+            id={editId}
+            autoFocus
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              } else if (event.key === "Escape") {
+                event.stopPropagation();
+                setDraft(comment.body);
+                setEditing(false);
+              }
+            }}
+            className="field-sizing-content min-h-10 max-h-64 w-full resize-none bg-transparent text-body leading-[1.55] focus-visible:outline-none"
+          />
+          <div className="flex justify-end gap-2 pt-1.5">
+            <Button
+              variant="ghost"
+              type="button"
+              onClick={() => {
+                setDraft(comment.body);
+                setEditing(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button variant="primary" type="submit" disabled={!draft.trim() || saving}>
+              Save
+            </Button>
+          </div>
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <article className="group grid grid-cols-[22px_minmax(0,1fr)] gap-x-3">
+      <Avatar name={author?.name ?? "?"} kind={author?.kind} size={22} className="mt-0.5" />
+      <div className="min-w-0">
+        <header className="flex items-baseline gap-2">
+          <b className="font-semibold text-ink">{author?.name ?? "Someone"}</b>
+          <time
+            dateTime={comment.createdAt}
+            title={new Date(comment.createdAt).toLocaleString()}
+            className="text-sm text-ink-3"
+          >
+            {ago(comment.createdAt)}
+          </time>
+          {comment.updatedAt !== comment.createdAt ? <span className="text-xs text-ink-3">(edited)</span> : null}
+          {mine ? (
+            <Button
+              variant="ghost"
+              className="ms-auto h-6 px-2 text-sm opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+              onClick={() => {
+                setDraft(comment.body);
+                setEditing(true);
+              }}
+            >
+              Edit
+            </Button>
+          ) : null}
+        </header>
+        <Markdown text={comment.body} />
+      </div>
+    </article>
+  );
+}
+
+// The new-record box, per the concept: a bordered field with the send
+// button, bottom right. ⌘/Ctrl-Enter sends, as the button's hint says.
+function Composer({
+  value,
+  onChange,
+  onSend,
+  pending,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onSend: () => void;
+  pending: boolean;
+}) {
+  const mod = typeof navigator !== "undefined" && /Mac|iP/.test(navigator.platform) ? "⌘" : "Ctrl";
+  return (
+    <form
+      className="rounded-md p-2.5 pb-2 shadow-[inset_0_0_0_1px_var(--line-strong)] focus-within:shadow-[inset_0_0_0_1px_var(--ink)]"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSend();
+      }}
+    >
+      <label htmlFor="peek-comment" className="sr-only">
+        Add a comment
+      </label>
+      <textarea
+        id="peek-comment"
+        value={value}
+        placeholder="Add a comment… Markdown works."
+        onChange={(event) => onChange(event.target.value)}
+        onKeyDown={(event) => {
+          if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+            event.preventDefault();
+            onSend();
+          } else if (event.key === "Escape") {
+            event.stopPropagation();
+            event.currentTarget.blur();
+          }
+        }}
+        className="field-sizing-content min-h-10 max-h-64 w-full resize-none bg-transparent text-body leading-[1.55] placeholder:text-ink-3 focus-visible:outline-none"
+      />
+      <div className="flex justify-end pt-1.5">
+        <Button type="submit" variant="primary" disabled={!value.trim() || pending} className="text-sm">
+          Comment <Kbd>{mod + "↵"}</Kbd>
+        </Button>
+      </div>
+    </form>
   );
 }

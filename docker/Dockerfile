@@ -25,6 +25,10 @@ COPY --from=build /srv /srv
 COPY --from=build /repo/apps/web/dist /srv/web
 ENV NODE_ENV=production
 ENV WEB_DIR=/srv/web
+# Attachments (ADR 0020). The compose file mounts a volume here; the image
+# creates it for the node user, so a fresh volume starts writable.
+ENV DATA_DIR=/srv/data
+RUN mkdir -p /srv/data && chown node:node /srv/data
 EXPOSE 3000
 USER node
 HEALTHCHECK --interval=10s --timeout=3s --start-period=30s --retries=5 \

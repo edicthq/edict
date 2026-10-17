@@ -9,6 +9,7 @@ const statusOf: Record<ErrorCode, ContentfulStatusCode> = {
   not_found: 404,
   conflict: 409,
   gone: 410,
+  too_large: 413,
 };
 
 // Thrown anywhere in a handler; onApiError turns it into the error response.
@@ -31,6 +32,7 @@ export const conflict = (message: string, details?: Record<string, unknown>) =>
   new ApiError("conflict", message, details);
 export const gone = (message: string) => new ApiError("gone", message);
 export const invalid = (message: string) => new ApiError("invalid_request", message);
+export const tooLarge = (message: string) => new ApiError("too_large", message);
 
 export function errorResponse(c: Context, code: ErrorCode, message: string, details?: Record<string, unknown>) {
   return c.json({ error: { code, message, ...details } }, statusOf[code]);
@@ -40,6 +42,7 @@ export function onApiError(error: Error, c: Context) {
   if (error instanceof ApiError) {
     return errorResponse(c, error.code, error.message, error.details);
   }
+  console.error(error);
   throw error;
 }
 

@@ -130,3 +130,62 @@ test("create an issue, change its status in the peek, see it on the board, and f
   await expect(page).toHaveURL(/\?issue=CORE-1$/);
   await expect(page.getByRole("complementary", { name: /CORE-1 Keep old identifiers resolving/ })).toBeVisible();
 });
+
+test("comment on an issue and attach a file in the peek", async ({ page, baseURL }) => {
+  // Distinct org and user: all tests in this file share the worker's instance.
+  const headers = { origin: baseURL! };
+  const signUp = await page.request.post("/api/auth/sign-up/email", {
+    headers,
+    data: { name: "Priya Nair", email: "priya@example.com", password: "correct-horse-battery" },
+  });
+  expect(signUp.ok()).toBe(true);
+  const org = await (await page.request.post("/api/v1/organizations", { headers, data: { name: "Beacon", slug: "beacon" } })).json();
+  const orgId = org.organization.id as string;
+  const team = await (
+    await page.request.post(`/api/v1/organizations/${orgId}/teams`, { headers, data: { name: "Core", key: "CORE" } })
+  ).json() as { id: string };
+  await page.request.post(`/api/v1/organizations/${orgId}/teams/${team.id}/issues`, { headers, data: { title: "Hook up discussion" } });
+
+  await page.goto(`/beacon/teams/${team.id}`);
+  const todo = page.getByRole("region", { name: "Todo" });
+  await todo.getByRole("button", { name: /CORE-1 Hook up discussion/ }).click();
+  const peek = page.getByRole("complementary", { name: /Hook up discussion/ });
+  await expect(peek).toBeVisible();
+
+  // Discussion: the creator line, then a comment from the composer. Markdown
+  // renders, and ⌘/Ctrl-Enter sends.
+  const discussion = peek.locator('section[aria-labelledby="peek-discussion"]');
+  await expect(discussion.getByText("created the issue")).toBeVisible();
+  const composer = discussion.getByLabel("Add a comment");
+  await composer.fill("Agreed — shipping the **first** pass");
+  await composer.press("ControlOrMeta+Enter");
+  await expect(discussion.getByText("whole pass")).toBeHidden();
+  await expect(discussion.getByText("first pass")).toBeVisible();
+  await expect(discussion.locator("article strong")).toHaveText("first");
+  await expect(composer).toHaveValue("");
+
+  // Hover shows Edit; only the creator sees it (this user created it).
+  await discussion.locator("article").first().hover();
+  await discussion.getByRole("button", { name: "Edit" }).click();
+  const edit = discussion.getByLabel("Edit your comment");
+  await edit.fill("Agreed — shipping the whole pass");
+  await discussion.getByRole("button", { name: "Save" }).click();
+  await expect(discussion.getByText("whole pass")).toBeVisible();
+  await expect(discussion.getByText("first pass")).toBeHidden();
+
+  // Files: upload through the section's file input; the row shows the name
+  // and size, and the link serves the same bytes back.
+  const files = peek.locator('section[aria-labelledby="peek-attachments"]');
+  await peek.locator('input[type="file"]').setInputFiles({
+    name: "notes.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("hello from edict"),
+  });
+  const link = files.getByRole("link", { name: /notes\.md/ });
+  await expect(link).toBeVisible();
+  await expect(files.getByText("16 B")).toBeVisible();
+  const href = await link.getAttribute("href");
+  const fetched = await page.request.get(href!, { headers });
+  expect(fetched.ok()).toBe(true);
+  expect(await fetched.text()).toBe("hello from edict");
+});

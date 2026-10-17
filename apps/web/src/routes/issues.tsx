@@ -53,7 +53,7 @@ export function TeamIssuesPage() {
 }
 
 function TeamIssues({ team }: { team: Team }) {
-  const { orgId, slug } = useOrg();
+  const { orgId, slug, membership } = useOrg();
   const statuses = useStatuses(orgId, team.id);
   const issues = useTeamIssues(orgId, team.id);
   const orgMembers = useMembers(orgId);
@@ -256,6 +256,7 @@ function TeamIssues({ team }: { team: Team }) {
       {peeked && statuses.data ? (
         <IssuePeek
           orgId={orgId}
+          myId={membership.member.id}
           issue={peeked}
           statuses={statuses.data}
           members={members}

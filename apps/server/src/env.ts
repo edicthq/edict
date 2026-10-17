@@ -1,3 +1,5 @@
+import { join } from "node:path";
+
 export interface ServerConfig {
   port: number;
   databaseUrl: string;
@@ -12,6 +14,12 @@ export interface ServerConfig {
   // The built web app (apps/web/dist). Unset in development, where Vite
   // serves it and proxies /api here.
   webDir?: string;
+  // Where attached files are stored (ADR 0020). Local disk; an S3-compatible
+  // bucket will take over when configured without changing anything else.
+  dataDir: string;
+  // The largest file an attachment accepts. DEFAULT_MAX_ATTACHMENT_BYTES
+  // otherwise.
+  maxAttachmentBytes: number;
   // Outgoing email. Both or neither: without them invites are links to share
   // by hand.
   smtpUrl?: string;
@@ -23,6 +31,9 @@ export interface ServerConfig {
 }
 
 export class ConfigError extends Error {}
+
+// 25 MB each; tunable per instance for big attachments.
+export const DEFAULT_MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 
 export function readConfig(env: NodeJS.ProcessEnv): ServerConfig {
   const url = env.DATABASE_URL;
@@ -51,10 +62,25 @@ export function readConfig(env: NodeJS.ProcessEnv): ServerConfig {
       .map((entry) => entry.trim())
       .filter(Boolean),
     webDir: env.WEB_DIR || undefined,
+    // Relative paths resolve against the working directory. Docker passes
+    // DATA_DIR=/srv/data with its volume there.
+    dataDir: env.DATA_DIR || join(process.cwd(), "data"),
+    maxAttachmentBytes: readAttachmentMax(env.ATTACHMENT_MAX_BYTES),
     smtpUrl,
     emailFrom,
     authRateLimit: env.AUTH_RATE_LIMIT !== "off",
   };
+}
+
+function readAttachmentMax(raw: string | undefined): number {
+  if (raw === undefined || raw === "") {
+    return DEFAULT_MAX_ATTACHMENT_BYTES;
+  }
+  const parsed = Number(raw);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new ConfigError(`ATTACHMENT_MAX_BYTES is not a positive byte count: ${raw}`);
+  }
+  return parsed;
 }
 
 function readPort(raw: string | undefined): number | undefined {
