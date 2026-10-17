@@ -27,6 +27,11 @@ services:
       # Comma-separated IPs or CIDR ranges of reverse proxies in front of Edict,
       # whose X-Forwarded-For is believed. Leave empty when clients connect directly.
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      # Optional outgoing email through any SMTP provider (Resend, Postmark, SES,
+      # Mailgun), like smtps://user:password@smtp.resend.com:465. Without it,
+      # invites are links you share yourself.
+      SMTP_URL: ${SMTP_URL:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
     depends_on:
       db:
         condition: service_healthy

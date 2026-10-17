@@ -265,6 +265,9 @@
           "url": {
             "type": "string",
             "format": "uri"
+          },
+          "emailSent": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -275,7 +278,8 @@
           "invitedBy",
           "expiresAt",
           "createdAt",
-          "url"
+          "url",
+          "emailSent"
         ]
       },
       "CreateInvite": {

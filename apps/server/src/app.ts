@@ -7,6 +7,7 @@ import { Hono, type Context } from "hono";
 import { createDatabase, createPool, migrateToLatest } from "@edicthq/db";
 import { createApi } from "./api/index.js";
 import { createAuth, type EdictAuth } from "./auth.js";
+import { createSmtpMailer, type Mailer } from "./email.js";
 import type { ServerConfig } from "./env.js";
 import { ensureInstanceSettings } from "./instance.js";
 
@@ -20,9 +21,17 @@ export interface App {
   shutdown: () => Promise<void>;
 }
 
-export function createApp(config: ServerConfig): App {
+export interface AppOptions {
+  // Overrides the SMTP mailer from config. Tests pass one that records.
+  mailer?: Mailer;
+}
+
+export function createApp(config: ServerConfig, options: AppOptions = {}): App {
   const pool = createPool(config.databaseUrl);
   const db = createDatabase(pool);
+  const mailer =
+    options.mailer ??
+    (config.smtpUrl && config.emailFrom ? createSmtpMailer(config.smtpUrl, config.emailFrom) : undefined);
 
   // Built in start(): the auth secret may live in the database.
   let auth: EdictAuth | undefined;
@@ -36,6 +45,7 @@ export function createApp(config: ServerConfig): App {
     "/api/v1",
     createApi({
       db,
+      mailer,
       publicUrl: config.baseUrl,
       getUser: async (headers) => {
         const session = await auth?.api.getSession({ headers });

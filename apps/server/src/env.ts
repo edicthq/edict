@@ -12,6 +12,10 @@ export interface ServerConfig {
   // The built web app (apps/web/dist). Unset in development, where Vite
   // serves it and proxies /api here.
   webDir?: string;
+  // Outgoing email. Both or neither: without them invites are links to share
+  // by hand.
+  smtpUrl?: string;
+  emailFrom?: string;
 }
 
 export class ConfigError extends Error {}
@@ -27,6 +31,12 @@ export function readConfig(env: NodeJS.ProcessEnv): ServerConfig {
     throw new ConfigError(`PORT is not a valid port number: ${env.PORT}`);
   }
 
+  const smtpUrl = env.SMTP_URL || undefined;
+  const emailFrom = env.EMAIL_FROM || undefined;
+  if (smtpUrl && !emailFrom) {
+    throw new ConfigError('SMTP_URL is set but EMAIL_FROM is not. Set it to the sender, like "Edict <edict@example.com>".');
+  }
+
   return {
     port,
     databaseUrl: url,
@@ -37,6 +47,8 @@ export function readConfig(env: NodeJS.ProcessEnv): ServerConfig {
       .map((entry) => entry.trim())
       .filter(Boolean),
     webDir: env.WEB_DIR || undefined,
+    smtpUrl,
+    emailFrom,
   };
 }
 

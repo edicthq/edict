@@ -123,7 +123,11 @@ export const CreateInvite = z
   .meta({ id: "CreateInvite" });
 
 // Returned once, when the invite is made. Only a hash of the token is stored.
-export const CreatedInvite = Invite.extend({ url: z.url() }).meta({ id: "CreatedInvite" });
+export const CreatedInvite = Invite.extend({
+  url: z.url(),
+  // Whether the link was emailed to the invitee. When false, share it by hand.
+  emailSent: z.boolean(),
+}).meta({ id: "CreatedInvite" });
 
 // What the invite link shows before the invitee accepts.
 export const InvitePreview = z

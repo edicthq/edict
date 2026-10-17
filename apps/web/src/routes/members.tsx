@@ -239,8 +239,17 @@ function InviteLink({ invite }: { invite: CreatedInvite }) {
   return (
     <div role="status" className="flex flex-col gap-2 border-t border-line pt-4">
       <p className="text-ui text-pretty">
-        Send this link to <span className="font-semibold">{invite.email}</span>. It works once, for that address, for
-        seven days. Edict can't email it yet.
+        {invite.emailSent ? (
+          <>
+            Invite emailed to <span className="font-semibold">{invite.email}</span>. You can also send them this link.
+          </>
+        ) : (
+          <>
+            Send this link to <span className="font-semibold">{invite.email}</span>. This instance doesn't send email,
+            so share it yourself.
+          </>
+        )}{" "}
+        It works once, for that address, for seven days.
       </p>
       <div className="flex gap-2">
         <Input readOnly value={invite.url} className="font-code text-ui sm:text-ui" onFocus={(e) => e.target.select()} aria-label="Invite link" />

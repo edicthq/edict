@@ -1228,6 +1228,7 @@ export interface components {
             createdAt: string;
             /** Format: uri */
             url: string;
+            emailSent: boolean;
         };
         CreateInvite: {
             /** Format: email */

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { onTestFinished } from "vitest";
 import { Pool } from "pg";
 import { createApp } from "../app.js";
+import type { Mailer } from "../email.js";
 
 export interface TestDatabase {
   url: string;
@@ -32,7 +33,13 @@ export async function createTestDatabase(): Promise<TestDatabase> {
 // configured) and shuts it down when the current test finishes. Pass a
 // database to run several servers against the same data.
 export async function startTestServer(
-  options: { database?: TestDatabase; authSecret?: string; trustedProxies?: string[]; webDir?: string } = {},
+  options: {
+    database?: TestDatabase;
+    authSecret?: string;
+    trustedProxies?: string[];
+    webDir?: string;
+    mailer?: Mailer;
+  } = {},
 ): Promise<TestServer> {
   const database = options.database ?? (await createTestDatabase());
   const app = createApp({
@@ -41,7 +48,7 @@ export async function startTestServer(
     authSecret: options.authSecret,
     trustedProxies: options.trustedProxies ?? [],
     webDir: options.webDir,
-  });
+  }, { mailer: options.mailer });
   await app.start();
 
   let closed = false;

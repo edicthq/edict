@@ -14,6 +14,7 @@ import {
   type Transaction,
 } from "@edicthq/db";
 import { CreateInvite, CreatedInvite, Id, Invite, InvitePreview, Membership } from "@edicthq/schema";
+import { inviteEmail } from "../email.js";
 import { loadMember, requireRole } from "./access.js";
 import { OrgParams, body, errors, inOrg, json, noContent, router, signedIn, type ApiDeps } from "./context.js";
 import { conflict, forbidden, gone, invalid, notFound } from "./errors.js";
@@ -126,7 +127,7 @@ export function inviteRoutes(deps: ApiDeps) {
     const email = input.email.toLowerCase();
     const token = randomBytes(32).toString("base64url");
 
-    const invite = await inOrg(deps, c, orgId, async (tx, caller) => {
+    const { invite, inviterName, organizationName } = await inOrg(deps, c, orgId, async (tx, caller) => {
       requireRole(caller, "admin", "invite people");
       if (input.role === "owner") {
         requireRole(caller, "owner", "invite Owners");
@@ -178,11 +179,27 @@ export function inviteRoutes(deps: ApiDeps) {
         subjectId: invite!.id,
         data: { email, role: input.role, teamIds },
       });
-      return invite!;
+      const [organization] = await tx.select().from(organizations).where(eq(organizations.id, orgId));
+      const inviter = await loadMember(tx, orgId, caller.id);
+      return { invite: invite!, inviterName: inviter.name, organizationName: organization!.name };
     });
 
     const base = deps.publicUrl ?? new URL(c.req.url).origin;
-    return c.json({ ...toInvite(invite), url: new URL(`/invite/${token}`, base).toString() }, 201);
+    const url = new URL(`/invite/${token}`, base).toString();
+    // After the commit: the link exists only in this request, since only its
+    // hash is stored. A failed send leaves the invite in place to share by hand.
+    let emailSent = false;
+    if (deps.mailer) {
+      try {
+        await deps.mailer.send(
+          inviteEmail({ to: email, inviterName, organizationName, role: invite.role, url }),
+        );
+        emailSent = true;
+      } catch (error) {
+        console.error(`Emailing the invite for ${email} failed`, error);
+      }
+    }
+    return c.json({ ...toInvite(invite), url, emailSent }, 201);
   });
 
   app.openapi(listInvites, async (c) => {

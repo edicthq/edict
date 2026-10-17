@@ -2,6 +2,7 @@ import { OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import { inScope, type Database, type Transaction } from "@edicthq/db";
 import { ErrorResponse, Id, type ErrorCode } from "@edicthq/schema";
+import type { Mailer } from "../email.js";
 import { callerMember, type MemberRow } from "./access.js";
 import { errorResponse, onApiError, unauthorized } from "./errors.js";
 
@@ -15,6 +16,8 @@ export interface SessionUser {
 export interface ApiDeps {
   db: Database;
   getUser: (headers: Headers) => Promise<SessionUser | null>;
+  // Unset when the instance has no email set up.
+  mailer?: Mailer;
   // Where links in responses point. Defaults to the request's origin.
   publicUrl?: string;
 }
