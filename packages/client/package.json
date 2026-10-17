@@ -1,0 +1,24 @@
+{
+  "name": "@edicthq/client",
+  "version": "0.0.0",
+  "description": "Typed client for the Edict API, generated from its OpenAPI document",
+  "license": "MIT",
+  "type": "module",
+  "files": ["dist", "openapi.json"],
+  "exports": {
+    ".": "./dist/index.js",
+    "./openapi.json": "./openapi.json"
+  },
+  "scripts": {
+    "generate": "openapi-typescript openapi.json -o src/schema.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.17.0"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.13.0",
+    "typescript": "^5.9.0"
+  }
+}

@@ -157,7 +157,12 @@ export type SignUpMode = z.infer<typeof SignUpMode>;
 export const InstanceSettings = z
   .object({
     signUpMode: SignUpMode,
+    // False until the first user signs up and becomes the instance admin.
+    setUp: z.boolean(),
   })
   .meta({ id: "InstanceSettings" });
 
-export const UpdateInstanceSettings = InstanceSettings.partial().meta({ id: "UpdateInstanceSettings" });
+export const UpdateInstanceSettings = z
+  .object({ signUpMode: SignUpMode })
+  .partial()
+  .meta({ id: "UpdateInstanceSettings" });

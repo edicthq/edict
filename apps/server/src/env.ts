@@ -9,6 +9,9 @@ export interface ServerConfig {
   // Reverse proxies (IPs or CIDR ranges) whose X-Forwarded-For is believed.
   // Empty means clients connect directly and the socket address is the IP.
   trustedProxies: string[];
+  // The built web app (apps/web/dist). Unset in development, where Vite
+  // serves it and proxies /api here.
+  webDir?: string;
 }
 
 export class ConfigError extends Error {}
@@ -33,6 +36,7 @@ export function readConfig(env: NodeJS.ProcessEnv): ServerConfig {
       .split(",")
       .map((entry) => entry.trim())
       .filter(Boolean),
+    webDir: env.WEB_DIR || undefined,
   };
 }
 

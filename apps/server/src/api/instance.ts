@@ -1,6 +1,7 @@
 import { createRoute } from "@hono/zod-openapi";
 import { InstanceSettings, UpdateInstanceSettings } from "@edicthq/schema";
-import { readInstanceSettings, setSignUpMode } from "../instance.js";
+import { hasUsers, readInstanceSettings, setSignUpMode } from "../instance.js";
+import type { Database } from "@edicthq/db";
 import { body, errors, json, router, signedIn, type ApiDeps } from "./context.js";
 import { forbidden } from "./errors.js";
 
@@ -9,7 +10,8 @@ const getInstance = createRoute({
   path: "/instance",
   tags: ["Instance"],
   summary: "The instance's public settings",
-  description: "Readable without signing in, so the sign-up page can say whether it needs an invite.",
+  description:
+    "Readable without signing in, so the sign-up page can say whether it needs an invite, and a fresh instance can send its first visitor to sign up.",
   responses: {
     200: json(InstanceSettings, "Instance settings"),
   },
@@ -32,8 +34,7 @@ export function instanceRoutes(deps: ApiDeps) {
   const app = router();
 
   app.openapi(getInstance, async (c) => {
-    const settings = await readInstanceSettings(deps.db);
-    return c.json({ signUpMode: settings.signUpMode }, 200);
+    return c.json(await publicSettings(deps.db), 200);
   });
 
   app.openapi(updateInstance, async (c) => {
@@ -45,9 +46,13 @@ export function instanceRoutes(deps: ApiDeps) {
     if (input.signUpMode) {
       await setSignUpMode(deps.db, user.id, input.signUpMode);
     }
-    const settings = await readInstanceSettings(deps.db);
-    return c.json({ signUpMode: settings.signUpMode }, 200);
+    return c.json(await publicSettings(deps.db), 200);
   });
 
   return app;
+}
+
+async function publicSettings(db: Database) {
+  const settings = await readInstanceSettings(db);
+  return { signUpMode: settings.signUpMode, setUp: await hasUsers(db) };
 }

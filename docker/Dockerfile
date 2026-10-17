@@ -8,18 +8,23 @@ WORKDIR /repo
 FROM base AS build
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
 COPY apps/server/package.json apps/server/
+COPY apps/web/package.json apps/web/
+COPY packages/client/package.json packages/client/
 COPY packages/db/package.json packages/db/
 COPY packages/schema/package.json packages/schema/
+COPY packages/ui/package.json packages/ui/
 RUN pnpm install --frozen-lockfile
 COPY apps ./apps
 COPY packages ./packages
-RUN pnpm turbo run build --filter=@edicthq/server
+RUN pnpm turbo run build --filter=@edicthq/server --filter=@edicthq/web
 RUN pnpm deploy --filter=@edicthq/server --prod /srv
 
 FROM node:22-slim AS app
 WORKDIR /srv
 COPY --from=build /srv /srv
+COPY --from=build /repo/apps/web/dist /srv/web
 ENV NODE_ENV=production
+ENV WEB_DIR=/srv/web
 EXPOSE 3000
 USER node
 HEALTHCHECK --interval=10s --timeout=3s --start-period=30s --retries=5 \

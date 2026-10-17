@@ -5,6 +5,8 @@
     "jsx": "react-jsx",
     "rootDir": ".",
     "types": [],
+    "declaration": false,
+    "declarationMap": false,
     "noEmit": true
   },
   "include": ["src", "vite.config.ts", "vite-env.d.ts"]

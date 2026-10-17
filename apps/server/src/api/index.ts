@@ -23,10 +23,20 @@ export function createApi(deps: ApiDeps) {
   api.route("/", eventRoutes(deps));
   api.route("/", instanceRoutes(deps));
 
-  api.doc31("/openapi.json", {
-    openapi: "3.1.0",
-    info: { title: "Edict API", version: "1" },
-  });
+  api.doc31("/openapi.json", documentConfig);
 
   return api;
+}
+
+const documentConfig = {
+  openapi: "3.1.0",
+  info: { title: "Edict API", version: "1" },
+  servers: [{ url: "/api/v1" }],
+};
+
+// The document without a running server. Building routes touches no
+// dependency, so stubs are enough. scripts/openapi.ts writes it to
+// packages/client, which generates the typed client from it.
+export function openApiDocument() {
+  return createApi({ db: undefined as never, getUser: async () => null }).getOpenAPI31Document(documentConfig);
 }

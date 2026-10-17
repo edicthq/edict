@@ -46,11 +46,15 @@ export async function setSignUpMode(db: Database, actorUserId: string, mode: Sig
   });
 }
 
+export async function hasUsers(db: Database): Promise<boolean> {
+  const [users] = await db.select({ n: count() }).from(user);
+  return (users?.n ?? 0) > 0;
+}
+
 // Whether the sign-up mode lets this email become a user. The first user is
 // always let in: someone has to become the instance admin.
 export async function maySignUp(db: Database, email: string): Promise<boolean> {
-  const [users] = await db.select({ n: count() }).from(user);
-  if (!users || users.n === 0) {
+  if (!(await hasUsers(db))) {
     return true;
   }
   const settings = await readInstanceSettings(db);

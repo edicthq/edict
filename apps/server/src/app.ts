@@ -1,5 +1,8 @@
 import { serve, type ServerType } from "@hono/node-server";
+import { readFileSync } from "node:fs";
+import { extname, join } from "node:path";
 import { getConnInfo } from "@hono/node-server/conninfo";
+import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono, type Context } from "hono";
 import { createDatabase, createPool, migrateToLatest } from "@edicthq/db";
 import { createApi } from "./api/index.js";
@@ -45,6 +48,10 @@ export function createApp(config: ServerConfig): App {
     }),
   );
 
+  if (config.webDir) {
+    serveWeb(app, config.webDir);
+  }
+
   let server: ServerType | undefined;
   let poolEnded = false;
 
@@ -80,6 +87,32 @@ export function createApp(config: ServerConfig): App {
   };
 
   return state;
+}
+
+// The built web app. Hashed files under /assets cache forever; every other
+// path that is not a file gets index.html, so the client router handles it.
+function serveWeb(app: Hono, root: string): void {
+  const indexHtml = readFileSync(join(root, "index.html"), "utf8");
+  const files = serveStatic({ root });
+
+  app.use("/assets/*", async (c, next) => {
+    await next();
+    if (c.res.ok) {
+      c.header("cache-control", "public, max-age=31536000, immutable");
+    }
+  });
+  app.get("/assets/*", files);
+  app.get("*", async (c, next) => {
+    const path = c.req.path;
+    if (path.startsWith("/api/") || path === "/health") {
+      return next();
+    }
+    if (extname(path)) {
+      return files(c, next);
+    }
+    c.header("cache-control", "no-cache");
+    return c.html(indexHtml);
+  });
 }
 
 // Better Auth rate-limits by client IP and reads it from X-Forwarded-For. A

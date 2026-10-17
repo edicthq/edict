@@ -1,0 +1,11 @@
+# The image installs and builds from source; host artifacts must not leak in.
+**/node_modules
+**/dist
+**/.turbo
+**/*.tsbuildinfo
+**/coverage
+.git
+.env
+.env.*
+docs
+prototypes

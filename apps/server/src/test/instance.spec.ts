@@ -16,11 +16,14 @@ async function sessionIp(baseUrl: string, res: Response): Promise<string | undef
 }
 
 describe("instance settings", () => {
-  it("anyone can read the sign-up mode, which starts open", async () => {
+  it("anyone can read the sign-up mode, which starts open, and whether setup is done", async () => {
     const t = await startTestServer();
     const res = await apiClient(t.baseUrl).get("/instance");
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ signUpMode: "open" });
+    expect(res.body).toEqual({ signUpMode: "open", setUp: false });
+
+    await signUpAs(t.baseUrl, "Admin");
+    expect((await apiClient(t.baseUrl).get("/instance")).body).toEqual({ signUpMode: "open", setUp: true });
   });
 
   it("only the instance admin changes it", async () => {
@@ -33,7 +36,7 @@ describe("instance settings", () => {
 
     const res = await admin.patch("/instance", { signUpMode: "invite_only" });
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ signUpMode: "invite_only" });
+    expect(res.body).toEqual({ signUpMode: "invite_only", setUp: true });
     expect((await apiClient(t.baseUrl).get("/instance")).body.signUpMode).toBe("invite_only");
   });
 

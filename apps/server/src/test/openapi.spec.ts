@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { startTestServer } from "./server.js";
 
@@ -41,5 +43,15 @@ describe("OpenAPI document", () => {
     expect(Object.keys(doc.components.schemas)).toEqual(
       expect.arrayContaining(["Error", "Organization", "Member", "Membership", "Team", "Invite", "Event", "InstanceSettings"]),
     );
+  });
+
+  it("matches the document packages/client was generated from", async () => {
+    const t = await startTestServer();
+    const served = await (await fetch(`${t.baseUrl}/api/v1/openapi.json`)).json();
+    const committed = JSON.parse(
+      readFileSync(join(import.meta.dirname, "../../../../packages/client/openapi.json"), "utf8"),
+    );
+    // On failure, run `pnpm api:generate` and commit the result.
+    expect(served).toEqual(committed);
   });
 });

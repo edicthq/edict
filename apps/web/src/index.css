@@ -1,0 +1,4 @@
+@import "tailwindcss";
+@import "@edicthq/ui/tokens.css";
+
+@source "../../../packages/ui/src";
