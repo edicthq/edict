@@ -76,6 +76,7 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
           secret: config.authSecret ?? settings.authSecret,
           baseURL: config.baseUrl,
           trustedProxies: config.trustedProxies,
+          rateLimit: config.authRateLimit === false ? false : undefined,
         },
         db,
         mailer,

@@ -16,6 +16,10 @@ export interface ServerConfig {
   // by hand.
   smtpUrl?: string;
   emailFrom?: string;
+  // Better Auth's per-IP rate limit on sign-in and sign-up (three requests
+  // over ten seconds by default). Off only for tests that create several
+  // users from one address, like the browser end-to-end suite.
+  authRateLimit?: boolean;
 }
 
 export class ConfigError extends Error {}
@@ -49,6 +53,7 @@ export function readConfig(env: NodeJS.ProcessEnv): ServerConfig {
     webDir: env.WEB_DIR || undefined,
     smtpUrl,
     emailFrom,
+    authRateLimit: env.AUTH_RATE_LIMIT !== "off",
   };
 }
 

@@ -22,6 +22,9 @@ export const test = base.extend<{}, { instanceUrl: string }>({
           WEB_DIR: join(root, "web/dist"),
           BETTER_AUTH_URL: url,
           BETTER_AUTH_SECRET: "",
+          // The tests sign several people up from the same address, which the
+          // production rate limiter would turn away.
+          AUTH_RATE_LIMIT: "off",
           SMTP_URL: "",
         },
         stdio: ["ignore", "inherit", "inherit"],

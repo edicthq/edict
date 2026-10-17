@@ -13,6 +13,9 @@ export interface AuthConfig {
   // See ServerConfig.trustedProxies. The server puts the socket address at the
   // end of X-Forwarded-For before Better Auth reads it (app.ts).
   trustedProxies?: string[];
+  // On by default; tests that sign several people up from one address turn it
+  // off.
+  rateLimit?: boolean;
 }
 
 export type EdictAuth = ReturnType<typeof createAuth>;
@@ -37,6 +40,9 @@ export function createAuth(config: AuthConfig, db: Database, mailer?: Mailer) {
           sendVerificationEmail: async ({ user, url }) => mailer.send(verificationEmail({ to: user.email, url })),
         }
       : undefined,
+    // Better Auth turns the rate limiter on in production and off elsewhere;
+    // tests may switch it off explicitly.
+    ...(config.rateLimit === false ? { rateLimit: { enabled: false } } : {}),
     plugins: [admin()],
     advanced: {
       ipAddress: {
