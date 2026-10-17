@@ -51,8 +51,9 @@
   --lane: oklch(0.978 0.008 var(--a-h));
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
+/* Dark follows the system unless the person chose a theme (data-theme on the
+   root, set from Appearance in the rail). */
+:root[data-theme="dark"] {
     --bg: oklch(0.165 0.006 260);
     --rail: oklch(0.145 0.006 260);
     --surface: oklch(0.198 0.008 260);
@@ -70,16 +71,74 @@
     --danger-wash: oklch(0.7 0.17 25 / 0.15);
     --overlay-shadow: 0 0 0 1px oklch(1 0 0 / 0.05), 0 20px 56px -16px oklch(0 0 0 / 0.75);
     color-scheme: dark;
-  }
-
-  :root,
-  [data-accent] {
+}
+:root[data-theme="dark"],
+:root[data-theme="dark"] [data-accent] {
     --agent: oklch(0.64 calc(var(--a-c) * 0.85) var(--a-h));
     --on-agent: oklch(0.17 0.02 var(--a-h));
     --agent-ink: oklch(0.8 calc(var(--a-c) * 0.6) var(--a-h));
     --agent-wash: oklch(0.64 calc(var(--a-c) * 0.85) var(--a-h) / 0.15);
     --agent-edge: oklch(0.64 calc(var(--a-c) * 0.85) var(--a-h) / 0.55);
     --lane: oklch(0.185 0.016 var(--a-h));
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: oklch(0.165 0.006 260);
+      --rail: oklch(0.145 0.006 260);
+      --surface: oklch(0.198 0.008 260);
+      --hover: oklch(0.235 0.009 260);
+      --line: oklch(0.262 0.009 260);
+      --line-strong: oklch(0.33 0.011 260);
+      --ink: oklch(0.95 0.004 255);
+      --ink-2: oklch(0.74 0.009 255);
+      --ink-3: oklch(0.56 0.009 255);
+      --on-human: oklch(0.17 0.008 260);
+      --scrim: oklch(0 0 0 / 0.45);
+      --warn: oklch(0.83 0.13 80);
+      --warn-wash: oklch(0.8 0.14 80 / 0.14);
+      --danger: oklch(0.76 0.14 25);
+      --danger-wash: oklch(0.7 0.17 25 / 0.15);
+      --overlay-shadow: 0 0 0 1px oklch(1 0 0 / 0.05), 0 20px 56px -16px oklch(0 0 0 / 0.75);
+      color-scheme: dark;
+  }
+  :root:not([data-theme="light"]),
+  :root:not([data-theme="light"]) [data-accent] {
+    --agent: oklch(0.64 calc(var(--a-c) * 0.85) var(--a-h));
+      --on-agent: oklch(0.17 0.02 var(--a-h));
+      --agent-ink: oklch(0.8 calc(var(--a-c) * 0.6) var(--a-h));
+      --agent-wash: oklch(0.64 calc(var(--a-c) * 0.85) var(--a-h) / 0.15);
+      --agent-edge: oklch(0.64 calc(var(--a-c) * 0.85) var(--a-h) / 0.55);
+      --lane: oklch(0.185 0.016 var(--a-h));
+  }
+}
+
+/* Lime keeps a bright fill, so it needs dark text on it. */
+[data-accent="lime"] {
+  --a-h: 128;
+  --a-c: 0.2;
+  --agent: oklch(0.86 0.2 128);
+  --on-agent: oklch(0.25 0.06 130);
+  --agent-ink: oklch(0.47 0.13 135);
+  --agent-wash: oklch(0.86 0.2 128 / 0.22);
+  --agent-edge: oklch(0.72 0.17 130);
+}
+:root[data-theme="dark"][data-accent="lime"],
+:root[data-theme="dark"] [data-accent="lime"] {
+  --agent: oklch(0.88 0.2 128);
+  --on-agent: oklch(0.22 0.05 130);
+  --agent-ink: oklch(0.87 0.19 128);
+  --agent-wash: oklch(0.88 0.2 128 / 0.11);
+  --agent-edge: oklch(0.88 0.2 128 / 0.6);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"])[data-accent="lime"],
+  :root:not([data-theme="light"]) [data-accent="lime"] {
+    --agent: oklch(0.88 0.2 128);
+    --on-agent: oklch(0.22 0.05 130);
+    --agent-ink: oklch(0.87 0.19 128);
+    --agent-wash: oklch(0.88 0.2 128 / 0.11);
+    --agent-edge: oklch(0.88 0.2 128 / 0.6);
   }
 }
 
@@ -168,4 +227,17 @@
   ::selection {
     background: var(--hover);
   }
+}
+
+@keyframes dialog-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* Set for one frame while the theme or accent switches, so colors swap at once. */
+.no-transition,
+.no-transition * {
+  transition: none !important;
 }

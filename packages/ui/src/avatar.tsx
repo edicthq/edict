@@ -12,7 +12,7 @@ const sizes = {
   32: { box: "size-8 text-[12px]", agent: "rounded-[9px]" },
 } as const;
 
-// Humans are ink-outlined circles; agents are accent-filled rounded squares.
+// Humans are outlined circles; agents are accent-filled rounded squares.
 // Shape and fill tell them apart even without seeing the color.
 export function Avatar({
   name,
@@ -33,7 +33,7 @@ export function Avatar({
         sizes[size].box,
         kind === "agent"
           ? cn("bg-agent text-on-agent", sizes[size].agent)
-          : "rounded-full bg-hover text-ink-2 shadow-[inset_0_0_0_1px_var(--line-strong)]",
+          : "rounded-full bg-surface text-ink shadow-[inset_0_0_0_1px_var(--line-strong)]",
         className,
       )}
     >

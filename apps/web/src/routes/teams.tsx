@@ -1,75 +1,52 @@
-import { zodResolver } from "@hookform/resolvers/zod";
-import { ChevronRight, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
 import { Link, useParams } from "react-router";
-import type { z } from "zod";
-import { CreateTeam } from "@edicthq/schema";
-import { Avatar, Badge, Button, Field, Input, Select, TeamKey } from "@edicthq/ui";
-import { EmptyState, FormError, Loading, PageHeader, SectionLabel } from "../components/shell.js";
-import { ApiFailure } from "../lib/api.js";
-import {
-  useAddTeamMember,
-  useCreateTeam,
-  useMembers,
-  useRemoveTeamMember,
-  useTeamMembers,
-  useTeams,
-} from "../lib/queries.js";
-import { roleLabel } from "./members.js";
+import { Avatar, Badge, Button, Select, TeamKey } from "@edicthq/ui";
+import { EmptyState, FormError, GroupHeader, Loading, PageBody, PageHeader, rowClass } from "../components/shell.js";
+import { roleLabel } from "../lib/labels.js";
+import { useAddTeamMember, useMembers, useRemoveTeamMember, useTeamMembers, useTeams } from "../lib/queries.js";
 import { useOrg } from "./org.js";
 
-// A first guess at a team key from its name: "Engineering" → "ENG",
-// "Customer Success" → "CS".
-export function suggestKey(name: string): string {
-  const words = name.toUpperCase().replace(/[^A-Z0-9 ]/g, "").split(/\s+/).filter(Boolean);
-  const key = words.length > 1 ? words.map((w) => w[0]).join("") : (words[0] ?? "").slice(0, 3);
-  return key.replace(/^[0-9]+/, "").slice(0, 7);
-}
-
 export function TeamsPage() {
-  const { orgId, canManage, membership } = useOrg();
+  const { orgId, canManage, slug, openCreateTeam } = useOrg();
   const teams = useTeams(orgId);
-  const [creating, setCreating] = useState(false);
 
   return (
     <>
       <PageHeader
         title="Teams"
         actions={
-          canManage && !creating && teams.data?.length ? (
-            <Button variant="primary" onClick={() => setCreating(true)}>
+          canManage && teams.data?.length ? (
+            <Button variant="primary" onClick={openCreateTeam}>
               Create team
             </Button>
           ) : null
         }
       />
-      <div className="mx-auto flex max-w-[760px] flex-col gap-8 px-6 py-8">
-        {creating ? <CreateTeamForm onDone={() => setCreating(false)} /> : null}
+      <PageBody>
         {teams.isPending ? (
           <Loading label="Loading teams" />
         ) : teams.data?.length ? (
-          <ul className="flex flex-col">
-            {teams.data.map((team) => (
-              <li key={team.id} className="border-b border-line last:border-b-0">
-                <Link
-                  to={`/${membership.organization.slug}/teams/${team.id}`}
-                  className="group flex h-10 items-center gap-3 rounded-sm px-2 hover:bg-hover"
-                >
-                  <TeamKey>{team.key}</TeamKey>
-                  <span className="truncate text-body font-medium tracking-[-0.005em]">{team.name}</span>
-                  {team.private ? (
-                    <Badge className="gap-1">
-                      <Lock aria-hidden="true" className="size-3" strokeWidth={2} />
-                      Private
-                    </Badge>
-                  ) : null}
-                  <ChevronRight aria-hidden="true" className="ms-auto size-4 text-ink-3" strokeWidth={1.75} />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        ) : !creating ? (
+          <>
+            <GroupHeader count={teams.data.length}>All teams</GroupHeader>
+            <ul className="flex flex-col gap-px">
+              {teams.data.map((team) => (
+                <li key={team.id}>
+                  <Link to={`/${slug}/teams/${team.id}`} className={rowClass}>
+                    <TeamKey>{team.key}</TeamKey>
+                    <span className="truncate text-body tracking-[-0.005em]">{team.name}</span>
+                    {team.private ? (
+                      <Badge>
+                        <Lock aria-hidden="true" className="size-3" strokeWidth={2} />
+                        Private
+                      </Badge>
+                    ) : null}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
           <EmptyState
             title="No teams yet"
             body={
@@ -79,99 +56,15 @@ export function TeamsPage() {
             }
             action={
               canManage ? (
-                <Button variant="primary" onClick={() => setCreating(true)}>
+                <Button variant="primary" onClick={openCreateTeam}>
                   Create team
                 </Button>
               ) : null
             }
           />
-        ) : null}
-      </div>
+        )}
+      </PageBody>
     </>
-  );
-}
-
-function CreateTeamForm({ onDone }: { onDone: () => void }) {
-  const { orgId } = useOrg();
-  const create = useCreateTeam(orgId);
-  const [failure, setFailure] = useState<string | null>(null);
-  const [keyTouched, setKeyTouched] = useState(false);
-  const form = useForm<z.input<typeof CreateTeam>, unknown, z.output<typeof CreateTeam>>({
-    resolver: zodResolver(CreateTeam),
-    defaultValues: { name: "", key: "", private: false },
-  });
-
-  const onSubmit = form.handleSubmit(async (values) => {
-    setFailure(null);
-    try {
-      await create.mutateAsync(values);
-      onDone();
-    } catch (error) {
-      if (error instanceof ApiFailure && error.code === "conflict") {
-        form.setError("key", { message: "Another team uses this key. Choose a different one." });
-        return;
-      }
-      setFailure(error instanceof Error ? error.message : "Creating the team failed.");
-    }
-  });
-
-  return (
-    <section aria-labelledby="create-team" className="rounded-md border border-line bg-surface p-4">
-      <SectionLabel id="create-team">New team</SectionLabel>
-      <form onSubmit={onSubmit} noValidate className="mt-4 flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-[1fr_140px]">
-          <Field label="Name" error={form.formState.errors.name?.message}>
-            {(control) => (
-              <Input
-                {...control}
-                autoFocus
-                placeholder="Engineering"
-                {...form.register("name", {
-                  onChange: (event: { target: { value: string } }) => {
-                    if (!keyTouched) form.setValue("key", suggestKey(event.target.value));
-                  },
-                })}
-              />
-            )}
-          </Field>
-          <Field
-            label="Key"
-            hint="In identifiers, like ENG-12."
-            error={form.formState.errors.key && (form.formState.errors.key.message?.startsWith("Another") ? form.formState.errors.key.message : "2–7 capital letters or digits, starting with a letter.")}
-          >
-            {(control) => (
-              <Input
-                {...control}
-                className="font-code uppercase"
-                autoCapitalize="characters"
-                maxLength={7}
-                placeholder="ENG"
-                {...form.register("key", {
-                  setValueAs: (value: string) => value.toUpperCase(),
-                  onChange: () => setKeyTouched(true),
-                })}
-              />
-            )}
-          </Field>
-        </div>
-        <label className="flex items-start gap-2 text-ui">
-          <input type="checkbox" className="mt-0.5 size-4 accent-[var(--ink)]" {...form.register("private")} />
-          <span>
-            <span className="font-medium">Private team</span>
-            <span className="block text-ink-2">Only its members and admins can see it.</span>
-          </span>
-        </label>
-        <FormError message={failure} />
-        <div className="flex gap-2">
-          <Button type="submit" variant="primary" disabled={form.formState.isSubmitting}>
-            {form.formState.isSubmitting ? "Creating…" : "Create team"}
-          </Button>
-          <Button variant="ghost" onClick={onDone}>
-            Cancel
-          </Button>
-        </div>
-      </form>
-    </section>
   );
 }
 
@@ -189,9 +82,9 @@ export function TeamPage() {
   if (teams.isPending || teamMembers.isPending) return <Loading />;
   if (!team) {
     return (
-      <div className="px-6 py-8">
+      <PageBody className="pt-6">
         <EmptyState title="Team not found" body="It doesn't exist, or it's a private team you aren't in." />
-      </div>
+      </PageBody>
     );
   }
 
@@ -203,38 +96,43 @@ export function TeamPage() {
   return (
     <>
       <PageHeader
+        lead={<TeamKey>{team.key}</TeamKey>}
         title={team.name}
-        meta={
+        actions={
           <>
-            <TeamKey>{team.key}</TeamKey>
-            {team.private ? <Badge>Private</Badge> : null}
+            {team.private ? (
+              <Badge>
+                <Lock aria-hidden="true" className="size-3" strokeWidth={2} />
+                Private
+              </Badge>
+            ) : null}
+            {!canManage && !inTeam.has(me) && !team.private ? (
+              <Button variant="primary" disabled={add.isPending} onClick={() => add.mutate(me)}>
+                Join team
+              </Button>
+            ) : null}
           </>
         }
-        actions={
-          !canManage && !inTeam.has(me) && !team.private ? (
-            <Button variant="primary" disabled={add.isPending} onClick={() => add.mutate(me)}>
-              Join team
-            </Button>
-          ) : null
-        }
       />
-      <div className="mx-auto flex max-w-[760px] flex-col gap-4 px-6 py-8">
-        <div className="flex items-center gap-3">
-          <SectionLabel>
-            Members <span className="tabular-nums">{teamMembers.data?.length ?? 0}</span>
-          </SectionLabel>
-        </div>
+      <PageBody>
+        <section className="mb-6 flex flex-col items-start gap-1 px-3 py-2">
+          <p className="text-body font-semibold">Issues arrive in the next milestone</p>
+          <p className="max-w-[60ch] text-ui text-ink-2 text-pretty">
+            {team.name}'s issues will be numbered {team.key}-1, {team.key}-2 and so on, and appear here as a list and a
+            board.
+          </p>
+        </section>
+
+        <GroupHeader count={teamMembers.data?.length ?? 0}>Members</GroupHeader>
         <FormError message={error?.message} />
-        <ul className="flex flex-col">
+        <ul className="flex flex-col gap-px">
           {teamMembers.data?.map((member) => (
-            <li key={member.id} className="flex h-12 items-center gap-3 border-b border-line px-2 last:border-b-0">
+            <li key={member.id} className={rowClass}>
               <Avatar name={member.name} kind={member.kind} />
-              <div className="min-w-0">
-                <p className="truncate text-body font-medium">
-                  {member.name}
-                  {member.id === me ? <span className="font-normal text-ink-2"> (you)</span> : null}
-                </p>
-              </div>
+              <span className="truncate text-body">
+                {member.name}
+                {member.id === me ? <span className="text-ink-2"> (you)</span> : null}
+              </span>
               <Badge className="ms-auto">{roleLabel[member.role]}</Badge>
               {canManage || member.id === me ? (
                 <Button variant="ghost" disabled={remove.isPending} onClick={() => remove.mutate(member.id)}>
@@ -246,30 +144,30 @@ export function TeamPage() {
         </ul>
         {canManage && candidates.length ? (
           <form
-            className="flex items-end gap-2"
+            className="mt-3 flex items-center gap-2 px-3"
             onSubmit={(event) => {
               event.preventDefault();
               if (adding) add.mutate(adding, { onSuccess: () => setAdding("") });
             }}
           >
-            <Field label="Add a member" className="flex-1">
-              {(control) => (
-                <Select {...control} value={adding} onChange={(event) => setAdding(event.target.value)}>
-                  <option value="">Choose someone…</option>
-                  {candidates.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
+            <label className="flex flex-1 items-center gap-2">
+              <span className="sr-only">Member to add</span>
+              <Select className="max-w-[280px] sm:h-[30px]" value={adding} onChange={(event) => setAdding(event.target.value)}>
+                <option value="">Add a member…</option>
+                {candidates.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </Select>
+            </label>
             <Button type="submit" disabled={!adding || add.isPending}>
               Add to team
             </Button>
           </form>
         ) : null}
-      </div>
+      </PageBody>
     </>
   );
 }
+

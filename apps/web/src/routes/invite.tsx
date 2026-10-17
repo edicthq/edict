@@ -4,7 +4,7 @@ import { AuthShell, FormError, Loading } from "../components/shell.js";
 import { ApiFailure } from "../lib/api.js";
 import { authClient, useSession } from "../lib/auth.js";
 import { useAcceptInvite, useInvitePreview } from "../lib/queries.js";
-import { roleLabel } from "./members.js";
+import { roleLabel } from "../lib/labels.js";
 
 export function InvitePage() {
   const { token = "" } = useParams();

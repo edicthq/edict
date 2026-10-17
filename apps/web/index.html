@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <title>Edict</title>
+    <script>
+      // Apply the saved theme and accent before the first paint (src/lib/appearance.ts).
+      try {
+        var a = JSON.parse(localStorage.getItem("edict.appearance") || "{}");
+        if (a.theme === "light" || a.theme === "dark") document.documentElement.dataset.theme = a.theme;
+        document.documentElement.dataset.accent = a.accent || "violet";
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,6 +1,6 @@
 import type { SignUpMode } from "@edicthq/client";
 import { cn } from "@edicthq/ui";
-import { FormError, Loading, PageHeader, SectionLabel } from "../components/shell.js";
+import { FormError, GroupHeader, Loading, PageBody, PageHeader } from "../components/shell.js";
 import { useInstance, useSetSignUpMode } from "../lib/queries.js";
 
 const modes: { value: SignUpMode; label: string; description: string }[] = [
@@ -19,16 +19,16 @@ export function InstancePage() {
   return (
     <>
       <PageHeader title="Instance" />
-      <div className="mx-auto flex max-w-[760px] flex-col gap-4 px-6 py-8">
-        <p className="max-w-[60ch] text-body text-ink-2 text-pretty">
+      <PageBody className="flex max-w-[720px] flex-col gap-4">
+        <p className="max-w-[60ch] px-3 text-body text-ink-2 text-pretty">
           These settings cover every organization on this instance. Only instance admins see them.
         </p>
         {instance.isPending ? (
           <Loading />
         ) : (
-          <fieldset className="flex flex-col gap-3" disabled={setMode.isPending}>
-            <legend className="mb-1">
-              <SectionLabel>Who can sign up</SectionLabel>
+          <fieldset className="flex flex-col gap-2" disabled={setMode.isPending}>
+            <legend className="contents">
+              <GroupHeader>Who can sign up</GroupHeader>
             </legend>
             {modes.map((mode) => {
               const checked = instance.data?.signUpMode === mode.value;
@@ -38,6 +38,7 @@ export function InstancePage() {
                   className={cn(
                     "flex cursor-pointer items-start gap-3 rounded-md border p-4 transition-[border-color,background-color] duration-[140ms] ease-standard",
                     checked ? "border-ink bg-surface" : "border-line hover:bg-hover",
+                    "mx-3",
                   )}
                 >
                   <input
@@ -58,7 +59,7 @@ export function InstancePage() {
           </fieldset>
         )}
         <FormError message={setMode.error?.message} />
-      </div>
+      </PageBody>
     </>
   );
 }

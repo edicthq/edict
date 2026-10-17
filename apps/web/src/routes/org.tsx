@@ -1,17 +1,28 @@
-import { ChevronsUpDown, LogOut, Plus, Settings2, Users, UsersRound } from "lucide-react";
+import { ChevronDown, LogOut, Plus } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { Membership } from "@edicthq/client";
-import { NavLink, Outlet, useNavigate, useOutletContext, useParams } from "react-router";
-import { Avatar, Button, cn } from "@edicthq/ui";
-import { Logo } from "../components/logo.js";
+import { Link, NavLink, Outlet, useNavigate, useOutletContext, useParams } from "react-router";
+import { Avatar, Button, Count, Kbd, LogoMark, TeamKey, cn } from "@edicthq/ui";
+import { CreateTeamDialog } from "../components/create-team-dialog.js";
+import { InviteDialog } from "../components/invite-dialog.js";
+import { CommandPalette } from "../components/palette.js";
 import { AuthShell, Loading } from "../components/shell.js";
+import { accentNames, accents, setAppearance, themes, useAppearance, type Theme } from "../lib/appearance.js";
 import { authClient, useSession } from "../lib/auth.js";
-import { useMemberships } from "../lib/queries.js";
+import { mod } from "../lib/labels.js";
+import { useMembers, useMemberships, useTeams } from "../lib/queries.js";
 
 export interface OrgContext {
   membership: Membership;
   orgId: string;
+  slug: string;
   // The signed-in user is an Admin or Owner here.
   canManage: boolean;
+  instanceAdmin: boolean;
+  openCreateTeam: () => void;
+  openInvite: () => void;
+  openPalette: () => void;
+  signOut: () => Promise<void>;
 }
 
 export function useOrg(): OrgContext {
@@ -21,6 +32,21 @@ export function useOrg(): OrgContext {
 export function OrgLayout() {
   const { slug } = useParams();
   const memberships = useMemberships();
+  const session = useSession();
+  const navigate = useNavigate();
+  const [dialog, setDialog] = useState<"team" | "invite" | "palette" | null>(null);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setDialog((open) => (open === "palette" ? null : "palette"));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   if (memberships.isPending) return <Loading />;
   const membership = memberships.data?.find((m) => m.organization.slug === slug);
   if (!membership) {
@@ -29,17 +55,29 @@ export function OrgLayout() {
         title="Organization not found"
         lead="It doesn't exist, or you aren't a member. Ask one of its admins for an invite."
       >
-        <NavLink to="/" className="text-ui font-medium underline decoration-line-strong underline-offset-4">
+        <Link to="/" className="text-ui font-medium underline decoration-line-strong underline-offset-4">
           Go to your organizations
-        </NavLink>
+        </Link>
       </AuthShell>
     );
   }
+
+  const canManage = membership.member.role === "owner" || membership.member.role === "admin";
   const context: OrgContext = {
     membership,
     orgId: membership.organization.id,
-    canManage: membership.member.role === "owner" || membership.member.role === "admin",
+    slug: membership.organization.slug,
+    canManage,
+    instanceAdmin: (session.data?.user as { role?: string } | undefined)?.role === "admin",
+    openCreateTeam: () => setDialog("team"),
+    openInvite: () => setDialog("invite"),
+    openPalette: () => setDialog("palette"),
+    signOut: async () => {
+      await authClient.signOut();
+      navigate("/sign-in", { replace: true });
+    },
   };
+
   return (
     <div className="flex min-h-dvh">
       <a
@@ -48,40 +86,242 @@ export function OrgLayout() {
       >
         Skip to content
       </a>
-      <Rail membership={membership} others={memberships.data ?? []} />
+      <Rail context={context} others={memberships.data ?? []} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <MobileBar membership={membership} />
+        <MobileBar context={context} />
         <main id="main" className="min-w-0 flex-1">
           <Outlet context={context} />
         </main>
       </div>
+      {canManage ? (
+        <>
+          <CreateTeamDialog context={context} open={dialog === "team"} onClose={() => setDialog(null)} />
+          <InviteDialog context={context} open={dialog === "invite"} onClose={() => setDialog(null)} />
+        </>
+      ) : null}
+      <CommandPalette
+        context={context}
+        others={memberships.data ?? []}
+        open={dialog === "palette"}
+        onClose={() => setDialog(null)}
+      />
     </div>
   );
 }
 
-function useRailState() {
-  const session = useSession();
-  const navigate = useNavigate();
-  return {
-    instanceAdmin: (session.data?.user as { role?: string } | undefined)?.role === "admin",
-    signOut: async () => {
-      await authClient.signOut();
-      navigate("/sign-in", { replace: true });
-    },
-  };
+function RailSection({ title, aside, children }: { title: string; aside?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-0.5">
+      <div className="flex items-center gap-2 px-1 pb-1">
+        <h2 className="text-sm font-semibold text-ink-2">{title}</h2>
+        {aside ? <div className="ms-auto flex items-center">{aside}</div> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+const railLink = ({ isActive }: { isActive: boolean }) =>
+  cn(
+    "flex h-[30px] items-center gap-2 rounded-sm px-2 text-ui transition-[background-color,color] duration-[140ms] ease-standard",
+    isActive
+      ? "bg-surface font-medium text-ink shadow-[inset_0_0_0_1px_var(--line)]"
+      : "text-ink-2 hover:text-ink",
+  );
+
+function Rail({ context, others }: { context: OrgContext; others: Membership[] }) {
+  const { orgId, slug, canManage, membership, instanceAdmin } = context;
+  const teams = useTeams(orgId);
+  const members = useMembers(orgId);
+  const humans = members.data?.filter((m) => m.kind === "human") ?? [];
+  const agents = members.data?.filter((m) => m.kind === "agent") ?? [];
+
+  return (
+    <nav
+      aria-label="Organization"
+      className="sticky top-0 flex h-dvh w-[252px] shrink-0 flex-col gap-5 overflow-y-auto border-e border-line bg-rail px-3 py-4 max-md:hidden"
+    >
+      <div className="flex items-center gap-2 px-1">
+        <LogoMark />
+        <span className="text-body font-semibold tracking-[-0.01em]">Edict</span>
+        <OrgSwitcher current={membership} others={others} />
+      </div>
+
+      <button
+        type="button"
+        onClick={context.openPalette}
+        className="flex h-8 items-center justify-between rounded-sm bg-surface ps-2.5 pe-1.5 text-ui text-ink-2 shadow-[inset_0_0_0_1px_var(--line)] transition-[color] duration-[140ms] ease-standard hover:text-ink"
+      >
+        <span>Search or command</span>
+        <Kbd>{`${mod}K`}</Kbd>
+      </button>
+
+      <RailSection
+        title="Teams"
+        aside={
+          canManage ? (
+            <Button variant="ghost" aria-label="Create team" title="Create team" className="size-6 px-0" onClick={context.openCreateTeam}>
+              <Plus aria-hidden="true" className="size-3.5" strokeWidth={2} />
+            </Button>
+          ) : null
+        }
+      >
+        {teams.data?.length ? (
+          teams.data.map((team) => (
+            <NavLink key={team.id} to={`/${slug}/teams/${team.id}`} className={railLink}>
+              <TeamKey>{team.key}</TeamKey>
+              <span className="truncate">{team.name}</span>
+            </NavLink>
+          ))
+        ) : (
+          <p className="px-2 text-sm text-ink-2">No teams yet.</p>
+        )}
+      </RailSection>
+
+      <RailSection title="Agents">
+        {agents.length ? (
+          agents.map((agent) => (
+            <div key={agent.id} className="flex min-h-[30px] items-center gap-2 px-2 text-ui">
+              <Avatar name={agent.name} kind="agent" />
+              <span className="truncate">{agent.name}</span>
+            </div>
+          ))
+        ) : (
+          <p className="px-2 text-sm text-ink-2 text-pretty">
+            Agents join when someone connects an MCP client like Claude Code.
+          </p>
+        )}
+      </RailSection>
+
+      <RailSection
+        title="Humans"
+        aside={
+          <NavLink to={`/${slug}/members`} className="rounded-xs px-1 text-sm text-ink-2 hover:text-ink aria-[current=page]:text-ink">
+            {canManage ? "Manage" : "All"}
+          </NavLink>
+        }
+      >
+        {humans.map((human) => (
+          <div key={human.id} className="flex min-h-[30px] items-center gap-2 px-2 text-ui">
+            <Avatar name={human.name} />
+            <span className="truncate">{human.name}</span>
+            {human.id === membership.member.id ? <Count className="ms-auto">you</Count> : null}
+          </div>
+        ))}
+      </RailSection>
+
+      <div className="mt-auto flex flex-col gap-3">
+        {instanceAdmin ? (
+          <NavLink to={`/${slug}/instance`} className={railLink}>
+            Instance settings
+          </NavLink>
+        ) : null}
+        <AppearanceSection />
+        <div className="flex items-center gap-2 border-t border-line px-1 pt-3">
+          <Avatar name={membership.member.name} />
+          <div className="min-w-0">
+            <p className="truncate text-ui font-medium">{membership.member.name}</p>
+            <p className="truncate text-sm text-ink-2">{membership.member.email}</p>
+          </div>
+          <Button variant="ghost" aria-label="Sign out" title="Sign out" className="ms-auto size-7 px-0" onClick={context.signOut}>
+            <LogOut aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+          </Button>
+        </div>
+      </div>
+    </nav>
+  );
+}
+
+function OrgSwitcher({ current, others }: { current: Membership; others: Membership[] }) {
+  return (
+    <details className="group relative ms-auto min-w-0">
+      <summary
+        className="flex h-6 cursor-pointer list-none items-center gap-1 rounded-sm px-1.5 text-sm text-ink-2 hover:bg-hover hover:text-ink [&::-webkit-details-marker]:hidden"
+        aria-label={`Organization: ${current.organization.name}. Switch organization`}
+      >
+        <span className="truncate">{current.organization.slug}</span>
+        <ChevronDown aria-hidden="true" className="size-3 shrink-0" strokeWidth={2} />
+      </summary>
+      <div className="absolute end-0 top-7 z-20 flex w-56 flex-col gap-0.5 rounded-md bg-surface p-1 shadow-overlay">
+        {others.map((m) => (
+          <NavLink
+            key={m.organization.id}
+            to={`/${m.organization.slug}`}
+            className="flex h-8 items-center gap-2 rounded-sm px-2 text-ui hover:bg-hover aria-[current=page]:font-semibold"
+            end
+          >
+            <span className="truncate">{m.organization.name}</span>
+            <span className="ms-auto text-sm text-ink-2">{m.organization.slug}</span>
+          </NavLink>
+        ))}
+        <NavLink to="/new" className="flex h-8 items-center gap-2 rounded-sm px-2 text-ui text-ink-2 hover:bg-hover hover:text-ink">
+          <Plus aria-hidden="true" className="size-3.5" strokeWidth={2} />
+          New organization
+        </NavLink>
+      </div>
+    </details>
+  );
+}
+
+const themeLabel: Record<Theme, string> = { system: "System", light: "Light", dark: "Dark" };
+
+function AppearanceSection() {
+  const { theme, accent } = useAppearance();
+  return (
+    <section className="flex flex-col gap-2 border-t border-line pt-3">
+      <h2 className="px-1 text-sm font-semibold text-ink-2">Appearance</h2>
+      <div className="flex items-center gap-2 px-1 text-sm text-ink-2">
+        Theme
+        <button
+          type="button"
+          className="ms-auto h-6 rounded-sm px-2 text-sm text-ink shadow-[inset_0_0_0_1px_var(--line)] hover:bg-hover"
+          onClick={() => setAppearance({ theme: themes[(themes.indexOf(theme) + 1) % themes.length] })}
+          aria-label={`Theme: ${themeLabel[theme]}. Change theme`}
+        >
+          {themeLabel[theme]}
+        </button>
+      </div>
+      <div className="flex items-center gap-2 px-1 text-sm text-ink-2">
+        <span id="accent-label">Agent color</span>
+        <div role="radiogroup" aria-labelledby="accent-label" className="ms-auto flex gap-1.5">
+          {accents.map((a) => (
+            <button
+              key={a}
+              type="button"
+              role="radio"
+              aria-checked={accent === a}
+              aria-label={accentNames[a]}
+              title={accentNames[a]}
+              data-accent={a}
+              onClick={() => setAppearance({ accent: a })}
+              className={cn(
+                "grid size-5 place-items-center rounded-full",
+                accent === a && "shadow-[0_0_0_2px_var(--rail),0_0_0_3.5px_var(--agent)]",
+              )}
+            >
+              <span className="size-3.5 rounded-full bg-agent" />
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
 }
 
 // Below the md breakpoint the rail becomes a bar above the page.
-function MobileBar({ membership }: { membership: Membership }) {
-  const { instanceAdmin, signOut } = useRailState();
-  const slug = membership.organization.slug;
+function MobileBar({ context }: { context: OrgContext }) {
+  const { slug, membership, instanceAdmin } = context;
   const link = ({ isActive }: { isActive: boolean }) =>
-    cn("flex h-8 items-center rounded-sm px-2.5 text-ui", isActive ? "bg-hover font-medium text-ink" : "text-ink-2");
+    cn("flex h-8 items-center rounded-sm px-2.5 text-ui", isActive ? "bg-surface font-medium text-ink shadow-[inset_0_0_0_1px_var(--line)]" : "text-ink-2");
   return (
     <nav aria-label="Organization" className="flex flex-col gap-2 border-b border-line bg-rail px-4 pt-3 pb-2 md:hidden">
       <div className="flex items-center gap-2">
+        <LogoMark />
         <span className="truncate text-ui font-semibold">{membership.organization.name}</span>
-        <Button variant="ghost" aria-label="Sign out" className="ms-auto size-8 px-0" onClick={signOut}>
+        <Button variant="ghost" aria-label="Search or command" className="ms-auto" onClick={context.openPalette}>
+          Search
+        </Button>
+        <Button variant="ghost" aria-label="Sign out" className="size-8 px-0" onClick={context.signOut}>
           <LogOut aria-hidden="true" className="size-4" strokeWidth={1.75} />
         </Button>
       </div>
@@ -99,105 +339,5 @@ function MobileBar({ membership }: { membership: Membership }) {
         ) : null}
       </div>
     </nav>
-  );
-}
-
-function Rail({ membership, others }: { membership: Membership; others: Membership[] }) {
-  const { instanceAdmin, signOut } = useRailState();
-  const slug = membership.organization.slug;
-
-  return (
-    <nav
-      aria-label="Organization"
-      className="sticky top-0 flex h-dvh w-[252px] shrink-0 flex-col gap-5 border-e border-line bg-rail px-3 py-4 max-md:hidden"
-    >
-      <div className="px-2">
-        <Logo className="text-body" />
-      </div>
-
-      <details className="group relative">
-        <summary className="flex h-9 cursor-pointer list-none items-center gap-2 rounded-sm px-2 hover:bg-hover [&::-webkit-details-marker]:hidden">
-          <span className="truncate text-ui font-semibold">{membership.organization.name}</span>
-          <ChevronsUpDown aria-hidden="true" className="ms-auto size-3.5 text-ink-3" strokeWidth={2} />
-        </summary>
-        <div className="absolute inset-x-0 top-10 z-10 flex flex-col gap-0.5 rounded-md border border-line bg-surface p-1 shadow-overlay">
-          {others.map((m) => (
-            <NavLink
-              key={m.organization.id}
-              to={`/${m.organization.slug}`}
-              className="flex h-8 items-center rounded-sm px-2 text-ui hover:bg-hover aria-[current=page]:font-semibold"
-              end
-            >
-              <span className="truncate">{m.organization.name}</span>
-            </NavLink>
-          ))}
-          <NavLink to="/new" className="flex h-8 items-center gap-2 rounded-sm px-2 text-ui text-ink-2 hover:bg-hover hover:text-ink">
-            <Plus aria-hidden="true" className="size-3.5" strokeWidth={2} />
-            New organization
-          </NavLink>
-        </div>
-      </details>
-
-      <ul className="flex flex-col gap-0.5">
-        <RailLink to={`/${slug}`} icon={UsersRound} end>
-          Teams
-        </RailLink>
-        <RailLink to={`/${slug}/members`} icon={Users}>
-          Members
-        </RailLink>
-        {instanceAdmin ? (
-          <RailLink to={`/${slug}/instance`} icon={Settings2}>
-            Instance
-          </RailLink>
-        ) : null}
-      </ul>
-
-      <div className="mt-auto flex items-center gap-2 border-t border-line px-2 pt-3">
-        <Avatar name={membership.member.name} />
-        <div className="min-w-0">
-          <p className="truncate text-ui font-medium">{membership.member.name}</p>
-          <p className="truncate text-sm text-ink-2">{membership.member.email}</p>
-        </div>
-        <Button
-          variant="ghost"
-          aria-label="Sign out"
-          title="Sign out"
-          className="ms-auto size-8 px-0"
-          onClick={signOut}
-        >
-          <LogOut aria-hidden="true" className="size-4" strokeWidth={1.75} />
-        </Button>
-      </div>
-    </nav>
-  );
-}
-
-function RailLink({
-  to,
-  icon: Icon,
-  end,
-  children,
-}: {
-  to: string;
-  icon: typeof Users;
-  end?: boolean;
-  children: string;
-}) {
-  return (
-    <li>
-      <NavLink
-        to={to}
-        end={end}
-        className={({ isActive }) =>
-          cn(
-            "flex h-8 items-center gap-2 rounded-sm px-2 text-ui transition-[background-color,color] duration-[140ms] ease-standard",
-            isActive ? "bg-hover font-medium text-ink" : "text-ink-2 hover:bg-hover hover:text-ink",
-          )
-        }
-      >
-        <Icon aria-hidden="true" className="size-4" strokeWidth={1.75} />
-        {children}
-      </NavLink>
-    </li>
   );
 }
