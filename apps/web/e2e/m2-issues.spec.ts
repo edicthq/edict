@@ -9,7 +9,7 @@ async function orgWithTeam(request: APIRequestContext, baseURL: string) {
     headers,
     data: { name: "Lena Park", email: "lena@example.com", password: "correct-horse-battery" },
   });
-  expect(signUp.ok()).toBe(true);
+  if (!signUp.ok()) throw new Error(`sign-up failed: ${signUp.status()} ${await signUp.text()}`);
   const org = await (await request.post("/api/v1/organizations", { headers, data: { name: "Acme", slug: "acme" } })).json();
   const orgId = org.organization.id as string;
   const team = await (
@@ -17,6 +17,66 @@ async function orgWithTeam(request: APIRequestContext, baseURL: string) {
   ).json();
   return { orgId, team: team as { id: string; version: number } };
 }
+
+test("label an issue, add a sub-issue and a relation, and move it to another team", async ({ page, baseURL }) => {
+  // Distinct org and user: all tests in this file share the worker's instance.
+  const headers = { origin: baseURL! };
+  const signUp = await page.request.post("/api/auth/sign-up/email", {
+    headers,
+    data: { name: "Maya Chen", email: "maya@example.com", password: "correct-horse-battery" },
+  });
+  expect(signUp.ok()).toBe(true);
+  const org = await (await page.request.post("/api/v1/organizations", { headers, data: { name: "Waypoint", slug: "waypoint" } })).json();
+  const orgId = org.organization.id as string;
+  const team = await (
+    await page.request.post(`/api/v1/organizations/${orgId}/teams`, { headers, data: { name: "Engineering", key: "ENG" } })
+  ).json() as { id: string };
+  const ops = await (
+    await page.request.post(`/api/v1/organizations/${orgId}/teams`, { headers, data: { name: "Ops", key: "OPS" } })
+  ).json() as { id: string };
+  await page.request.post(`/api/v1/organizations/${orgId}/teams/${team.id}/issues`, { headers, data: { title: "Ship the exporter" } });
+  await page.request.post(`/api/v1/organizations/${orgId}/teams/${ops.id}/issues`, { headers, data: { title: "Restart the relay" } });
+
+  await page.goto(`/waypoint/teams/${team.id}`);
+  const list = page.getByRole("region", { name: "Todo" });
+  await list.getByRole("button", { name: /ENG-1 Ship the exporter/ }).click();
+  const peek = page.getByRole("complementary", { name: /Ship the exporter/ });
+  await expect(peek).toBeVisible();
+
+  // Create a label from the picker and the issue keeps the pill. Enter picks
+  // the "create" option from the keyboard, which keeps focus in its input.
+  await peek.getByRole("button", { name: "Labels: none. Add labels" }).click();
+  await page.getByRole("combobox", { name: "Add labels" }).fill("bug");
+  await page.keyboard.press("Enter");
+  await expect(peek.getByRole("button", { name: "Labels: bug. Change labels" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(list.getByRole("button", { name: /bug/ })).toBeVisible();
+
+  // A sub-issue in the same team takes the next number.
+  await peek.getByRole("button", { name: "Add sub-issue" }).click();
+  const sub = page.getByRole("dialog", { name: "New sub-issue of ENG-1" });
+  await sub.getByLabel("Title").fill("Pick the format");
+  await page.keyboard.press("ControlOrMeta+Enter");
+  await expect(sub).toBeHidden();
+  await expect(peek.getByText("0/1")).toBeVisible();
+  await expect(peek.getByRole("button", { name: /ENG-2 Pick the format/ })).toBeVisible();
+
+  // A relation to an issue in the other team.
+  const relations = peek.locator('section[aria-labelledby="peek-relations"]');
+  await peek.getByRole("button", { name: "Add relation" }).click();
+  await peek.getByRole("textbox", { name: "Issue" }).fill("OPS-1");
+  await peek.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(relations.getByText("Blocks")).toBeVisible();
+  await expect(relations.getByRole("button", { name: /OPS-1 Restart the relay/ })).toBeVisible();
+
+  // Moving the issue to Ops numbers it there; the old identifier still resolves.
+  await peek.getByRole("button", { name: "Move", exact: true }).click();
+  await page.getByRole("option", { name: /Ops/ }).click();
+  await expect(page.getByRole("complementary", { name: /OPS-2 Ship the exporter/ })).toBeVisible();
+  await expect(page).toHaveURL(/issue=OPS-2$/);
+  await page.goto("/waypoint/issue/ENG-1");
+  await expect(page).toHaveURL(/issue=OPS-2$/);
+});
 
 test("create an issue, change its status in the peek, see it on the board, and follow an old identifier", async ({
   page,

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Issue, paths, Role, SignUpMode } from "@edicthq/client";
+import type { Issue, Label, paths, RelationType, Role, SignUpMode } from "@edicthq/client";
 import { ApiFailure, api, unwrap } from "./api.js";
 
 export const keys = {
@@ -13,6 +13,9 @@ export const keys = {
   statuses: (orgId: string, teamId: string) => ["org", orgId, "teams", teamId, "statuses"] as const,
   issues: (orgId: string, teamId: string) => ["org", orgId, "teams", teamId, "issues"] as const,
   issue: (orgId: string, issueRef: string) => ["org", orgId, "issue", issueRef] as const,
+  teamLabels: (orgId: string, teamId: string) => ["org", orgId, "teams", teamId, "labels"] as const,
+  subIssues: (orgId: string, issueId: string) => ["org", orgId, "issue", issueId, "sub-issues"] as const,
+  relations: (orgId: string, issueId: string) => ["org", orgId, "issue", issueId, "relations"] as const,
 };
 
 const org = (orgId: string) => ({ params: { path: { orgId } } });
@@ -215,6 +218,7 @@ export function useCreateIssue(orgId: string, teamId: string) {
       unwrap(api.POST("/organizations/{orgId}/teams/{teamId}/issues", { params: { path: { orgId, teamId } }, body })),
     onSuccess: (issue) => {
       client.setQueryData<Issue[]>(keys.issues(orgId, teamId), (list) => (list ? [issue, ...list] : list));
+      if (issue.parentId) void client.invalidateQueries({ queryKey: keys.subIssues(orgId, issue.parentId) });
     },
   });
 }
@@ -249,11 +253,21 @@ export function useUpdateIssue(orgId: string) {
             body: { version: cached?.version ?? issue.version, ...changes },
           }),
         );
-        client.setQueryData<Issue[]>(listKey(issue.teamId), (list) => replaceIssue(list, updated));
+        if (updated.teamId === issue.teamId) {
+          client.setQueryData<Issue[]>(listKey(issue.teamId), (list) => replaceIssue(list, updated));
+        } else {
+          // Moved: it leaves this team's list and joins the other's.
+          client.setQueryData<Issue[]>(listKey(issue.teamId), (list) => list?.filter((item) => item.id !== issue.id));
+          void client.invalidateQueries({ queryKey: listKey(updated.teamId) });
+        }
+        // Lists of sub-issues show its title and status.
+        void client.invalidateQueries({ queryKey: ["org", orgId, "issue"] });
         return updated;
       }),
-    // Shows the change at once; the server's answer replaces it.
+    // Shows the change at once; the server's answer replaces it. A move waits
+    // for the server, which picks the new number and status.
     onMutate: async ({ issue, changes }) => {
+      if (changes.teamId) return {};
       await client.cancelQueries({ queryKey: listKey(issue.teamId) });
       const before = client.getQueryData<Issue[]>(listKey(issue.teamId))?.find((item) => item.id === issue.id);
       client.setQueryData<Issue[]>(listKey(issue.teamId), (list) =>
@@ -267,5 +281,75 @@ export function useUpdateIssue(orgId: string) {
       const current = error instanceof ApiFailure && error.code === "conflict" ? (error.details.current as Issue) : context?.before;
       if (current) client.setQueryData<Issue[]>(listKey(issue.teamId), (list) => replaceIssue(list, current));
     },
+  });
+}
+
+export function useTeamLabels(orgId: string, teamId: string) {
+  return useQuery({
+    queryKey: keys.teamLabels(orgId, teamId),
+    queryFn: () =>
+      unwrap(api.GET("/organizations/{orgId}/teams/{teamId}/labels", { params: { path: { orgId, teamId } } })),
+    staleTime: 5 * 60_000,
+  });
+}
+
+// A new label for one team, from the label picker.
+export function useCreateLabel(orgId: string, teamId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { name: string }) =>
+      unwrap(api.POST("/organizations/{orgId}/teams/{teamId}/labels", { params: { path: { orgId, teamId } }, body })),
+    onSuccess: (label) =>
+      client.setQueryData<Label[]>(keys.teamLabels(orgId, teamId), (list) =>
+        list ? [...list, label].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })) : list,
+      ),
+  });
+}
+
+export function useSubIssues(orgId: string, issueId: string) {
+  return useQuery({
+    queryKey: keys.subIssues(orgId, issueId),
+    queryFn: () =>
+      unwrap(
+        api.GET("/organizations/{orgId}/issues/{issueRef}/sub-issues", { params: { path: { orgId, issueRef: issueId } } }),
+      ),
+  });
+}
+
+export function useRelations(orgId: string, issueId: string) {
+  return useQuery({
+    queryKey: keys.relations(orgId, issueId),
+    queryFn: () =>
+      unwrap(
+        api.GET("/organizations/{orgId}/issues/{issueRef}/relations", { params: { path: { orgId, issueRef: issueId } } }),
+      ),
+  });
+}
+
+// Relations show on both issues, so a change refreshes every open relation list.
+export function useCreateRelation(orgId: string, issueId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { type: RelationType; issue: string }) =>
+      unwrap(
+        api.POST("/organizations/{orgId}/issues/{issueRef}/relations", {
+          params: { path: { orgId, issueRef: issueId } },
+          body,
+        }),
+      ),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["org", orgId, "issue"] }),
+  });
+}
+
+export function useDeleteRelation(orgId: string, issueId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (relationId: string) =>
+      unwrap(
+        api.DELETE("/organizations/{orgId}/issues/{issueRef}/relations/{relationId}", {
+          params: { path: { orgId, issueRef: issueId, relationId } },
+        }),
+      ),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["org", orgId, "issue"] }),
   });
 }

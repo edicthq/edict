@@ -12,12 +12,17 @@ export interface MenuItem<T extends string> {
 // A picker that opens under its trigger with a filter field, like the
 // prototype's "Change status…". Arrows move, Enter picks, Escape closes and
 // returns focus to the trigger. Pass open and onOpenChange to open it from a
-// keyboard shortcut.
+// keyboard shortcut. With `multiple`, picking toggles an item in `values` and
+// the menu stays open. With `onCreate`, a filter that matches nothing exactly
+// offers to create it.
 export function Menu<T extends string>({
   label,
   items,
   value,
+  values,
+  multiple = false,
   onSelect,
+  onCreate,
   trigger,
   open: controlledOpen,
   onOpenChange,
@@ -27,7 +32,10 @@ export function Menu<T extends string>({
   label: string;
   items: MenuItem<T>[];
   value?: T;
+  values?: T[];
+  multiple?: boolean;
   onSelect: (value: T) => void;
+  onCreate?: (name: string) => void;
   trigger: (props: {
     ref: React.Ref<HTMLButtonElement>;
     onClick: () => void;
@@ -52,7 +60,13 @@ export function Menu<T extends string>({
   const id = useId();
 
   const q = query.trim().toLowerCase();
-  const shown = q ? items.filter((item) => `${item.label} ${item.keywords ?? ""}`.toLowerCase().includes(q)) : items;
+  const matches = q ? items.filter((item) => `${item.label} ${item.keywords ?? ""}`.toLowerCase().includes(q)) : items;
+  const creating = onCreate && q && !items.some((item) => item.label.toLowerCase() === q);
+  const createValue = "\u0000create" as T;
+  const shown: MenuItem<T>[] = creating
+    ? [...matches, { value: createValue, label: `Create “${query.trim()}”` }]
+    : matches;
+  const isSelected = (item: MenuItem<T>) => (multiple ? (values ?? []).includes(item.value) : item.value === value);
 
   useEffect(() => {
     if (!open) return;
@@ -73,6 +87,16 @@ export function Menu<T extends string>({
   };
   const pick = (item: MenuItem<T> | undefined) => {
     if (!item) return;
+    if (item.value === createValue) {
+      onCreate?.(query.trim());
+      setQuery("");
+      if (!multiple) close();
+      return;
+    }
+    if (multiple) {
+      onSelect(item.value);
+      return;
+    }
     close();
     if (item.value !== value) onSelect(item.value);
   };
@@ -123,21 +147,42 @@ export function Menu<T extends string>({
             }}
             className="mb-1 h-8 rounded-sm bg-transparent px-2 text-ui text-ink placeholder:text-ink-2 focus-visible:outline-none"
           />
-          <ul id={`${id}-list`} role="listbox" aria-label={label} className="flex max-h-72 flex-col overflow-y-auto">
+          <ul
+            id={`${id}-list`}
+            role="listbox"
+            aria-label={label}
+            aria-multiselectable={multiple || undefined}
+            className="flex max-h-72 flex-col overflow-y-auto"
+          >
             {shown.map((item, index) => (
               <li
                 key={item.value}
                 id={`${id}-${item.value}`}
                 role="option"
-                aria-selected={item.value === value}
+                aria-selected={isSelected(item)}
                 onPointerMove={() => setActive(index)}
                 onClick={() => pick(item)}
                 className={cn(
                   "flex h-8 cursor-default items-center gap-2 rounded-sm px-2 text-ui",
                   index === active && "bg-hover",
-                  item.value === value && "font-semibold",
+                  !multiple && isSelected(item) && "font-semibold",
                 )}
               >
+                {multiple && item.value !== createValue ? (
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "grid size-3.5 shrink-0 place-items-center rounded-xs shadow-[inset_0_0_0_1px_var(--line-strong)]",
+                      isSelected(item) && "bg-ink shadow-none",
+                    )}
+                  >
+                    {isSelected(item) ? (
+                      <svg viewBox="0 0 10 10" className="size-2.5 text-on-human" aria-hidden="true">
+                        <path d="M2 5.2l2 2 4-4.4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    ) : null}
+                  </span>
+                ) : null}
                 {item.icon}
                 <span className="truncate">{item.label}</span>
               </li>

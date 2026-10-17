@@ -1,14 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router";
-import type { Issue, Member, Status, Team } from "@edicthq/client";
-import { Avatar, Button, Kbd, PriorityIcon, StatusIcon, TeamKey, cn } from "@edicthq/ui";
+import type { Issue, Label, Member, Status, Team } from "@edicthq/client";
+import { Avatar, Button, Kbd, LabelPill, PriorityIcon, StatusIcon, TeamKey, cn } from "@edicthq/ui";
 import { CreateIssueDialog } from "../components/create-issue-dialog.js";
 import { NoAssignee } from "../components/issue-fields.js";
 import { IssuePeek, type PeekMenu } from "../components/issue-peek.js";
 import { EmptyState, Loading, PageBody, PageHeader } from "../components/shell.js";
 import { useToast } from "../components/toast.js";
 import { ago, assignable, boardColumns, listGroups, priorityLabel, statusFill, type StatusGroup } from "../lib/issues.js";
-import { useIssue, useMembers, useStatuses, useTeamIssues, useTeamMembers, useTeams, useUpdateIssue } from "../lib/queries.js";
+import {
+  useIssue,
+  useMembers,
+  useStatuses,
+  useTeamIssues,
+  useTeamLabels,
+  useTeamMembers,
+  useTeams,
+  useUpdateIssue,
+} from "../lib/queries.js";
 import { useOrg } from "./org.js";
 
 type View = "list" | "board";
@@ -49,13 +58,16 @@ function TeamIssues({ team }: { team: Team }) {
   const issues = useTeamIssues(orgId, team.id);
   const orgMembers = useMembers(orgId);
   const teamMembers = useTeamMembers(orgId, team.id);
+  const labels = useTeamLabels(orgId, team.id);
+  const teams = useTeams(orgId);
   const update = useUpdateIssue(orgId);
   const toast = useToast();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const view: View = params.get("view") === "board" ? "board" : "list";
   const peekRef = params.get("issue");
-  const [creating, setCreating] = useState(false);
+  // The create dialog, and the issue it makes a sub-issue of.
+  const [creating, setCreating] = useState<{ parent?: Issue } | null>(null);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [menu, setMenu] = useState<PeekMenu>(null);
 
@@ -93,6 +105,13 @@ function TeamIssues({ team }: { team: Team }) {
     if (!issue) return;
     setFocusId(issue.id);
     setParam("issue", issue.identifier, peekRef !== null);
+  };
+  // An issue from a link in the peek: in the peek if it's this team's, else
+  // over its own team's list.
+  const openLinked = (identifier: string) => {
+    const here = byRef(identifier);
+    if (here) openIssue(here);
+    else navigate(`/${slug}/issue/${identifier}`);
   };
   const closePeek = () => {
     setMenu(null);
@@ -136,7 +155,7 @@ function TeamIssues({ team }: { team: Team }) {
       requestAnimationFrame(() => document.getElementById(`issue-${peeked.id}`)?.focus());
     } else if (key === "c") {
       event.preventDefault();
-      setCreating(true);
+      setCreating({});
     } else if (key === "v") {
       event.preventDefault();
       setParam("view", view === "list" ? "board" : null);
@@ -164,7 +183,7 @@ function TeamIssues({ team }: { team: Team }) {
             <Button variant="ghost" className="h-8 text-ui" onClick={() => navigate(`/${slug}/teams/${team.id}/members`)}>
               Members
             </Button>
-            <Button variant="primary" onClick={() => setCreating(true)}>
+            <Button variant="primary" onClick={() => setCreating({})}>
               New issue <Kbd>C</Kbd>
             </Button>
           </>
@@ -200,7 +219,7 @@ function TeamIssues({ team }: { team: Team }) {
               title="No issues yet"
               body={`Issues in ${team.name} are numbered ${team.key}-1, ${team.key}-2 and so on. Press C to create one.`}
               action={
-                <Button variant="primary" onClick={() => setCreating(true)}>
+                <Button variant="primary" onClick={() => setCreating({})}>
                   New issue <Kbd>C</Kbd>
                 </Button>
               }
@@ -210,6 +229,8 @@ function TeamIssues({ team }: { team: Team }) {
           <IssueList
             groups={groups}
             statuses={statusList}
+            labels={labels.data ?? []}
+            issues={issues.data ?? []}
             orgMembers={orgMembers.data ?? []}
             focusId={focusId}
             openId={peeked?.id}
@@ -220,6 +241,7 @@ function TeamIssues({ team }: { team: Team }) {
           <IssueBoard
             groups={groups}
             statuses={statusList}
+            labels={labels.data ?? []}
             orgMembers={orgMembers.data ?? []}
             focusId={focusId}
             onOpen={openIssue}
@@ -238,9 +260,13 @@ function TeamIssues({ team }: { team: Team }) {
           statuses={statuses.data}
           members={members}
           orgMembers={orgMembers.data ?? []}
+          labels={labels.data ?? []}
+          teams={teams.data ?? []}
           menu={menu}
           onMenu={setMenu}
           onClose={closePeek}
+          onOpen={openLinked}
+          onAddSubIssue={() => setCreating({ parent: peeked })}
         />
       ) : null}
 
@@ -250,8 +276,10 @@ function TeamIssues({ team }: { team: Team }) {
           team={team}
           statuses={statuses.data}
           members={members}
-          open={creating}
-          onClose={() => setCreating(false)}
+          labels={labels.data ?? []}
+          parent={creating?.parent}
+          open={creating !== null}
+          onClose={() => setCreating(null)}
           onCreated={(identifier) => toast(`Created ${identifier}`)}
         />
       ) : null}
@@ -282,9 +310,23 @@ function Assignee({ issue, orgMembers }: { issue: Issue; orgMembers: Member[] })
   );
 }
 
+function IssueLabels({ issue, labels }: { issue: Issue; labels: Label[] }) {
+  const own = labels.filter((label) => issue.labelIds.includes(label.id));
+  if (own.length === 0) return <span />;
+  return (
+    <span className="flex flex-wrap justify-end gap-1">
+      {own.map((label) => (
+        <LabelPill key={label.id} name={label.name} hue={label.hue} />
+      ))}
+    </span>
+  );
+}
+
 function IssueList({
   groups,
   statuses,
+  labels,
+  issues,
   orgMembers,
   focusId,
   openId,
@@ -293,12 +335,16 @@ function IssueList({
 }: {
   groups: StatusGroup[];
   statuses: Status[];
+  labels: Label[];
+  // The whole team's issues, to name a row's parent.
+  issues: Issue[];
   orgMembers: Member[];
   focusId: string | null;
   openId?: string;
   onOpen: (issue: Issue) => void;
   onFocus: (id: string) => void;
 }) {
+  const parentOf = (issue: Issue) => issues.find((i) => i.id === issue.parentId)?.identifier;
   return (
     <div className="px-3 pb-28">
       {groups.map((group) => (
@@ -319,7 +365,7 @@ function IssueList({
                     aria-current={openId === issue.id ? "true" : undefined}
                     data-focused={focusId === issue.id || undefined}
                     className={cn(
-                      "grid min-h-10 w-full grid-cols-[16px_58px_16px_minmax(0,1fr)_auto_30px] items-center gap-x-3 rounded-sm py-2 ps-4 pe-3 text-start",
+                      "grid min-h-10 w-full grid-cols-[16px_58px_16px_minmax(0,1fr)_auto_auto_30px] items-center gap-x-3 rounded-sm py-2 ps-4 pe-3 text-start",
                       "transition-[background-color] duration-[140ms] ease-standard hover:bg-hover",
                       "data-focused:bg-hover focus-visible:shadow-[inset_0_0_0_1.5px_var(--ink)] focus-visible:outline-none",
                     )}
@@ -331,14 +377,20 @@ function IssueList({
                     <span title={status.name}>
                       <StatusIcon category={status.category} fill={statusFill(statuses, status)} />
                     </span>
-                    <span
-                      className={cn(
-                        "truncate text-body tracking-[-0.005em]",
-                        openId === issue.id && "font-semibold",
-                      )}
-                    >
-                      {issue.title}
+                    <span className="flex min-w-0 items-baseline gap-2">
+                      <span
+                        className={cn(
+                          "truncate text-body tracking-[-0.005em]",
+                          openId === issue.id && "font-semibold",
+                        )}
+                      >
+                        {issue.title}
+                      </span>
+                      {parentOf(issue) ? (
+                        <span className="shrink-0 text-sm text-ink-2">↳ {parentOf(issue)}</span>
+                      ) : null}
                     </span>
+                    <IssueLabels issue={issue} labels={labels} />
                     <Assignee issue={issue} orgMembers={orgMembers} />
                     <time dateTime={issue.updatedAt} className="text-end text-sm text-ink-2">
                       {ago(issue.updatedAt)}
@@ -357,6 +409,7 @@ function IssueList({
 function IssueBoard({
   groups,
   statuses,
+  labels,
   orgMembers,
   focusId,
   onOpen,
@@ -365,6 +418,7 @@ function IssueBoard({
 }: {
   groups: StatusGroup[];
   statuses: Status[];
+  labels: Label[];
   orgMembers: Member[];
   focusId: string | null;
   onOpen: (issue: Issue) => void;
@@ -426,7 +480,14 @@ function IssueBoard({
                     </span>
                   </span>
                   <span className="text-body leading-[1.35] text-pretty">{issue.title}</span>
-                  <span className="flex items-center justify-end gap-2">
+                  <span className="flex items-center gap-2">
+                    <span className="flex min-w-0 flex-1 flex-wrap gap-1">
+                      {labels
+                        .filter((label) => issue.labelIds.includes(label.id))
+                        .map((label) => (
+                          <LabelPill key={label.id} name={label.name} hue={label.hue} />
+                        ))}
+                    </span>
                     <Assignee issue={issue} orgMembers={orgMembers} />
                   </span>
                 </button>

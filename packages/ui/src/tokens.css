@@ -28,6 +28,9 @@
   --danger: oklch(0.52 0.19 27);
   --danger-wash: oklch(0.62 0.2 27 / 0.1);
   --overlay-shadow: 0 1px 2px oklch(0.2 0.02 260 / 0.06), 0 20px 48px -16px oklch(0.2 0.02 260 / 0.28);
+  /* Label dots: oklch(label-l label-c hue). Decorative, never a state. */
+  --label-l: 0.66;
+  --label-c: 0.1;
   color-scheme: light;
 
   /* The accent is a hue, a chroma and a light-theme lightness. Violet is the default. */
@@ -70,6 +73,8 @@
     --danger: oklch(0.76 0.14 25);
     --danger-wash: oklch(0.7 0.17 25 / 0.15);
     --overlay-shadow: 0 0 0 1px oklch(1 0 0 / 0.05), 0 20px 56px -16px oklch(0 0 0 / 0.75);
+    --label-l: 0.72;
+    --label-c: 0.09;
     color-scheme: dark;
 }
 :root[data-theme="dark"],
@@ -100,6 +105,8 @@
       --danger: oklch(0.76 0.14 25);
       --danger-wash: oklch(0.7 0.17 25 / 0.15);
       --overlay-shadow: 0 0 0 1px oklch(1 0 0 / 0.05), 0 20px 56px -16px oklch(0 0 0 / 0.75);
+      --label-l: 0.72;
+      --label-c: 0.09;
       color-scheme: dark;
   }
   :root:not([data-theme="light"]),

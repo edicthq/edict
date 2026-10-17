@@ -7,3 +7,4 @@ export { Field, Input, Select, type FieldProps } from "./field.js";
 export { LogoMark } from "./logo.js";
 export { PriorityIcon, StatusIcon } from "./issue-icons.js";
 export { Menu, type MenuItem } from "./menu.js";
+export { LabelDot, LabelPill } from "./label.js";

@@ -20,6 +20,10 @@ export type StatusCategory = Schemas["StatusCategory"];
 export type Issue = Schemas["Issue"];
 export type Priority = Schemas["Priority"];
 export type IssueConflict = Schemas["IssueConflict"]["error"];
+export type Label = Schemas["Label"];
+export type LinkedIssue = Schemas["LinkedIssue"];
+export type Relation = Schemas["Relation"];
+export type RelationType = Schemas["RelationType"];
 export type ApiError = Schemas["Error"]["error"];
 
 export type EdictClient = ReturnType<typeof createEdictClient>;

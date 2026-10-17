@@ -1,6 +1,6 @@
-import type { Member, Priority, Status } from "@edicthq/client";
-import { Avatar, Menu, PriorityIcon, StatusIcon, cn } from "@edicthq/ui";
-import { CircleDashed, Hash } from "lucide-react";
+import type { Label, Member, Priority, Status } from "@edicthq/client";
+import { Avatar, LabelDot, LabelPill, Menu, PriorityIcon, StatusIcon, cn } from "@edicthq/ui";
+import { CircleDashed, Hash, Tag } from "lucide-react";
 import { categoryLabel, estimates, priorities, priorityLabel, statusFill } from "../lib/issues.js";
 
 // The prototype's property chip: an outlined pill with an icon and a value.
@@ -118,6 +118,62 @@ export function NoAssignee({ size = 18 }: { size?: 18 | 22 }) {
       aria-hidden="true"
       className={cn("shrink-0 text-ink-3", size === 18 ? "size-[18px]" : "size-[22px]")}
       strokeWidth={1.5}
+    />
+  );
+}
+
+// Labels as pills that open a multi-select menu; typing a new name offers to
+// create a label for the team.
+export function LabelPicker({
+  labels,
+  value,
+  onChange,
+  onCreate,
+}: {
+  labels: Label[];
+  value: string[];
+  onChange: (labelIds: string[]) => void;
+  onCreate?: (name: string) => Promise<Label>;
+}) {
+  const chosen = labels.filter((label) => value.includes(label.id));
+  return (
+    <Menu
+      label="Add labels"
+      multiple
+      values={value}
+      onSelect={(id) => onChange(value.includes(id) ? value.filter((v) => v !== id) : [...value, id])}
+      onCreate={
+        onCreate
+          ? (name) => {
+              void onCreate(name).then((label) => onChange([...value, label.id]));
+            }
+          : undefined
+      }
+      items={labels.map((label) => ({
+        value: label.id,
+        label: label.name,
+        keywords: label.teamId ? "" : "organization",
+        icon: <LabelDot hue={label.hue} />,
+      }))}
+      trigger={(props) =>
+        chosen.length ? (
+          <button
+            type="button"
+            {...props}
+            aria-label={`Labels: ${chosen.map((l) => l.name).join(", ")}. Change labels`}
+            className="inline-flex flex-wrap items-center gap-1 rounded-full hover:opacity-80"
+          >
+            {chosen.map((label) => (
+              <LabelPill key={label.id} name={label.name} hue={label.hue} size="lg" />
+            ))}
+          </button>
+        ) : (
+          <button type="button" {...props} className={cn(chipClass, "text-ink-2")} aria-label="Labels: none. Add labels">
+            <Tag aria-hidden="true" className="size-3.5" strokeWidth={2} />
+            Labels
+          </button>
+        )
+      }
     />
   );
 }
