@@ -96,6 +96,33 @@ describe("row-level security", () => {
     expect(rows).toEqual([]);
   });
 
+  it("covers every table that carries org_id", async () => {
+    const { db } = await twoOrgs();
+    const { rows } = await db.execute<{ table: string }>(sql`
+      SELECT c.relname AS table
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      JOIN pg_attribute a ON a.attrelid = c.oid AND a.attname = 'org_id' AND NOT a.attisdropped
+      WHERE n.nspname = 'public' AND c.relkind = 'r' AND NOT c.relrowsecurity`);
+    expect(rows).toEqual([]);
+  });
+
+  it("gives every event of one scope the same change id, and each scope its own", async () => {
+    const { db, a } = await twoOrgs();
+    const change = () =>
+      inScope(db, { orgId: a.orgId }, async (tx) => {
+        await emit(tx, a.orgId, { type: "team.updated", actorId: a.memberId, subjectId: a.teamId });
+        await emit(tx, a.orgId, { type: "team.updated", actorId: a.memberId, subjectId: a.teamId });
+      });
+    await change();
+    await change();
+    const rows = await inScope(db, { orgId: a.orgId }, (tx) => tx.select().from(events).orderBy(events.id));
+    const ids = rows.map((row) => row.changeId);
+    expect(ids[0]).toBe(ids[1]);
+    expect(ids[2]).toBe(ids[3]);
+    expect(ids[0]).not.toBe(ids[2]);
+  });
+
   it("does not leak a scope into the next transaction on the same connection", async () => {
     const { db, a } = await twoOrgs();
     await inScope(db, { orgId: a.orgId }, async (tx) => {

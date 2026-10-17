@@ -116,6 +116,22 @@ export function toTeam(row: TeamRow): Team {
     name: row.name,
     key: row.key,
     private: row.private,
+    version: row.version,
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+// Whether a member can see a team, by the rules of teamVisibility.
+export async function canSeeTeam(tx: Transaction, member: MemberRow, team: TeamRow): Promise<boolean> {
+  if (atLeast(member.role, "admin")) {
+    return true;
+  }
+  if (member.role !== "guest" && !team.private) {
+    return true;
+  }
+  const [row] = await tx
+    .select({ teamId: teamMembers.teamId })
+    .from(teamMembers)
+    .where(and(eq(teamMembers.teamId, team.id), eq(teamMembers.memberId, member.id)));
+  return row !== undefined;
 }

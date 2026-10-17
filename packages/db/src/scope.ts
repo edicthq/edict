@@ -19,7 +19,8 @@ export interface Scope {
 
 // The data-access layer's entry point for tenant data (ADR 0006). Runs fn in
 // one transaction as the edict_app role, so row-level security applies, with
-// the scope set as transaction-local settings the policies read.
+// the scope set as transaction-local settings the policies read. Each scope is
+// one change (ADR 0019): every event it emits gets the same change id.
 export function inScope<T>(db: Database, scope: Scope, fn: (tx: Transaction) => Promise<T>): Promise<T> {
   return db.transaction(async (tx) => {
     await tx.execute(sql`SET LOCAL ROLE edict_app`);
@@ -27,7 +28,8 @@ export function inScope<T>(db: Database, scope: Scope, fn: (tx: Transaction) => 
       set_config('edict.org_id', ${scope.orgId ?? ""}, true),
       set_config('edict.user_id', ${scope.userId ?? ""}, true),
       set_config('edict.invite_token_hash', ${scope.inviteTokenHash ?? ""}, true),
-      set_config('edict.invite_email', ${scope.inviteEmail ?? ""}, true)`);
+      set_config('edict.invite_email', ${scope.inviteEmail ?? ""}, true),
+      set_config('edict.change_id', uuidv7()::text, true)`);
     return fn(tx);
   });
 }

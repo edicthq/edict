@@ -4,6 +4,7 @@ import {
   check,
   foreignKey,
   index,
+  integer,
   pgEnum,
   pgTable,
   primaryKey,
@@ -75,12 +76,38 @@ export const teams = pgTable(
     name: text("name").notNull(),
     key: text("key").notNull(),
     private: boolean("private").notNull().default(false),
+    // The last issue number given out. Only goes up, so numbers are never
+    // reused (ADR 0017).
+    issueCounter: integer("issue_counter").notNull().default(0),
+    // ADR 0018.
+    version: integer("version").notNull().default(1),
     createdAt: createdAt(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
   },
   (table) => [
     unique("teams_org_id_id_unique").on(table.orgId, table.id),
     unique("teams_org_id_key_unique").on(table.orgId, table.key),
+  ],
+);
+
+// Every key a team has had, its current one included. Old identifiers resolve
+// through it, and a retired key stays reserved to its team (ADR 0017).
+export const teamKeys = pgTable(
+  "team_keys",
+  {
+    orgId: uuid("org_id").notNull(),
+    key: text("key").notNull(),
+    teamId: uuid("team_id").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.orgId, table.key] }),
+    index("team_keys_team_id_idx").on(table.teamId),
+    foreignKey({
+      name: "team_keys_team_fk",
+      columns: [table.orgId, table.teamId],
+      foreignColumns: [teams.orgId, teams.id],
+    }).onDelete("cascade"),
   ],
 );
 

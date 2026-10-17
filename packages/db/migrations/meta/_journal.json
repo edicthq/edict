@@ -50,6 +50,20 @@
       "when": 1792207029010,
       "tag": "0006_invites_by_email",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792211041298,
+      "tag": "0007_issues_and_statuses",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792211048955,
+      "tag": "0008_issues_row_level_security",
+      "breakpoints": true
     }
   ]
 }

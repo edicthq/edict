@@ -2,7 +2,9 @@ import { router, type ApiDeps } from "./context.js";
 import { eventRoutes } from "./events.js";
 import { instanceRoutes } from "./instance.js";
 import { inviteRoutes } from "./invites.js";
+import { issueRoutes } from "./issues.js";
 import { organizationRoutes } from "./organizations.js";
+import { statusRoutes } from "./statuses.js";
 import { teamRoutes } from "./teams.js";
 
 export type { ApiDeps, SessionUser } from "./context.js";
@@ -19,6 +21,8 @@ export function createApi(deps: ApiDeps) {
 
   api.route("/", organizationRoutes(deps));
   api.route("/", teamRoutes(deps));
+  api.route("/", statusRoutes(deps));
+  api.route("/", issueRoutes(deps));
   api.route("/", inviteRoutes(deps));
   api.route("/", eventRoutes(deps));
   api.route("/", instanceRoutes(deps));

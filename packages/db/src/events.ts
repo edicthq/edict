@@ -16,12 +16,19 @@ export const events = pgTable(
     // agents using an API key.
     onBehalfOfId: uuid("on_behalf_of_id"),
     subjectId: uuid("subject_id").notNull(),
+    // The change the event is part of: every event one transaction writes
+    // shares it (ADR 0019). inScope sets it, so an event written outside a
+    // scope fails this column's NOT NULL.
+    changeId: uuid("change_id")
+      .notNull()
+      .default(sql`nullif(current_setting('edict.change_id', true), '')::uuid`),
     data: jsonb("data").$type<Record<string, unknown>>().notNull().default({}),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
   },
   (table) => [
     index("events_org_id_id_idx").on(table.orgId, table.id),
     index("events_subject_id_idx").on(table.subjectId),
+    index("events_change_id_idx").on(table.changeId),
     foreignKey({
       name: "events_org_fk",
       columns: [table.orgId],

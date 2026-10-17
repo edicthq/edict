@@ -47,6 +47,7 @@ export function eventRoutes(deps: ApiDeps) {
         actorId: row.actorId,
         onBehalfOfId: row.onBehalfOfId,
         subjectId: row.subjectId,
+        changeId: row.changeId,
         data: row.data,
         createdAt: row.createdAt.toISOString(),
       })),
