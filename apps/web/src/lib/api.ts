@@ -9,6 +9,9 @@ export class ApiFailure extends Error {
     readonly status: number,
     readonly code: ApiError["code"] | "unknown",
     message: string,
+    // The whole error object, for errors that carry more than a message, like
+    // the current issue on a version conflict.
+    readonly details: Record<string, unknown> = {},
   ) {
     super(message);
   }
@@ -26,6 +29,7 @@ export async function unwrap<T>(
       response.status,
       body?.error?.code ?? "unknown",
       body?.error?.message ?? `The server answered ${response.status}.`,
+      body?.error ?? {},
     );
   }
   return data as T;

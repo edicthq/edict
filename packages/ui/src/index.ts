@@ -5,3 +5,5 @@ export { cn } from "./cn.js";
 export { Dialog } from "./dialog.js";
 export { Field, Input, Select, type FieldProps } from "./field.js";
 export { LogoMark } from "./logo.js";
+export { PriorityIcon, StatusIcon } from "./issue-icons.js";
+export { Menu, type MenuItem } from "./menu.js";

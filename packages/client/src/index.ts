@@ -15,6 +15,11 @@ export type InvitePreview = Schemas["InvitePreview"];
 export type Event = Schemas["Event"];
 export type InstanceSettings = Schemas["InstanceSettings"];
 export type SignUpMode = Schemas["SignUpMode"];
+export type Status = Schemas["Status"];
+export type StatusCategory = Schemas["StatusCategory"];
+export type Issue = Schemas["Issue"];
+export type Priority = Schemas["Priority"];
+export type IssueConflict = Schemas["IssueConflict"]["error"];
 export type ApiError = Schemas["Error"]["error"];
 
 export type EdictClient = ReturnType<typeof createEdictClient>;

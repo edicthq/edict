@@ -68,9 +68,9 @@ export function TeamsPage() {
   );
 }
 
-export function TeamPage() {
+export function TeamMembersPage() {
   const { teamId = "" } = useParams();
-  const { orgId, canManage, membership } = useOrg();
+  const { orgId, canManage, membership, slug } = useOrg();
   const teams = useTeams(orgId);
   const teamMembers = useTeamMembers(orgId, teamId);
   const orgMembers = useMembers(orgId);
@@ -106,6 +106,12 @@ export function TeamPage() {
                 Private
               </Badge>
             ) : null}
+            <Link
+              to={`/${slug}/teams/${team.id}`}
+              className="inline-flex h-8 items-center rounded-sm px-2 text-ui text-ink-2 hover:bg-hover hover:text-ink"
+            >
+              Issues
+            </Link>
             {!canManage && !inTeam.has(me) && !team.private ? (
               <Button variant="primary" disabled={add.isPending} onClick={() => add.mutate(me)}>
                 Join team
@@ -115,14 +121,6 @@ export function TeamPage() {
         }
       />
       <PageBody>
-        <section className="mb-6 flex flex-col items-start gap-1 px-3 py-2">
-          <p className="text-body font-semibold">Issues arrive in the next milestone</p>
-          <p className="max-w-[60ch] text-ui text-ink-2 text-pretty">
-            {team.name}'s issues will be numbered {team.key}-1, {team.key}-2 and so on, and appear here as a list and a
-            board.
-          </p>
-        </section>
-
         <GroupHeader count={teamMembers.data?.length ?? 0}>Members</GroupHeader>
         <FormError message={error?.message} />
         <ul className="flex flex-col gap-px">

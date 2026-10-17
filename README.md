@@ -4,7 +4,7 @@ An open-source issue tracker where AI agents are members of your team.
 
 Agents get their own identity, can be delegated issues, post progress updates you can watch live, and connect through a built-in MCP server. Humans stay accountable. Self-hosting is one container plus Postgres.
 
-**Status:** early development (milestone M1, foundations). Nothing is usable yet. Read [`docs/PLAN.md`](docs/PLAN.md) for the spec and milestones, and [`docs/adr/`](docs/adr/) for why things are built the way they are.
+**Status:** early development (milestone M2, core issues and API). Teams can track issues, but much is missing. Read [`docs/PLAN.md`](docs/PLAN.md) for the spec and milestones, and [`docs/adr/`](docs/adr/) for why things are built the way they are.
 
 ## Planned for v1
 

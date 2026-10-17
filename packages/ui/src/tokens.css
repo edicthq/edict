@@ -241,3 +241,10 @@
 .no-transition * {
   transition: none !important;
 }
+
+@keyframes peek-slide {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}

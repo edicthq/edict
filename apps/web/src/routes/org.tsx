@@ -87,10 +87,10 @@ export function OrgLayout() {
         Skip to content
       </a>
       <Rail context={context} others={memberships.data ?? []} />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex h-dvh min-w-0 flex-1 flex-col">
         <MobileBar context={context} />
         <VerifyBanner />
-        <main id="main" className="min-w-0 flex-1">
+        <main id="main" className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           <Outlet context={context} />
         </main>
       </div>

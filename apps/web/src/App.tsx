@@ -1,18 +1,20 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Link, Navigate, Outlet, RouterProvider, createBrowserRouter, useLocation } from "react-router";
 import { AuthShell, Loading } from "./components/shell.js";
+import { ToastProvider } from "./components/toast.js";
 import { useSession } from "./lib/auth.js";
 import { ApiFailure } from "./lib/api.js";
 import { useInstance } from "./lib/queries.js";
 import { SignIn, SignUp } from "./routes/auth.js";
 import { InstancePage } from "./routes/instance.js";
 import { InvitePage } from "./routes/invite.js";
+import { IssueLink, TeamIssuesPage } from "./routes/issues.js";
 import { MembersPage } from "./routes/members.js";
 import { Home, NewOrganization } from "./routes/onboarding.js";
 import { OrgLayout } from "./routes/org.js";
 import { ForgotPassword, ResetPassword } from "./routes/password.js";
 import { SettingsPage } from "./routes/settings.js";
-import { TeamPage, TeamsPage } from "./routes/teams.js";
+import { TeamMembersPage, TeamsPage } from "./routes/teams.js";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -77,7 +79,9 @@ const router = createBrowserRouter([
         element: <OrgLayout />,
         children: [
           { index: true, element: <TeamsPage /> },
-          { path: "teams/:teamId", element: <TeamPage /> },
+          { path: "teams/:teamId", element: <TeamIssuesPage /> },
+          { path: "teams/:teamId/members", element: <TeamMembersPage /> },
+          { path: "issue/:issueRef", element: <IssueLink /> },
           { path: "members", element: <MembersPage /> },
           { path: "settings", element: <SettingsPage /> },
           { path: "instance", element: <InstancePage /> },
@@ -91,7 +95,9 @@ const router = createBrowserRouter([
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <ToastProvider>
+        <RouterProvider router={router} />
+      </ToastProvider>
     </QueryClientProvider>
   );
 }

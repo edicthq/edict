@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Role, SignUpMode } from "@edicthq/client";
-import { api, unwrap } from "./api.js";
+import type { Issue, paths, Role, SignUpMode } from "@edicthq/client";
+import { ApiFailure, api, unwrap } from "./api.js";
 
 export const keys = {
   memberships: ["memberships"] as const,
@@ -10,6 +10,9 @@ export const keys = {
   members: (orgId: string) => ["org", orgId, "members"] as const,
   invites: (orgId: string) => ["org", orgId, "invites"] as const,
   invite: (token: string) => ["invite", token] as const,
+  statuses: (orgId: string, teamId: string) => ["org", orgId, "teams", teamId, "statuses"] as const,
+  issues: (orgId: string, teamId: string) => ["org", orgId, "teams", teamId, "issues"] as const,
+  issue: (orgId: string, issueRef: string) => ["org", orgId, "issue", issueRef] as const,
 };
 
 const org = (orgId: string) => ({ params: { path: { orgId } } });
@@ -172,5 +175,97 @@ export function useSetSignUpMode() {
   return useMutation({
     mutationFn: (signUpMode: SignUpMode) => unwrap(api.PATCH("/instance", { body: { signUpMode } })),
     onSuccess: (data) => client.setQueryData(keys.instance, data),
+  });
+}
+
+// ---------- issues ----------
+
+export function useStatuses(orgId: string, teamId: string) {
+  return useQuery({
+    queryKey: keys.statuses(orgId, teamId),
+    queryFn: () =>
+      unwrap(api.GET("/organizations/{orgId}/teams/{teamId}/statuses", { params: { path: { orgId, teamId } } })),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useTeamIssues(orgId: string, teamId: string) {
+  return useQuery({
+    queryKey: keys.issues(orgId, teamId),
+    queryFn: () =>
+      unwrap(api.GET("/organizations/{orgId}/teams/{teamId}/issues", { params: { path: { orgId, teamId } } })),
+  });
+}
+
+// One issue by id or any identifier it has had. Used to resolve links; the
+// team's list is the copy screens read and edit.
+export function useIssue(orgId: string, issueRef: string | null) {
+  return useQuery({
+    queryKey: keys.issue(orgId, issueRef ?? ""),
+    queryFn: () =>
+      unwrap(api.GET("/organizations/{orgId}/issues/{issueRef}", { params: { path: { orgId, issueRef: issueRef! } } })),
+    enabled: issueRef !== null,
+  });
+}
+
+export function useCreateIssue(orgId: string, teamId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreateIssueBody) =>
+      unwrap(api.POST("/organizations/{orgId}/teams/{teamId}/issues", { params: { path: { orgId, teamId } }, body })),
+    onSuccess: (issue) => {
+      client.setQueryData<Issue[]>(keys.issues(orgId, teamId), (list) => (list ? [issue, ...list] : list));
+    },
+  });
+}
+
+type CreateIssueBody = NonNullable<paths["/organizations/{orgId}/teams/{teamId}/issues"]["post"]["requestBody"]>["content"]["application/json"];
+export type IssueChanges = Omit<NonNullable<paths["/organizations/{orgId}/issues/{issueRef}"]["patch"]["requestBody"]>["content"]["application/json"], "version">;
+
+// Updates to one issue run one at a time, each sending the version in the
+// cache when it starts, so quick edits to the same field never conflict with
+// each other (ADR 0018).
+const issueQueues = new Map<string, Promise<unknown>>();
+function queued<T>(issueId: string, run: () => Promise<T>): Promise<T> {
+  const next = (issueQueues.get(issueId) ?? Promise.resolve()).catch(() => undefined).then(run);
+  issueQueues.set(issueId, next);
+  return next;
+}
+
+function replaceIssue(list: Issue[] | undefined, issue: Issue): Issue[] | undefined {
+  return list?.map((item) => (item.id === issue.id ? issue : item));
+}
+
+export function useUpdateIssue(orgId: string) {
+  const client = useQueryClient();
+  const listKey = (teamId: string) => keys.issues(orgId, teamId);
+  return useMutation({
+    mutationFn: ({ issue, changes }: { issue: Issue; changes: IssueChanges }) =>
+      queued(issue.id, async () => {
+        const cached = client.getQueryData<Issue[]>(listKey(issue.teamId))?.find((item) => item.id === issue.id);
+        const updated = await unwrap(
+          api.PATCH("/organizations/{orgId}/issues/{issueRef}", {
+            params: { path: { orgId, issueRef: issue.id } },
+            body: { version: cached?.version ?? issue.version, ...changes },
+          }),
+        );
+        client.setQueryData<Issue[]>(listKey(issue.teamId), (list) => replaceIssue(list, updated));
+        return updated;
+      }),
+    // Shows the change at once; the server's answer replaces it.
+    onMutate: async ({ issue, changes }) => {
+      await client.cancelQueries({ queryKey: listKey(issue.teamId) });
+      const before = client.getQueryData<Issue[]>(listKey(issue.teamId))?.find((item) => item.id === issue.id);
+      client.setQueryData<Issue[]>(listKey(issue.teamId), (list) =>
+        list?.map((item) => (item.id === issue.id ? { ...item, ...changes } : item)),
+      );
+      return { before };
+    },
+    onError: (error, { issue }, context) => {
+      // A conflict brings the current issue with it; anything else puts back
+      // what was there.
+      const current = error instanceof ApiFailure && error.code === "conflict" ? (error.details.current as Issue) : context?.before;
+      if (current) client.setQueryData<Issue[]>(listKey(issue.teamId), (list) => replaceIssue(list, current));
+    },
   });
 }
