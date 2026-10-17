@@ -12,7 +12,8 @@
     "test": "turbo run test",
     "dev": "turbo run dev --parallel",
     "db:generate": "pnpm --filter @edicthq/db generate",
-    "api:generate": "pnpm --filter @edicthq/server openapi && pnpm --filter @edicthq/client generate"
+    "api:generate": "pnpm --filter @edicthq/server openapi && pnpm --filter @edicthq/client generate",
+    "e2e": "turbo run e2e"
   },
   "devDependencies": {
     "turbo": "^2.11.8"
