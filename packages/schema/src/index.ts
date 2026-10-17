@@ -148,3 +148,16 @@ export const Event = z
   })
   .meta({ id: "Event" });
 export type Event = z.infer<typeof Event>;
+
+// Who can create a user on this instance: anyone, or only people with an open
+// invite. The first user can always sign up.
+export const SignUpMode = z.enum(["open", "invite_only"]).meta({ id: "SignUpMode" });
+export type SignUpMode = z.infer<typeof SignUpMode>;
+
+export const InstanceSettings = z
+  .object({
+    signUpMode: SignUpMode,
+  })
+  .meta({ id: "InstanceSettings" });
+
+export const UpdateInstanceSettings = InstanceSettings.partial().meta({ id: "UpdateInstanceSettings" });

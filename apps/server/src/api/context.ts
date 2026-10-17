@@ -9,6 +9,7 @@ export interface SessionUser {
   id: string;
   email: string;
   name: string;
+  instanceAdmin: boolean;
 }
 
 export interface ApiDeps {

@@ -1,10 +1,11 @@
 import { serve, type ServerType } from "@hono/node-server";
-import { Hono } from "hono";
+import { getConnInfo } from "@hono/node-server/conninfo";
+import { Hono, type Context } from "hono";
 import { createDatabase, createPool, migrateToLatest } from "@edicthq/db";
 import { createApi } from "./api/index.js";
 import { createAuth, type EdictAuth } from "./auth.js";
 import type { ServerConfig } from "./env.js";
-import { instanceAuthSecret } from "./instance.js";
+import { ensureInstanceSettings } from "./instance.js";
 
 export interface App {
   app: Hono;
@@ -26,7 +27,7 @@ export function createApp(config: ServerConfig): App {
   const app = new Hono();
   app.get("/health", (c) => c.json({ ok: true }));
   app.on(["POST", "GET"], "/api/auth/*", (c) =>
-    auth ? auth.handler(c.req.raw) : c.json({ error: "starting" }, 503),
+    auth ? auth.handler(withClientIp(c, config.trustedProxies)) : c.json({ error: "starting" }, 503),
   );
   app.route(
     "/api/v1",
@@ -38,8 +39,8 @@ export function createApp(config: ServerConfig): App {
         if (!session) {
           return null;
         }
-        const { id, email, name } = session.user;
-        return { id, email, name };
+        const { id, email, name, role } = session.user;
+        return { id, email, name, instanceAdmin: role === "admin" };
       },
     }),
   );
@@ -52,8 +53,15 @@ export function createApp(config: ServerConfig): App {
     port: 0,
     start: async () => {
       await migrateToLatest(pool);
-      const secret = config.authSecret ?? (await instanceAuthSecret(db));
-      auth = createAuth({ secret, baseURL: config.baseUrl }, db);
+      const settings = await ensureInstanceSettings(db);
+      auth = createAuth(
+        {
+          secret: config.authSecret ?? settings.authSecret,
+          baseURL: config.baseUrl,
+          trustedProxies: config.trustedProxies,
+        },
+        db,
+      );
 
       server = await listen(app, config.port);
       state.port = boundPort(server);
@@ -72,6 +80,25 @@ export function createApp(config: ServerConfig): App {
   };
 
   return state;
+}
+
+// Better Auth rate-limits by client IP and reads it from X-Forwarded-For. A
+// client can send that header itself, so the socket address goes last: with
+// no trusted proxies it replaces the header, and with trusted proxies Better
+// Auth walks the chain from the right, skipping them, so a client that
+// bypasses the proxy is still seen by its own address.
+function withClientIp(c: Context, trustedProxies: string[]): Request {
+  const socket = getConnInfo(c).remote.address;
+  const headers = new Headers(c.req.raw.headers);
+  const forwarded = headers.get("x-forwarded-for");
+  if (!socket) {
+    headers.delete("x-forwarded-for");
+  } else if (trustedProxies.length > 0 && forwarded) {
+    headers.set("x-forwarded-for", `${forwarded}, ${socket}`);
+  } else {
+    headers.set("x-forwarded-for", socket);
+  }
+  return new Request(c.req.raw, { headers });
 }
 
 function listen(app: Hono, port: number): Promise<ServerType> {

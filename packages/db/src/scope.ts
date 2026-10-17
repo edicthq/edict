@@ -12,6 +12,9 @@ export interface Scope {
   userId?: string;
   // Lets one invite be read by its token hash before its organization is known.
   inviteTokenHash?: string;
+  // Lets the invites for one lowercase email be read, but not changed, across
+  // organizations. Invite-only sign-up uses it.
+  inviteEmail?: string;
 }
 
 // The data-access layer's entry point for tenant data (ADR 0006). Runs fn in
@@ -23,7 +26,8 @@ export function inScope<T>(db: Database, scope: Scope, fn: (tx: Transaction) => 
     await tx.execute(sql`SELECT
       set_config('edict.org_id', ${scope.orgId ?? ""}, true),
       set_config('edict.user_id', ${scope.userId ?? ""}, true),
-      set_config('edict.invite_token_hash', ${scope.inviteTokenHash ?? ""}, true)`);
+      set_config('edict.invite_token_hash', ${scope.inviteTokenHash ?? ""}, true),
+      set_config('edict.invite_email', ${scope.inviteEmail ?? ""}, true)`);
     return fn(tx);
   });
 }

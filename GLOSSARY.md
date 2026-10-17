@@ -12,6 +12,10 @@ _Avoid_: Server, deployment, installation
 The person who manages an instance's sign-up mode, email, storage and updates. Instance admins are separate from organization roles.
 _Avoid_: Superuser, sysadmin
 
+**Sign-up mode**:
+Who can create a user on an instance: anyone, or only people with an invite.
+_Avoid_: Registration mode, access mode
+
 **Organization**:
 The top-level tenant that owns teams, projects, members and agents.
 _Avoid_: Workspace, company, account, tenant

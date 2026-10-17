@@ -32,10 +32,15 @@ export async function createTestDatabase(): Promise<TestDatabase> {
 // configured) and shuts it down when the current test finishes. Pass a
 // database to run several servers against the same data.
 export async function startTestServer(
-  options: { database?: TestDatabase; authSecret?: string } = {},
+  options: { database?: TestDatabase; authSecret?: string; trustedProxies?: string[] } = {},
 ): Promise<TestServer> {
   const database = options.database ?? (await createTestDatabase());
-  const app = createApp({ port: 0, databaseUrl: database.url, authSecret: options.authSecret });
+  const app = createApp({
+    port: 0,
+    databaseUrl: database.url,
+    authSecret: options.authSecret,
+    trustedProxies: options.trustedProxies ?? [],
+  });
   await app.start();
 
   let closed = false;

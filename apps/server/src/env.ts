@@ -6,6 +6,9 @@ export interface ServerConfig {
   authSecret?: string;
   // The public URL Better Auth builds links and checks origins against.
   baseUrl?: string;
+  // Reverse proxies (IPs or CIDR ranges) whose X-Forwarded-For is believed.
+  // Empty means clients connect directly and the socket address is the IP.
+  trustedProxies: string[];
 }
 
 export class ConfigError extends Error {}
@@ -26,6 +29,10 @@ export function readConfig(env: NodeJS.ProcessEnv): ServerConfig {
     databaseUrl: url,
     authSecret: env.BETTER_AUTH_SECRET || undefined,
     baseUrl: env.BETTER_AUTH_URL || undefined,
+    trustedProxies: (env.TRUSTED_PROXIES ?? "")
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean),
   };
 }
 

@@ -1,5 +1,6 @@
 import { router, type ApiDeps } from "./context.js";
 import { eventRoutes } from "./events.js";
+import { instanceRoutes } from "./instance.js";
 import { inviteRoutes } from "./invites.js";
 import { organizationRoutes } from "./organizations.js";
 import { teamRoutes } from "./teams.js";
@@ -20,6 +21,7 @@ export function createApi(deps: ApiDeps) {
   api.route("/", teamRoutes(deps));
   api.route("/", inviteRoutes(deps));
   api.route("/", eventRoutes(deps));
+  api.route("/", instanceRoutes(deps));
 
   api.doc31("/openapi.json", {
     openapi: "3.1.0",

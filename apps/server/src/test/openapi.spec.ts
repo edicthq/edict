@@ -22,6 +22,7 @@ describe("OpenAPI document", () => {
       "DELETE /organizations/{orgId}/invites/{inviteId}",
       "DELETE /organizations/{orgId}/members/{memberId}",
       "DELETE /organizations/{orgId}/teams/{teamId}/members/{memberId}",
+      "GET /instance",
       "GET /invites/{token}",
       "GET /organizations",
       "GET /organizations/{orgId}/events",
@@ -29,6 +30,7 @@ describe("OpenAPI document", () => {
       "GET /organizations/{orgId}/members",
       "GET /organizations/{orgId}/teams",
       "GET /organizations/{orgId}/teams/{teamId}/members",
+      "PATCH /instance",
       "PATCH /organizations/{orgId}/members/{memberId}",
       "POST /invites/{token}/accept",
       "POST /organizations",
@@ -37,7 +39,7 @@ describe("OpenAPI document", () => {
       "POST /organizations/{orgId}/teams/{teamId}/members",
     ]);
     expect(Object.keys(doc.components.schemas)).toEqual(
-      expect.arrayContaining(["Error", "Organization", "Member", "Membership", "Team", "Invite", "Event"]),
+      expect.arrayContaining(["Error", "Organization", "Member", "Membership", "Team", "Invite", "Event", "InstanceSettings"]),
     );
   });
 });

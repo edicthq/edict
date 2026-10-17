@@ -24,6 +24,9 @@ services:
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-}
       # The URL people reach Edict at, when it differs from http://localhost:3000.
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-}
+      # Comma-separated IPs or CIDR ranges of reverse proxies in front of Edict,
+      # whose X-Forwarded-For is believed. Leave empty when clients connect directly.
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
     depends_on:
       db:
         condition: service_healthy

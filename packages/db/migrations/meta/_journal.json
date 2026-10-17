@@ -36,6 +36,20 @@
       "when": 1792191848487,
       "tag": "0004_row_level_security",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792207028774,
+      "tag": "0005_spooky_annihilus",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792207029010,
+      "tag": "0006_invites_by_email",
+      "breakpoints": true
     }
   ]
 }
