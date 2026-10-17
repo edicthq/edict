@@ -1,4 +1,4 @@
-import { ChevronDown, LogOut, Plus } from "lucide-react";
+import { ChevronDown, LogOut, Plus, Server, Settings } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import type { Membership } from "@edicthq/client";
 import { Link, NavLink, Outlet, useNavigate, useOutletContext, useParams } from "react-router";
@@ -7,7 +7,6 @@ import { CreateTeamDialog } from "../components/create-team-dialog.js";
 import { InviteDialog } from "../components/invite-dialog.js";
 import { CommandPalette } from "../components/palette.js";
 import { AuthShell, Loading } from "../components/shell.js";
-import { accentNames, accents, setAppearance, themes, useAppearance, type Theme } from "../lib/appearance.js";
 import { authClient, useSession } from "../lib/auth.js";
 import { mod } from "../lib/labels.js";
 import { useMembers, useMemberships, useTeams } from "../lib/queries.js";
@@ -211,12 +210,18 @@ function Rail({ context, others }: { context: OrgContext; others: Membership[] }
       </RailSection>
 
       <div className="mt-auto flex flex-col gap-3">
-        {instanceAdmin ? (
-          <NavLink to={`/${slug}/instance`} className={railLink}>
-            Instance settings
+        <div className="flex flex-col gap-0.5">
+          <NavLink to={`/${slug}/settings`} className={railLink}>
+            <Settings aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+            Settings
           </NavLink>
-        ) : null}
-        <AppearanceSection />
+          {instanceAdmin ? (
+            <NavLink to={`/${slug}/instance`} className={railLink}>
+              <Server aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+              Instance settings
+            </NavLink>
+          ) : null}
+        </div>
         <div className="flex items-center gap-2 border-t border-line px-1 pt-3">
           <Avatar name={membership.member.name} />
           <div className="min-w-0">
@@ -263,51 +268,6 @@ function OrgSwitcher({ current, others }: { current: Membership; others: Members
   );
 }
 
-const themeLabel: Record<Theme, string> = { system: "System", light: "Light", dark: "Dark" };
-
-function AppearanceSection() {
-  const { theme, accent } = useAppearance();
-  return (
-    <section className="flex flex-col gap-2 border-t border-line pt-3">
-      <h2 className="px-1 text-sm font-semibold text-ink-2">Appearance</h2>
-      <div className="flex items-center gap-2 px-1 text-sm text-ink-2">
-        Theme
-        <button
-          type="button"
-          className="ms-auto h-6 rounded-sm px-2 text-sm text-ink shadow-[inset_0_0_0_1px_var(--line)] hover:bg-hover"
-          onClick={() => setAppearance({ theme: themes[(themes.indexOf(theme) + 1) % themes.length] })}
-          aria-label={`Theme: ${themeLabel[theme]}. Change theme`}
-        >
-          {themeLabel[theme]}
-        </button>
-      </div>
-      <div className="flex items-center gap-2 px-1 text-sm text-ink-2">
-        <span id="accent-label">Agent color</span>
-        <div role="radiogroup" aria-labelledby="accent-label" className="ms-auto flex gap-1.5">
-          {accents.map((a) => (
-            <button
-              key={a}
-              type="button"
-              role="radio"
-              aria-checked={accent === a}
-              aria-label={accentNames[a]}
-              title={accentNames[a]}
-              data-accent={a}
-              onClick={() => setAppearance({ accent: a })}
-              className={cn(
-                "grid size-5 place-items-center rounded-full",
-                accent === a && "shadow-[0_0_0_2px_var(--rail),0_0_0_3.5px_var(--agent)]",
-              )}
-            >
-              <span className="size-3.5 rounded-full bg-agent" />
-            </button>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 // Below the md breakpoint the rail becomes a bar above the page.
 function MobileBar({ context }: { context: OrgContext }) {
   const { slug, membership, instanceAdmin } = context;
@@ -331,6 +291,9 @@ function MobileBar({ context }: { context: OrgContext }) {
         </NavLink>
         <NavLink to={`/${slug}/members`} className={link}>
           Members
+        </NavLink>
+        <NavLink to={`/${slug}/settings`} className={link}>
+          Settings
         </NavLink>
         {instanceAdmin ? (
           <NavLink to={`/${slug}/instance`} className={link}>

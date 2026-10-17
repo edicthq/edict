@@ -10,6 +10,7 @@ import { InvitePage } from "./routes/invite.js";
 import { MembersPage } from "./routes/members.js";
 import { Home, NewOrganization } from "./routes/onboarding.js";
 import { OrgLayout } from "./routes/org.js";
+import { SettingsPage } from "./routes/settings.js";
 import { TeamPage, TeamsPage } from "./routes/teams.js";
 
 const queryClient = new QueryClient({
@@ -75,6 +76,7 @@ const router = createBrowserRouter([
           { index: true, element: <TeamsPage /> },
           { path: "teams/:teamId", element: <TeamPage /> },
           { path: "members", element: <MembersPage /> },
+          { path: "settings", element: <SettingsPage /> },
           { path: "instance", element: <InstancePage /> },
         ],
       },

@@ -1,7 +1,8 @@
 import { cn } from "./cn.js";
 
-// The Edict mark from the M0 prototype: a hexagon in the agent color with three
-// lines of an edict on it.
+// Placeholder mark from the M0 prototype: a hexagon in the agent color with
+// three lines of an edict on it. Edict still needs a real logo and app icon
+// (docs/PLAN.md, "Logo and app icon"); replace this when it exists.
 export function LogoMark({ size = 20, className }: { size?: number; className?: string }) {
   return (
     <svg viewBox="0 0 20 20" width={size} height={size} aria-hidden="true" className={cn("shrink-0", className)}>

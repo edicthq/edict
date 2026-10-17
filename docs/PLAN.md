@@ -246,6 +246,10 @@ Linear is the bar for polish, not a look to copy. M0 prototypes two directions o
 
 The chosen direction becomes design tokens in `packages/ui` before any product UI is built. Light and dark ship together. Each user picks the accent color; an admin can set the organization default. The tokens with their presets live in [`docs/design/tokens.md`](./design/tokens.md).
 
+### Logo and app icon
+
+Edict has no real logo yet. The hexagon mark in the app and the favicon is the M0 prototype's placeholder, drawn in the agent color, so it changes with the accent. Edict needs a designed logo and app icon before v1.0. The icon has to work in one color and at 16px, without depending on the accent: favicon, desktop app and tray icons for macOS, Windows and Linux, and the avatars for the GitHub org, GHCR and npm. The desktop app in M6 cannot ship without it.
+
 ## Quality
 
 - Server: integration tests against real Postgres with Testcontainers, through HTTP. Few mocks.
@@ -285,7 +289,7 @@ Week 1 starts Monday 2026-10-19. Estimates assume one developer working with AI 
 | M3 | Agents | 7–8 | Agent members, connected agents created on OAuth for MCP, API keys, `/mcp` tools, resources and prompts, delegate, progress updates, webhooks and delivery log, guardrails, pause switch | Claude Code connects by URL and works an issue from start to finish. Release v0.1 "agent preview". Edict's own work moves into Edict |
 | M4 | The feel | 9–11 | TanStack DB collections, realtime, list and board, filter, group, sort, saved views, ⌘K, shortcuts, peek panel, bulk edit, themes, final visual design | Feels faster than Linear on the dogfood data |
 | M5 | Workflow | 12–13 | Projects and overview, My issues, inbox, templates, export | A small team runs on it every day |
-| M6 | v1.0 | 14–15 | Tauri shell and unsigned distribution, docs site with "Connect your agent" pages, telemetry, update check, release pipeline | v1.0 is public, around 2027-01-29 |
+| M6 | v1.0 | 14–15 | Logo and app icon, Tauri shell and unsigned distribution, docs site with "Connect your agent" pages, telemetry, update check, release pipeline | v1.0 is public, around 2027-01-29 |
 
 Agents come before polish on purpose. From M3 on, Edict's own development runs in Edict, so the agent workflow gets real use before the UI gets its final coat.
 

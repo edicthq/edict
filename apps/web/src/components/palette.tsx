@@ -56,6 +56,7 @@ function PaletteBody({ context, others, onClose }: { context: OrgContext; others
       })),
       { id: "teams", group: "Go to", label: "All teams", run: go(`/${context.slug}`) },
       { id: "members", group: "Go to", label: "Members", run: go(`/${context.slug}/members`) },
+      { id: "settings", group: "Go to", label: "Settings", run: go(`/${context.slug}/settings`) },
     ];
     if (context.instanceAdmin) {
       list.push({ id: "instance", group: "Go to", label: "Instance settings", run: go(`/${context.slug}/instance`) });
