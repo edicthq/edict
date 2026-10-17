@@ -4,6 +4,7 @@ import { admin } from "better-auth/plugins";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { count, eq } from "drizzle-orm";
 import { schema, type Database } from "@edicthq/db";
+import { passwordResetEmail, verificationEmail, type Mailer } from "./email.js";
 import { maySignUp } from "./instance.js";
 
 export interface AuthConfig {
@@ -16,14 +17,26 @@ export interface AuthConfig {
 
 export type EdictAuth = ReturnType<typeof createAuth>;
 
-export function createAuth(config: AuthConfig, db: Database) {
+// Without a mailer there is no email verification and no password reset: an
+// instance admin sets a new password instead.
+export function createAuth(config: AuthConfig, db: Database, mailer?: Mailer) {
   return betterAuth({
     secret: config.secret,
     baseURL: config.baseURL,
     database: drizzleAdapter(db, { provider: "pg", schema }),
     emailAndPassword: {
       enabled: true,
+      sendResetPassword: mailer
+        ? async ({ user, url }) => mailer.send(passwordResetEmail({ to: user.email, url }))
+        : undefined,
     },
+    emailVerification: mailer
+      ? {
+          sendOnSignUp: true,
+          autoSignInAfterVerification: true,
+          sendVerificationEmail: async ({ user, url }) => mailer.send(verificationEmail({ to: user.email, url })),
+        }
+      : undefined,
     plugins: [admin()],
     advanced: {
       ipAddress: {

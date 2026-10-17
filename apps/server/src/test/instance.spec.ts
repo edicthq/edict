@@ -20,10 +20,10 @@ describe("instance settings", () => {
     const t = await startTestServer();
     const res = await apiClient(t.baseUrl).get("/instance");
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ signUpMode: "open", setUp: false });
+    expect(res.body).toEqual({ signUpMode: "open", setUp: false, sendsEmail: false });
 
     await signUpAs(t.baseUrl, "Admin");
-    expect((await apiClient(t.baseUrl).get("/instance")).body).toEqual({ signUpMode: "open", setUp: true });
+    expect((await apiClient(t.baseUrl).get("/instance")).body).toEqual({ signUpMode: "open", setUp: true, sendsEmail: false });
   });
 
   it("only the instance admin changes it", async () => {
@@ -36,7 +36,7 @@ describe("instance settings", () => {
 
     const res = await admin.patch("/instance", { signUpMode: "invite_only" });
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ signUpMode: "invite_only", setUp: true });
+    expect(res.body).toEqual({ signUpMode: "invite_only", setUp: true, sendsEmail: false });
     expect((await apiClient(t.baseUrl).get("/instance")).body.signUpMode).toBe("invite_only");
   });
 

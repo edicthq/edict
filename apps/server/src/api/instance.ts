@@ -1,7 +1,6 @@
 import { createRoute } from "@hono/zod-openapi";
 import { InstanceSettings, UpdateInstanceSettings } from "@edicthq/schema";
 import { hasUsers, readInstanceSettings, setSignUpMode } from "../instance.js";
-import type { Database } from "@edicthq/db";
 import { body, errors, json, router, signedIn, type ApiDeps } from "./context.js";
 import { forbidden } from "./errors.js";
 
@@ -34,7 +33,7 @@ export function instanceRoutes(deps: ApiDeps) {
   const app = router();
 
   app.openapi(getInstance, async (c) => {
-    return c.json(await publicSettings(deps.db), 200);
+    return c.json(await publicSettings(deps), 200);
   });
 
   app.openapi(updateInstance, async (c) => {
@@ -46,13 +45,13 @@ export function instanceRoutes(deps: ApiDeps) {
     if (input.signUpMode) {
       await setSignUpMode(deps.db, user.id, input.signUpMode);
     }
-    return c.json(await publicSettings(deps.db), 200);
+    return c.json(await publicSettings(deps), 200);
   });
 
   return app;
 }
 
-async function publicSettings(db: Database) {
+async function publicSettings({ db, mailer }: ApiDeps) {
   const settings = await readInstanceSettings(db);
-  return { signUpMode: settings.signUpMode, setUp: await hasUsers(db) };
+  return { signUpMode: settings.signUpMode, setUp: await hasUsers(db), sendsEmail: Boolean(mailer) };
 }

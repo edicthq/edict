@@ -452,11 +452,15 @@
           },
           "setUp": {
             "type": "boolean"
+          },
+          "sendsEmail": {
+            "type": "boolean"
           }
         },
         "required": [
           "signUpMode",
-          "setUp"
+          "setUp",
+          "sendsEmail"
         ]
       },
       "SignUpMode": {
@@ -1449,7 +1453,7 @@
           "Invites"
         ],
         "summary": "Accept an invite as the signed-in user",
-        "description": "The signed-in user's email must be the invited one.",
+        "description": "The signed-in user's email must be the invited one, and verified when the instance sends email.",
         "parameters": [
           {
             "schema": {

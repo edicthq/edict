@@ -904,7 +904,7 @@ export interface paths {
         put?: never;
         /**
          * Accept an invite as the signed-in user
-         * @description The signed-in user's email must be the invited one.
+         * @description The signed-in user's email must be the invited one, and verified when the instance sends email.
          */
         post: {
             parameters: {
@@ -1284,6 +1284,7 @@ export interface components {
         InstanceSettings: {
             signUpMode: components["schemas"]["SignUpMode"];
             setUp: boolean;
+            sendsEmail: boolean;
         };
         /** @enum {string} */
         SignUpMode: "open" | "invite_only";

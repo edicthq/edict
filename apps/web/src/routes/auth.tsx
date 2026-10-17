@@ -29,6 +29,8 @@ const SignInForm = z.object({
 export function SignIn() {
   const navigate = useNavigate();
   const { next, email, query } = useNext();
+  const instance = useInstance();
+  const [params] = useSearchParams();
   const [failure, setFailure] = useState<string | null>(null);
   const form = useForm({ resolver: zodResolver(SignInForm), defaultValues: { email, password: "" } });
 
@@ -47,14 +49,27 @@ export function SignIn() {
   });
 
   return (
-    <AuthShell title="Sign in to Edict">
+    <AuthShell
+      title="Sign in to Edict"
+      lead={params.get("reset") ? "Your password is changed. Sign in with the new one." : undefined}
+    >
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
         <Field label="Email" error={form.formState.errors.email?.message}>
           {(control) => (
             <Input {...control} type="email" autoComplete="email" autoFocus={!email} {...form.register("email")} />
           )}
         </Field>
-        <Field label="Password" error={form.formState.errors.password?.message}>
+        <Field
+          label="Password"
+          error={form.formState.errors.password?.message}
+          hint={
+            instance.data?.sendsEmail ? (
+              <Link to="/forgot-password" className="underline decoration-line-strong underline-offset-4 hover:text-ink">
+                Forgot password?
+              </Link>
+            ) : undefined
+          }
+        >
           {(control) => (
             <Input
               {...control}
@@ -98,7 +113,9 @@ export function SignUp() {
 
   const onSubmit = form.handleSubmit(async (values) => {
     setFailure(null);
-    const { error } = await authClient.signUp.email(values);
+    // With email set up, the verification link brings them back to where they
+    // were going, such as the invite page.
+    const { error } = await authClient.signUp.email({ ...values, callbackURL: next });
     if (error) {
       setFailure(error.message ?? "Creating your account failed. Try again.");
       return;

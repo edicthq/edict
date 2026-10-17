@@ -163,6 +163,9 @@ export const InstanceSettings = z
     signUpMode: SignUpMode,
     // False until the first user signs up and becomes the instance admin.
     setUp: z.boolean(),
+    // Whether the instance has email set up. Without it there is no email
+    // verification or password reset, and invites are links to share by hand.
+    sendsEmail: z.boolean(),
   })
   .meta({ id: "InstanceSettings" });
 

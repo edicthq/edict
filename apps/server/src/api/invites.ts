@@ -97,7 +97,8 @@ const acceptInvite = createRoute({
   path: "/invites/{token}/accept",
   tags: ["Invites"],
   summary: "Accept an invite as the signed-in user",
-  description: "The signed-in user's email must be the invited one.",
+  description:
+    "The signed-in user's email must be the invited one, and verified when the instance sends email.",
   request: { params: TokenParams },
   responses: {
     200: json(Membership, "The organization joined and the caller's member in it"),
@@ -273,6 +274,11 @@ export function inviteRoutes(deps: ApiDeps) {
         const invite = await openInvite(tx, token);
         if (signedInUser.email.toLowerCase() !== invite.email) {
           throw forbidden(`This invite is for ${invite.email}. Sign in with that email to accept it.`);
+        }
+        // With email set up, the address must be proven, or anyone holding the
+        // link could sign up as the invitee (ADR 0016).
+        if (deps.mailer && !signedInUser.emailVerified) {
+          throw forbidden(`Verify ${invite.email} first: open the link in the email Edict sent you, then accept.`);
         }
         const orgId = invite.orgId;
 

@@ -52,8 +52,8 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
         if (!session) {
           return null;
         }
-        const { id, email, name, role } = session.user;
-        return { id, email, name, instanceAdmin: role === "admin" };
+        const { id, email, name, role, emailVerified } = session.user;
+        return { id, email, name, emailVerified, instanceAdmin: role === "admin" };
       },
     }),
   );
@@ -78,6 +78,7 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
           trustedProxies: config.trustedProxies,
         },
         db,
+        mailer,
       );
 
       server = await listen(app, config.port);

@@ -1,21 +1,11 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { defineConfig, type ProxyOptions } from "vite";
+import { defineConfig } from "vite";
 
-const api = "http://localhost:3000";
-
-// In development the app runs on Vite and the API on :3000. Production serves
-// both from one origin, so the proxy makes requests look same-origin too:
-// Better Auth rejects sign-ins from an origin it doesn't know.
-const toApi: ProxyOptions = {
-  target: api,
-  changeOrigin: true,
-  configure: (proxy) => {
-    proxy.on("proxyReq", (request) => {
-      if (request.getHeader("origin")) request.setHeader("origin", api);
-    });
-  },
-};
+// In development the app runs here and the API on :3000. The server's
+// BETTER_AUTH_URL points at this origin (apps/server/.env.example), so sign-in
+// origins and emailed links match.
+const toApi = "http://localhost:3000";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],

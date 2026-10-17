@@ -10,6 +10,7 @@ import { InvitePage } from "./routes/invite.js";
 import { MembersPage } from "./routes/members.js";
 import { Home, NewOrganization } from "./routes/onboarding.js";
 import { OrgLayout } from "./routes/org.js";
+import { ForgotPassword, ResetPassword } from "./routes/password.js";
 import { SettingsPage } from "./routes/settings.js";
 import { TeamPage, TeamsPage } from "./routes/teams.js";
 
@@ -60,10 +61,12 @@ const router = createBrowserRouter([
     children: [
       { path: "/sign-in", element: <SignIn /> },
       { path: "/sign-up", element: <SignUp /> },
+      { path: "/forgot-password", element: <ForgotPassword /> },
     ],
   },
   // Readable signed out: it offers sign-up or sign-in.
   { path: "/invite/:token", element: <InvitePage /> },
+  { path: "/reset-password", element: <ResetPassword /> },
   {
     element: <SignedIn />,
     children: [

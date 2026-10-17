@@ -6,6 +6,7 @@ import { Avatar, Button, Count, Kbd, LogoMark, TeamKey, cn } from "@edicthq/ui";
 import { CreateTeamDialog } from "../components/create-team-dialog.js";
 import { InviteDialog } from "../components/invite-dialog.js";
 import { CommandPalette } from "../components/palette.js";
+import { VerifyBanner } from "../components/verify-banner.js";
 import { AuthShell, Loading } from "../components/shell.js";
 import { authClient, useSession } from "../lib/auth.js";
 import { mod } from "../lib/labels.js";
@@ -88,6 +89,7 @@ export function OrgLayout() {
       <Rail context={context} others={memberships.data ?? []} />
       <div className="flex min-w-0 flex-1 flex-col">
         <MobileBar context={context} />
+        <VerifyBanner />
         <main id="main" className="min-w-0 flex-1">
           <Outlet context={context} />
         </main>

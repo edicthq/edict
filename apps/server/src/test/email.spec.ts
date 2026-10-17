@@ -1,16 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { EmailMessage, Mailer } from "../email.js";
+import type { Mailer } from "../email.js";
+import { recordingMailer } from "./mail.js";
 import { signUpAs, startTestServer } from "./server.js";
-
-function recordingMailer() {
-  const sent: EmailMessage[] = [];
-  const mailer: Mailer = {
-    send: async (message) => {
-      sent.push(message);
-    },
-  };
-  return { mailer, sent };
-}
 
 async function orgWithOwner(baseUrl: string) {
   const owner = await signUpAs(baseUrl, "Owner");
@@ -28,8 +19,7 @@ describe("invite emails", () => {
     expect(res.status).toBe(201);
     expect(res.body.emailSent).toBe(true);
 
-    expect(sent).toHaveLength(1);
-    const [message] = sent;
+    const message = sent.find((m) => /invited you/.test(m.subject));
     expect(message!.to).toBe("mia@example.com");
     expect(message!.subject).toBe("Owner invited you to Acme on Edict");
     expect(message!.text).toContain(res.body.url);
@@ -67,8 +57,9 @@ describe("invite emails", () => {
     const org = (await owner.post("/organizations", { name: "A & <B>", slug: "ab" })).body.organization;
     await owner.post(`/organizations/${org.id}/invites`, { email: "mia@example.com" });
 
-    expect(sent[0]!.html).toContain("&lt;b&gt;Eve&lt;/b&gt;");
-    expect(sent[0]!.html).toContain("A &amp; &lt;B&gt;");
-    expect(sent[0]!.html).not.toContain("<b>Eve</b>");
+    const invite = sent.find((m) => m.to === "mia@example.com")!;
+    expect(invite.html).toContain("&lt;b&gt;Eve&lt;/b&gt;");
+    expect(invite.html).toContain("A &amp; &lt;B&gt;");
+    expect(invite.html).not.toContain("<b>Eve</b>");
   });
 });

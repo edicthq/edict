@@ -1,9 +1,10 @@
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Avatar, Badge, Button } from "@edicthq/ui";
 import { AuthShell, FormError, Loading } from "../components/shell.js";
 import { ApiFailure } from "../lib/api.js";
 import { authClient, useSession } from "../lib/auth.js";
-import { useAcceptInvite, useInvitePreview } from "../lib/queries.js";
+import { useAcceptInvite, useInstance, useInvitePreview } from "../lib/queries.js";
 import { roleLabel } from "../lib/labels.js";
 
 export function InvitePage() {
@@ -12,6 +13,8 @@ export function InvitePage() {
   const preview = useInvitePreview(token);
   const session = useSession();
   const accept = useAcceptInvite(token);
+  const instance = useInstance();
+  const [resent, setResent] = useState(false);
 
   if (preview.isPending || session.isPending) return <Loading />;
 
@@ -37,6 +40,7 @@ export function InvitePage() {
   const user = session.data?.user;
   const params = new URLSearchParams({ invite: token, email: invite.email }).toString();
   const wrongUser = user && user.email.toLowerCase() !== invite.email;
+  const needsVerification = user && !user.emailVerified && instance.data?.sendsEmail;
 
   return (
     <AuthShell title={`Join ${invite.organization.name}`}>
@@ -74,6 +78,23 @@ export function InvitePage() {
               }}
             >
               Sign out and continue
+            </Button>
+          </>
+        ) : needsVerification ? (
+          <>
+            <p className="text-ui text-ink-2 text-pretty">
+              Verify {invite.email} first: open the link in the email Edict sent you, then come back to join.
+            </p>
+            <Button
+              variant="secondary"
+              size="lg"
+              disabled={resent}
+              onClick={async () => {
+                await authClient.sendVerificationEmail({ email: invite.email, callbackURL: `/invite/${token}` });
+                setResent(true);
+              }}
+            >
+              {resent ? "Sent. Check your inbox" : "Send the verification email again"}
             </Button>
           </>
         ) : (
