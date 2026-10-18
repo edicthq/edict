@@ -81,8 +81,8 @@ An issue whose parent is another issue.
 _Avoid_: Subtask, child task, checklist item
 
 **Relation**:
-A typed link between two issues: blocks, related or duplicate of.
-_Avoid_: Link, dependency
+A typed connection between two issues: blocks, related or duplicate of.
+_Avoid_: Dependency
 
 **Status**:
 A team-defined named stage an issue is in, such as "In Review".
@@ -103,6 +103,10 @@ _Avoid_: Epic, initiative, milestone
 **Comment**:
 A markdown message a member posts on an issue. Only its creator can edit it.
 _Avoid_: Record, note, reply
+
+**Link**:
+A URL attached to an issue, such as a pull request, with an optional title.
+_Avoid_: Reference, URL attachment, relation
 
 **Attachment**:
 A file uploaded to an issue, linked from descriptions and comments by its `/files` path.
