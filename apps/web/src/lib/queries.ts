@@ -200,16 +200,6 @@ export function useStatuses(orgId: string, teamId: string) {
   });
 }
 
-export function useTeamIssues(orgId: string, teamId: string) {
-  return useQuery({
-    queryKey: keys.issues(orgId, teamId),
-    queryFn: () =>
-      unwrap(api.GET("/organizations/{orgId}/teams/{teamId}/issues", { params: { path: { orgId, teamId } } })),
-    // Agents' progress shows up without a reload until realtime arrives (M4).
-    refetchInterval: 10_000,
-  });
-}
-
 // One issue by id or any identifier it has had. Used to resolve links; the
 // team's list is the copy screens read and edit.
 export function useIssue(orgId: string, issueRef: string | null) {

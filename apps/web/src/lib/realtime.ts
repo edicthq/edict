@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { patchIssues } from "./collections.js";
 import { keys } from "./queries.js";
 
 // Realtime: one socket to the server's /ws, subscribed to the organization
@@ -12,7 +13,7 @@ interface RealtimeEvent {
   type: string;
   subjectId: string;
   organizationId: string;
-  data: { teamId?: unknown; issueId?: unknown };
+  data: Record<string, unknown> & { teamId?: unknown; issueId?: unknown };
 }
 
 let socket: WebSocket | undefined;
@@ -50,18 +51,17 @@ function connect(): void {
   };
 }
 
-// Which queries an event touches. Issue events refresh the team's list, every
-// issue-scoped query (detail, comments, relations, progress) and the agents'
-// queues; events about one issue's children refresh that issue's queries;
-// everything else — teams, members, labels, agents, webhooks — refreshes the
-// organization's queries.
+// Which queries an event touches. Issue events patch the team's collection
+// and refresh every issue-scoped query (detail, comments, relations, progress)
+// and the agents' queues; events about one issue's children refresh that
+// issue's queries; everything else — teams, members, labels, agents, webhooks
+// — refreshes the organization's queries.
 function onEvent(event: RealtimeEvent): void {
   if (!client) return;
   const orgId = event.organizationId;
-  const teamId = typeof event.data.teamId === "string" ? event.data.teamId : undefined;
   const issueId = event.type.startsWith("issue.") ? event.subjectId : event.data.issueId;
   if (event.type.startsWith("issue.")) {
-    if (teamId) void client.invalidateQueries({ queryKey: keys.issues(orgId, teamId) });
+    void patchIssues(event);
     void client.invalidateQueries({ queryKey: ["org", orgId, "issue"] });
     void client.invalidateQueries({ queryKey: keys.agents(orgId) });
     return;

@@ -1,9 +1,10 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { DbProvider } from "@tanstack/react-db";
 import { Link, Navigate, Outlet, RouterProvider, createBrowserRouter, useLocation } from "react-router";
+import { db, queryClient } from "./lib/db.js";
 import { AuthShell, Loading } from "./components/shell.js";
 import { ToastProvider } from "./components/toast.js";
 import { useSession } from "./lib/auth.js";
-import { ApiFailure } from "./lib/api.js";
 import { useInstance } from "./lib/queries.js";
 import { SignIn, SignUp } from "./routes/auth.js";
 import { InstancePage } from "./routes/instance.js";
@@ -18,16 +19,6 @@ import { AgentsPage } from "./routes/agents.js";
 import { ConnectPage, ConsentPage } from "./routes/connect.js";
 import { TeamMembersPage, TeamsPage } from "./routes/teams.js";
 import { TrashPage } from "./routes/trash.js";
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000,
-      // A 4xx will not change on retry.
-      retry: (count, error) => !(error instanceof ApiFailure && error.status < 500) && count < 2,
-    },
-  },
-});
 
 // Pages for signed-in users. Others go to sign-in, or to sign-up on a fresh instance.
 function SignedIn() {
@@ -102,9 +93,11 @@ const router = createBrowserRouter([
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <RouterProvider router={router} />
-      </ToastProvider>
+      <DbProvider client={db}>
+        <ToastProvider>
+          <RouterProvider router={router} />
+        </ToastProvider>
+      </DbProvider>
     </QueryClientProvider>
   );
 }

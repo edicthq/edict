@@ -15,12 +15,12 @@ import {
   useIssue,
   useMembers,
   useStatuses,
-  useTeamIssues,
   useTeamLabels,
   useTeamMembers,
   useTeams,
   useUpdateIssue,
 } from "../lib/queries.js";
+import { useTeamIssues } from "../lib/collections.js";
 import { useOrg } from "./org.js";
 
 type View = "list" | "board";
@@ -175,7 +175,7 @@ function TeamIssues({ team }: { team: Team }) {
     return () => window.removeEventListener("keydown", listener);
   }, []);
 
-  const loading = statuses.isPending || issues.isPending;
+  const loading = statuses.isPending || issues.isLoading;
   const statusList = statuses.data ?? [];
 
   return (

@@ -175,14 +175,17 @@ export function IssuePeek({
           title="Delete"
           className="size-7 px-0"
           disabled={remove.isPending}
+          // The delete takes the row away before the response answers, which
+          // tears this peek down; callbacks passed to mutate die with it, so
+          // the promise is awaited instead.
           onClick={() =>
-            remove.mutate(issue, {
-              onSuccess: () => {
+            void remove
+              .mutateAsync(issue)
+              .then(() => {
                 offerUndo(`Moved ${issue.identifier} to the trash`);
                 onClose();
-              },
-              onError: (error) => toast(error.message),
-            })
+              })
+              .catch((error: Error) => toast(error.message))
           }
         >
           <Trash2 aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
@@ -859,10 +862,10 @@ function Discussion({
               await update.mutateAsync({ comment, body });
             }}
             onDelete={() =>
-              remove.mutate(comment, {
-                onSuccess: () => offerUndo("Comment deleted"),
-                onError: (error) => toast(error.message),
-              })
+              void remove.mutateAsync(comment).then(
+                () => offerUndo("Comment deleted"),
+                (error: Error) => toast(error.message),
+              )
             }
           />
         ))}
