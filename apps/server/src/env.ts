@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import type { S3Config } from "./storage.js";
 
 export interface ServerConfig {
   port: number;
@@ -14,9 +15,10 @@ export interface ServerConfig {
   // The built web app (apps/web/dist). Unset in development, where Vite
   // serves it and proxies /api here.
   webDir?: string;
-  // Where attached files are stored (ADR 0020). Local disk; an S3-compatible
-  // bucket will take over when configured without changing anything else.
+  // Where attached files are stored (ADR 0020): this directory, unless s3
+  // names a bucket.
   dataDir: string;
+  s3?: S3Config;
   // The largest file an attachment accepts. DEFAULT_MAX_ATTACHMENT_BYTES
   // otherwise.
   maxAttachmentBytes: number;
@@ -68,12 +70,29 @@ export function readConfig(env: NodeJS.ProcessEnv): ServerConfig {
     // Relative paths resolve against the working directory. Docker passes
     // DATA_DIR=/srv/data with its volume there.
     dataDir: env.DATA_DIR || join(process.cwd(), "data"),
+    s3: readS3(env),
     maxAttachmentBytes: readAttachmentMax(env.ATTACHMENT_MAX_BYTES),
     smtpUrl,
     emailFrom,
     authRateLimit: env.AUTH_RATE_LIMIT !== "off",
     jobs: env.JOBS !== "off",
   };
+}
+
+// S3_BUCKET turns on S3 storage, and then the credentials must be there too.
+function readS3(env: NodeJS.ProcessEnv): S3Config | undefined {
+  const bucket = env.S3_BUCKET || undefined;
+  if (!bucket) return undefined;
+  const accessKeyId = env.S3_ACCESS_KEY_ID || undefined;
+  const secretAccessKey = env.S3_SECRET_ACCESS_KEY || undefined;
+  if (!accessKeyId || !secretAccessKey) {
+    throw new ConfigError("S3_BUCKET is set, so S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY must be set too.");
+  }
+  const endpoint = env.S3_ENDPOINT || undefined;
+  if (endpoint && !/^https?:\/\//.test(endpoint)) {
+    throw new ConfigError(`S3_ENDPOINT must be a URL, like https://<account>.r2.cloudflarestorage.com: ${endpoint}`);
+  }
+  return { bucket, region: env.S3_REGION || "us-east-1", endpoint, accessKeyId, secretAccessKey };
 }
 
 function readAttachmentMax(raw: string | undefined): number {

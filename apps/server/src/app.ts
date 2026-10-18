@@ -11,7 +11,7 @@ import { createSmtpMailer, type Mailer } from "./email.js";
 import type { ServerConfig } from "./env.js";
 import { ensureInstanceSettings } from "./instance.js";
 import { purgeTrash, startJobs, type PurgeResult } from "./jobs.js";
-import { localDiskStorage } from "./storage.js";
+import { localDiskStorage, s3Storage } from "./storage.js";
 
 export interface App {
   app: Hono;
@@ -49,9 +49,9 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
     db,
     mailer,
     publicUrl: config.baseUrl,
-    // Attached files live on disk (ADR 0020); the routes read these together.
+    // Attached files (ADR 0020): a bucket when one is configured, else disk.
     maxAttachmentBytes: config.maxAttachmentBytes,
-    storage: localDiskStorage(config.dataDir),
+    storage: config.s3 ? s3Storage(config.s3) : localDiskStorage(config.dataDir),
     getUser: async (headers: Headers) => {
       const session = await auth?.api.getSession({ headers });
       if (!session) {
@@ -79,6 +79,7 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
     port: 0,
     start: async () => {
       await migrateToLatest(pool);
+      await deps.storage.check();
       const settings = await ensureInstanceSettings(db);
       auth = createAuth(
         {

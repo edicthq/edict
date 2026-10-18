@@ -7,6 +7,7 @@ import { Pool } from "pg";
 import { createApp, type App } from "../app.js";
 import { DEFAULT_MAX_ATTACHMENT_BYTES } from "../env.js";
 import type { Mailer } from "../email.js";
+import type { S3Config } from "../storage.js";
 
 export interface TestDatabase {
   url: string;
@@ -46,6 +47,8 @@ export async function startTestServer(
     mailer?: Mailer;
     // Where attachments are stored (ADR 0020). A fresh directory each test.
     dataDir?: string;
+    // Store attachments in this bucket instead of dataDir.
+    s3?: S3Config;
     // The attachment size limit. Defaults to production's.
     maxAttachmentBytes?: number;
     // Start pg-boss and its schedules. Off: tests call app.purgeTrash.
@@ -62,6 +65,7 @@ export async function startTestServer(
     trustedProxies: options.trustedProxies ?? [],
     webDir: options.webDir,
     dataDir,
+    s3: options.s3,
     maxAttachmentBytes: options.maxAttachmentBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES,
     jobs: options.jobs ?? false,
   }, { mailer: options.mailer });

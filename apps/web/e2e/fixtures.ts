@@ -1,6 +1,7 @@
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
+import { createServer } from "node:net";
 import { join } from "node:path";
 import { test as base } from "@playwright/test";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
@@ -10,9 +11,10 @@ import { PostgreSqlContainer } from "@testcontainers/postgresql";
 // the way the Docker image runs. `pnpm e2e` builds both first.
 export const test = base.extend<{}, { instanceUrl: string }>({
   instanceUrl: [
-    async ({}, use, workerInfo) => {
+    async ({}, use) => {
       const postgres = await new PostgreSqlContainer("postgres:18-alpine").start();
-      const port = 3100 + workerInfo.parallelIndex;
+      // Any free port: a fixed one collides with whatever dev server is up.
+      const port = await freePort();
       const url = `http://localhost:${port}`;
       const root = join(import.meta.dirname, "../..");
       // Attachment bytes (ADR 0020) go under their own temp dir.
@@ -54,11 +56,24 @@ async function waitForHealth(url: string, exited: () => boolean): Promise<void> 
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline && !exited()) {
     try {
-      if ((await fetch(`${url}/health`)).ok) return;
+      // Edict's own answer, not some other server's page on the port.
+      const res = await fetch(`${url}/health`);
+      if (res.ok && ((await res.json().catch(() => null)) as { ok?: boolean } | null)?.ok === true) return;
     } catch {
       // Not listening yet.
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   throw new Error("The Edict server did not start for the e2e tests");
+}
+
+function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const probe = createServer();
+    probe.once("error", reject);
+    probe.listen(0, "localhost", () => {
+      const { port } = probe.address() as { port: number };
+      probe.close(() => resolve(port));
+    });
+  });
 }
