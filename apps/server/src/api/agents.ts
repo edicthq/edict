@@ -1,6 +1,17 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
-import { apiKeys, emit, members, teamMembers, teams, type Transaction } from "@edicthq/db";
+import {
+  apiKeys,
+  emit,
+  members,
+  oauthAccessToken,
+  oauthClient,
+  oauthConsent,
+  oauthRefreshToken,
+  teamMembers,
+  teams,
+  type Transaction,
+} from "@edicthq/db";
 import {
   Agent,
   ApiKey,
@@ -371,6 +382,7 @@ export async function pause(tx: Transaction, actorId: string, agent: MemberRow):
     .set({ revokedAt: new Date() })
     .where(and(eq(apiKeys.agentId, agent.id), isNull(apiKeys.revokedAt)))
     .returning({ id: apiKeys.id });
+  const revokedGrants = agent.connectedBy ? await revokeGrants(tx, agent) : 0;
   const [paused] = await tx
     .update(members)
     .set({ pausedAt: new Date(), version: sql`${members.version} + 1` })
@@ -380,9 +392,34 @@ export async function pause(tx: Transaction, actorId: string, agent: MemberRow):
     type: "agent.paused",
     actorId,
     subjectId: agent.id,
-    data: { revokedApiKeys: revoked.length, version: paused!.version },
+    data: { revokedApiKeys: revoked.length, revokedGrants, version: paused!.version },
   });
   return paused!;
+}
+
+// Deletes a connected agent's OAuth grants: the tokens and consents its human
+// gave clients by its name in its organization. Row-level security keeps the
+// deletes to that organization. Returns how many grants it removed.
+async function revokeGrants(tx: Transaction, agent: MemberRow): Promise<number> {
+  const [human] = await tx.select({ userId: members.userId }).from(members).where(eq(members.id, agent.connectedBy!));
+  if (!human?.userId) {
+    return 0;
+  }
+  // As clientNameOf names them.
+  const clients = await tx
+    .select({ clientId: oauthClient.clientId })
+    .from(oauthClient)
+    .where(sql`coalesce(nullif(trim(${oauthClient.name}), ''), 'MCP client') = ${agent.clientName}`);
+  const clientIds = clients.map((client) => client.clientId);
+  if (clientIds.length === 0) {
+    return 0;
+  }
+  const mine = <T extends typeof oauthAccessToken | typeof oauthRefreshToken | typeof oauthConsent>(table: T) =>
+    and(eq(table.referenceId, agent.orgId), eq(table.userId, human.userId!), inArray(table.clientId, clientIds));
+  await tx.delete(oauthAccessToken).where(mine(oauthAccessToken));
+  await tx.delete(oauthRefreshToken).where(mine(oauthRefreshToken));
+  const consents = await tx.delete(oauthConsent).where(mine(oauthConsent)).returning({ id: oauthConsent.id });
+  return consents.length;
 }
 
 // When a human leaves, the agents they connected stop acting for them.

@@ -15,10 +15,12 @@
     "openapi": "tsx scripts/openapi.ts"
   },
   "dependencies": {
+    "@better-auth/oauth-provider": "1.7.10",
     "@edicthq/db": "workspace:*",
     "@edicthq/schema": "workspace:*",
     "@hono/node-server": "^1.19.0",
     "@hono/zod-openapi": "^1.6.3",
+    "@modelcontextprotocol/sdk": "1.32.1",
     "aws4fetch": "^1.0.20",
     "better-auth": "^1.7.10",
     "drizzle-orm": "^0.44.7",

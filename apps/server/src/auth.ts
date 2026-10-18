@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { oauthProvider } from "@better-auth/oauth-provider";
 import { betterAuth } from "better-auth";
 import { APIError } from "better-auth/api";
 import { admin } from "better-auth/plugins";
@@ -20,9 +22,28 @@ export interface AuthConfig {
 
 export type EdictAuth = ReturnType<typeof createAuth>;
 
+// What MCP clients get from OAuth (ADR 0021). Neither prefix is stored: the
+// provider strips it before hashing.
+export const OAUTH_ACCESS_TOKEN_PREFIX = "edict_at_";
+export const OAUTH_REFRESH_TOKEN_PREFIX = "edict_rt_";
+
+// How OAuth tokens are stored, so the API finds one with a single lookup.
+export function hashOAuthToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+// Reads the organization the signed-in user chose on the consent page, for
+// the grant's reference. Returns undefined when it is not theirs.
+export type ConsentOrganization = (userId: string, orgId: string | undefined) => Promise<string | undefined>;
+
 // Without a mailer there is no email verification and no password reset: an
 // instance admin sets a new password instead.
-export function createAuth(config: AuthConfig, db: Database, mailer?: Mailer) {
+export function createAuth(
+  config: AuthConfig,
+  db: Database,
+  mailer?: Mailer,
+  consentOrganization: ConsentOrganization = async () => undefined,
+) {
   return betterAuth({
     secret: config.secret,
     baseURL: config.baseURL,
@@ -43,7 +64,61 @@ export function createAuth(config: AuthConfig, db: Database, mailer?: Mailer) {
     // Better Auth turns the rate limiter on in production and off elsewhere;
     // tests may switch it off explicitly.
     ...(config.rateLimit === false ? { rateLimit: { enabled: false } } : {}),
-    plugins: [admin()],
+    session: {
+      additionalFields: {
+        // The organization an MCP client being connected joins (ADR 0021).
+        // Set by the API's consent step, read when the grant is recorded.
+        oauthOrgId: { type: "string", required: false, input: false },
+      },
+    },
+    plugins: [
+      admin(),
+      oauthProvider({
+        loginPage: "/sign-in",
+        consentPage: "/oauth/consent",
+        // MCP clients register themselves (RFC 7591) and use PKCE.
+        allowDynamicClientRegistration: true,
+        allowUnauthenticatedClientRegistration: true,
+        clientRegistrationDefaultApplicationType: "infer",
+        // Opaque tokens, so pausing an agent revokes them at once.
+        disableJwtPlugin: true,
+        storeTokens: { hash: hashOAuthToken },
+        prefix: { opaqueAccessToken: OAUTH_ACCESS_TOKEN_PREFIX, refreshToken: OAUTH_REFRESH_TOKEN_PREFIX },
+        // The /mcp resource is registered at boot when the public URL is
+        // known, else on the first request that names it (mcp.ts).
+        resources: config.baseURL ? [mcpResource(config.baseURL)] : [],
+        enforcePerClientResources: false,
+        // The consent page first asks which organization the client joins,
+        // then continues here, then asks for consent.
+        postLogin: {
+          page: "/oauth/consent",
+          shouldRedirect: async ({ user, session, isContinuation }) =>
+            !isContinuation || !(await consentOrganization(user.id, session.oauthOrgId as string | undefined)),
+          consentReferenceId: async ({ user, session }) => {
+            const orgId = await consentOrganization(user.id, session.oauthOrgId as string | undefined);
+            if (!orgId) {
+              throw new APIError("BAD_REQUEST", {
+                error: "invalid_request",
+                error_description: "Choose an organization to connect on the consent page.",
+              });
+            }
+            return orgId;
+          },
+        },
+        ...(config.rateLimit === false
+          ? {
+              rateLimit: {
+                token: false,
+                authorize: false,
+                introspect: false,
+                revoke: false,
+                register: false,
+                userinfo: false,
+              },
+            }
+          : {}),
+      }),
+    ],
     advanced: {
       ipAddress: {
         ipAddressHeaders: ["x-forwarded-for"],
@@ -80,4 +155,9 @@ export function createAuth(config: AuthConfig, db: Database, mailer?: Mailer) {
       },
     },
   });
+}
+
+// The resource identifier MCP clients ask tokens for (RFC 8707).
+export function mcpResource(origin: string): string {
+  return `${origin.replace(/\/$/, "")}/mcp`;
 }

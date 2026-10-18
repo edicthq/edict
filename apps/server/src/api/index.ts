@@ -3,6 +3,7 @@ import { localDiskStorage } from "../storage.js";
 import { agentRoutes } from "./agents.js";
 import { attachmentRoutes, type AttachmentDeps } from "./attachments.js";
 import { changeRoutes } from "./changes.js";
+import { connectionRoutes } from "./connections.js";
 import { commentRoutes } from "./comments.js";
 import { identify, router } from "./context.js";
 import { eventRoutes } from "./events.js";
@@ -18,6 +19,7 @@ import { trashRoutes } from "./trash.js";
 
 export type { ApiDeps, SessionUser } from "./context.js";
 export { fileRoutes, type AttachmentDeps } from "./attachments.js";
+export { consentOrganization } from "./connections.js";
 
 // The public API, mounted at /api/v1. Its OpenAPI document is served at
 // /api/v1/openapi.json.
@@ -37,6 +39,7 @@ export function createApi(deps: AttachmentDeps) {
   api.route("/", labelRoutes(deps));
   api.route("/", relationRoutes(deps));
   api.route("/", agentRoutes(deps));
+  api.route("/", connectionRoutes(deps));
   api.route("/", inviteRoutes(deps));
   api.route("/", eventRoutes(deps));
   api.route("/", instanceRoutes(deps));

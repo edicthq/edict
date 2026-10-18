@@ -120,6 +120,20 @@
       "when": 1792311117300,
       "tag": "0016_api_keys_row_level_security",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792311677877,
+      "tag": "0017_oauth_provider",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792311678129,
+      "tag": "0018_oauth_row_level_security",
+      "breakpoints": true
     }
   ]
 }

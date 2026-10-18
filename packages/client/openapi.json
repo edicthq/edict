@@ -1264,6 +1264,18 @@
           "name"
         ]
       },
+      "ConnectionOrganization": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "orgId"
+        ]
+      },
       "CreatedInvite": {
         "type": "object",
         "properties": {
@@ -5228,6 +5240,77 @@
         "responses": {
           "204": {
             "description": "Done"
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller's role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/oauth/organization": {
+      "post": {
+        "tags": [
+          "Connections"
+        ],
+        "summary": "Choose the organization an MCP client being connected joins",
+        "description": "The consent page calls this before accepting the OAuth request. The client's connected agent joins this organization, on behalf of the signed-in person.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionOrganization"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The organization, and the signed-in person's member in it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Membership"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the schema",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "401": {
             "description": "Not signed in",

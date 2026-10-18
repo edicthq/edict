@@ -159,6 +159,10 @@ export const CreatedApiKey = z
   })
   .meta({ id: "CreatedApiKey" });
 
+// The consent page's choice of organization for an MCP client being connected
+// through OAuth (ADR 0021).
+export const ConnectionOrganization = z.object({ orgId: Id }).meta({ id: "ConnectionOrganization" });
+
 export const TeamKey = z
   .string()
   .regex(/^[A-Z][A-Z0-9]{1,6}$/, "2-7 uppercase letters and digits, starting with a letter");

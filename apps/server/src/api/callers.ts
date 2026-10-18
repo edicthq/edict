@@ -1,13 +1,27 @@
 // ADR 0021: every request becomes one caller, whatever credential it carried.
 import { createHash, randomBytes } from "node:crypto";
-import { and, eq, isNull, lt, or } from "drizzle-orm";
-import { apiKeys, enterOrg, members, type Scope, type Transaction } from "@edicthq/db";
-import type { MemberRow } from "./access.js";
-import { callerMember } from "./access.js";
-import { ApiError, notFound } from "./errors.js";
+import { and, eq, gt, isNull, lt, or } from "drizzle-orm";
+import {
+  apiKeys,
+  emit,
+  enterOrg,
+  members,
+  oauthAccessToken,
+  oauthClient,
+  onBehalfOf,
+  user,
+  type Scope,
+  type Transaction,
+} from "@edicthq/db";
+import type { Role } from "@edicthq/schema";
+import { hashOAuthToken, OAUTH_ACCESS_TOKEN_PREFIX } from "../auth.js";
+import { atLeast, callerMember, type MemberRow } from "./access.js";
+import { ApiError, forbidden, notFound } from "./errors.js";
 
 export interface SessionUser {
   id: string;
+  // The Better Auth session the request came with.
+  sessionId: string;
   email: string;
   name: string;
   emailVerified: boolean;
@@ -17,7 +31,9 @@ export interface SessionUser {
 export type Credential =
   | { kind: "session"; user: SessionUser }
   // The SHA-256 hash of an API key's secret.
-  | { kind: "apiKey"; hash: string };
+  | { kind: "apiKey"; hash: string }
+  // The hash of an OAuth access token, as the provider stores it.
+  | { kind: "oauth"; hash: string };
 
 // The member acting, and what limits it.
 export interface Caller extends MemberRow {
@@ -35,12 +51,22 @@ export function credentialOf(headers: Headers, user: SessionUser | null): Creden
   if (bearer?.startsWith(API_KEY_PREFIX)) {
     return { kind: "apiKey", hash: hashSecret(bearer) };
   }
+  if (bearer?.startsWith(OAUTH_ACCESS_TOKEN_PREFIX)) {
+    return { kind: "oauth", hash: hashOAuthToken(bearer.slice(OAUTH_ACCESS_TOKEN_PREFIX.length)) };
+  }
   return user ? { kind: "session", user } : null;
 }
 
 // The scope settings a credential needs before its organization is known.
 export function scopeFor(credential: Credential): Scope {
-  return credential.kind === "session" ? { userId: credential.user.id } : { apiKeyHash: credential.hash };
+  switch (credential.kind) {
+    case "session":
+      return { userId: credential.user.id };
+    case "apiKey":
+      return { apiKeyHash: credential.hash };
+    case "oauth":
+      return { oauthTokenHash: credential.hash };
+  }
 }
 
 // The caller in the scoped organization. Outsiders get 404, so they cannot tell
@@ -49,6 +75,13 @@ export async function callerIn(tx: Transaction, orgId: string, credential: Crede
   if (credential.kind === "session") {
     const member = await callerMember(tx, orgId, credential.user.id);
     return { ...member, access: member, keyTeamIds: null };
+  }
+  if (credential.kind === "oauth") {
+    const grant = await grantByHash(tx, credential.hash);
+    if (grant.orgId !== orgId) {
+      throw notFound("organization");
+    }
+    return connectedCaller(tx, grant);
   }
   const key = await keyByHash(tx, credential.hash);
   if (key.orgId !== orgId) {
@@ -59,10 +92,14 @@ export async function callerIn(tx: Transaction, orgId: string, credential: Crede
 
 // The organization an agent credential belongs to, for requests that name none.
 export async function credentialOrg(tx: Transaction, credential: Credential): Promise<string | null> {
-  if (credential.kind === "session") {
-    return null;
+  switch (credential.kind) {
+    case "session":
+      return null;
+    case "apiKey":
+      return (await keyByHash(tx, credential.hash)).orgId;
+    case "oauth":
+      return (await grantByHash(tx, credential.hash)).orgId;
   }
-  return (await keyByHash(tx, credential.hash)).orgId;
 }
 
 type ApiKeyRow = typeof apiKeys.$inferSelect;
@@ -98,6 +135,85 @@ async function agentCaller(tx: Transaction, key: ApiKeyRow): Promise<Caller> {
       ),
     );
   return { ...agent, access: agent, keyTeamIds: key.teamIds };
+}
+
+interface Grant {
+  orgId: string;
+  userId: string;
+  clientName: string;
+}
+
+// The OAuth grant behind an access token: who approved which client, for
+// which organization.
+async function grantByHash(tx: Transaction, hash: string): Promise<Grant> {
+  const [token] = await tx
+    .select({ orgId: oauthAccessToken.referenceId, userId: oauthAccessToken.userId, clientName: oauthClient.name })
+    .from(oauthAccessToken)
+    .leftJoin(oauthClient, eq(oauthClient.clientId, oauthAccessToken.clientId))
+    .where(and(eq(oauthAccessToken.token, hash), isNull(oauthAccessToken.revoked), gt(oauthAccessToken.expiresAt, new Date())));
+  if (!token?.orgId || !token.userId) {
+    throw new ApiError("unauthorized", "The access token is not valid. It may have expired, or its agent was paused. Reconnect the MCP client.");
+  }
+  return { orgId: token.orgId, userId: token.userId, clientName: clientNameOf(token.clientName) };
+}
+
+// What a connected agent is called after. Keep in step with revokeGrants.
+export function clientNameOf(name: string | null): string {
+  return name?.trim() || "MCP client";
+}
+
+// A connected agent can never be more than a Member (ADR 0021).
+function connectedRole(human: Role): "member" | "guest" {
+  return human === "guest" ? "guest" : "member";
+}
+
+// The connected agent for an OAuth grant, created on its first request
+// (ADR 0015). It acts on behalf of its human and sees what they see.
+async function connectedCaller(tx: Transaction, grant: Grant): Promise<Caller> {
+  await enterOrg(tx, grant.orgId);
+  const [human] = await tx
+    .select()
+    .from(members)
+    .where(and(eq(members.orgId, grant.orgId), eq(members.userId, grant.userId), isNull(members.removedAt)));
+  if (!human) {
+    throw new ApiError("unauthorized", "The person who connected this client is no longer a member of the organization.");
+  }
+  const role = connectedRole(human.role);
+  const find = () =>
+    tx
+      .select()
+      .from(members)
+      .where(and(eq(members.orgId, grant.orgId), eq(members.connectedBy, human.id), eq(members.clientName, grant.clientName)));
+  let [agent] = await find();
+  if (!agent) {
+    const [person] = await tx.select({ name: user.name }).from(user).where(eq(user.id, grant.userId));
+    const firstName = person?.name.trim().split(/\s+/)[0] || "someone";
+    const name = `${grant.clientName} (${firstName})`;
+    // Two first requests at once: one inserts, the other finds its row.
+    const [created] = await tx
+      .insert(members)
+      .values({ orgId: grant.orgId, kind: "agent", role, name, connectedBy: human.id, clientName: grant.clientName })
+      .onConflictDoNothing()
+      .returning();
+    if (created) {
+      await emit(tx, grant.orgId, {
+        type: "agent.connected",
+        actorId: created.id,
+        onBehalfOfId: human.id,
+        subjectId: created.id,
+        data: { name, clientName: grant.clientName, role },
+      });
+    }
+    [agent] = created ? [created] : await find();
+  }
+  if (!agent || agent.removedAt) {
+    throw new ApiError("unauthorized", "This connection's agent was removed. Reconnect the MCP client.");
+  }
+  if (agent.pausedAt) {
+    throw forbidden(`${agent.name} is paused. An admin can resume it under Settings, Agents.`);
+  }
+  await onBehalfOf(tx, human.id);
+  return { ...agent, role: atLeast(agent.role, role) ? role : agent.role, access: human, keyTeamIds: null };
 }
 
 function invalidKey() {

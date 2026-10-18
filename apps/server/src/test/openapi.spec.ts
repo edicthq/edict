@@ -60,6 +60,7 @@ describe("OpenAPI document", () => {
       "PATCH /organizations/{orgId}/teams/{teamId}",
       "PATCH /organizations/{orgId}/teams/{teamId}/statuses/{statusId}",
       "POST /invites/{token}/accept",
+      "POST /oauth/organization",
       "POST /organizations",
       "POST /organizations/{orgId}/agents",
       "POST /organizations/{orgId}/agents/{agentId}/api-keys",

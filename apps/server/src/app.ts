@@ -5,11 +5,12 @@ import { getConnInfo } from "@hono/node-server/conninfo";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono, type Context } from "hono";
 import { createDatabase, createPool, migrateToLatest } from "@edicthq/db";
-import { createApi, fileRoutes } from "./api/index.js";
+import { consentOrganization, createApi, fileRoutes } from "./api/index.js";
 import { createAuth, type EdictAuth } from "./auth.js";
 import { createSmtpMailer, type Mailer } from "./email.js";
 import type { ServerConfig } from "./env.js";
 import { ensureInstanceSettings } from "./instance.js";
+import { oauthDiscovery, oauthRoutes } from "./oauth.js";
 import { purgeTrash, startJobs, type PurgeResult } from "./jobs.js";
 import { localDiskStorage, s3Storage } from "./storage.js";
 
@@ -58,10 +59,12 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
         return null;
       }
       const { id, email, name, role, emailVerified } = session.user;
-      return { id, email, name, emailVerified, instanceAdmin: role === "admin" };
+      return { id, sessionId: session.session.id, email, name, emailVerified, instanceAdmin: role === "admin" };
     },
   };
   app.route("/api/v1", createApi(deps));
+  const discovery = oauthDiscovery(db, config.baseUrl);
+  oauthRoutes(app, discovery, () => auth);
   // Attachment bytes live under /files, not /api/v1 (ADR 0020). The default
   // resolver uses cookies; use e.g. `curl -b` or an Authorization header.
   app.route("/", fileRoutes(deps));
@@ -90,6 +93,7 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
         },
         db,
         mailer,
+        (userId, orgId) => consentOrganization(db, userId, orgId),
       );
 
       if (config.jobs !== false) {

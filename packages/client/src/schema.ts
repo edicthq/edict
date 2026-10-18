@@ -3223,6 +3223,85 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/oauth/organization": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Choose the organization an MCP client being connected joins
+         * @description The consent page calls this before accepting the OAuth request. The client's connected agent joins this organization, on behalf of the signed-in person.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ConnectionOrganization"];
+                };
+            };
+            responses: {
+                /** @description The organization, and the signed-in person's member in it */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Membership"];
+                    };
+                };
+                /** @description The request does not match the schema */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The caller's role does not allow this */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{orgId}/invites": {
         parameters: {
             query?: never;
@@ -4092,6 +4171,10 @@ export interface components {
             name: string;
             /** @default null */
             teamIds: string[] | null;
+        };
+        ConnectionOrganization: {
+            /** Format: uuid */
+            orgId: string;
         };
         CreatedInvite: {
             /** Format: uuid */
