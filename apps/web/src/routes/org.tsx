@@ -11,6 +11,7 @@ import { VerifyBanner } from "../components/verify-banner.js";
 import { AuthShell, Loading } from "../components/shell.js";
 import { authClient, useSession } from "../lib/auth.js";
 import { mod } from "../lib/labels.js";
+import { useRealtime } from "../lib/realtime.js";
 import type { Agent, Member } from "@edicthq/client";
 import { agentState, connectionLine } from "../lib/agents.js";
 import { useAgentQueue, useAgents, useMembers, useMemberships, useTeams } from "../lib/queries.js";
@@ -38,6 +39,7 @@ export function OrgLayout() {
   const session = useSession();
   const navigate = useNavigate();
   const [dialog, setDialog] = useState<"team" | "invite" | "palette" | null>(null);
+  useRealtime(memberships.data?.find((m) => m.organization.slug === slug)?.organization.id);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {

@@ -71,7 +71,7 @@ export interface NewEvent {
 // as the change, so both commit or neither does.
 // When the organization has an active webhook, also queues the event for
 // delivery in the same transaction (ADR 0022) and wakes the dispatcher once it
-// commits.
+// commits. Always wakes the realtime hub on commit (the socket fanout).
 export async function emit(tx: Transaction, orgId: string, event: NewEvent): Promise<void> {
   const [row] = await tx.insert(events).values({
     orgId,
@@ -90,7 +90,14 @@ export async function emit(tx: Transaction, orgId: string, event: NewEvent): Pro
       RETURNING org_id
     )
     SELECT pg_notify(${WEBHOOK_CHANNEL}, org_id::text) FROM queued`);
+  // pg_notify inside a transaction delivers only when it commits, so sockets
+  // never see an event before its change is durable. The hub reads the event
+  // by id: notify payloads cap at 8 KB, event data does not.
+  await tx.execute(sql`SELECT pg_notify(${EVENTS_CHANNEL}, ${`${orgId}:${row!.id}`})`);
 }
 
 // Where emit tells the webhook dispatcher there is work.
 export const WEBHOOK_CHANNEL = "edict_webhooks";
+
+// Where emit tells the realtime hub there is an event to fan out.
+export const EVENTS_CHANNEL = "edict_events";

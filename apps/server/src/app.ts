@@ -13,6 +13,7 @@ import type { ServerConfig } from "./env.js";
 import { ensureInstanceSettings } from "./instance.js";
 import { mcpRoutes } from "./mcp/index.js";
 import { oauthDiscovery, oauthRoutes } from "./oauth.js";
+import { startRealtime } from "./realtime.js";
 import { DEFAULT_WEBHOOK_RETRY } from "./webhooks.js";
 import { purgeTrash, startJobs, type PurgeResult } from "./jobs.js";
 import { localDiskStorage, s3Storage } from "./storage.js";
@@ -85,6 +86,7 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
 
   let server: ServerType | undefined;
   let jobs: Awaited<ReturnType<typeof startJobs>> | undefined;
+  let realtime: Awaited<ReturnType<typeof startRealtime>> | undefined;
   let poolEnded = false;
 
   const state: App = {
@@ -112,9 +114,17 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
 
       server = await listen(app, config.port);
       state.port = boundPort(server);
+      realtime = await startRealtime(server, { db, pool, getUser: deps.getUser });
     },
     purgeTrash: (now) => purgeTrash(db, deps.storage, now),
     shutdown: async () => {
+      // Before server.close(): open sockets would hold it open, and only
+      // stopping realtime ends them.
+      if (realtime) {
+        const stopping = realtime;
+        realtime = undefined;
+        await stopping.stop();
+      }
       if (server) {
         const closing = server;
         server = undefined;

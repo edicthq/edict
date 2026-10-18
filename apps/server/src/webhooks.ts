@@ -66,8 +66,9 @@ async function targets(tx: Transaction, event: EventRow, active: WebhookRow[]): 
   );
 }
 
-// The JSON an event is delivered as.
-async function payload(tx: Transaction, event: EventRow): Promise<string> {
+// The JSON an event is delivered as. The realtime hub sends the same shape
+// over /ws.
+export async function eventPayload(tx: Transaction, event: EventRow): Promise<string> {
   const people = await tx
     .select({ id: members.id, kind: members.kind, agentName: members.name, userName: user.name })
     .from(members)
@@ -110,7 +111,7 @@ export async function dispatch(db: Database, queue: (jobs: DeliveryJob[]) => Pro
       for (const { event } of queued) {
         const to = await targets(tx, event, active);
         if (to.length > 0) {
-          const body = await payload(tx, event);
+          const body = await eventPayload(tx, event);
           const rows = await tx
             .insert(webhookDeliveries)
             .values(to.map((hook) => ({ orgId, webhookId: hook.id, eventId: event.id, requestBody: body })))
