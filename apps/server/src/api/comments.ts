@@ -54,7 +54,7 @@ const createComment = createRoute({
   path: "/organizations/{orgId}/issues/{issueRef}/comments",
   tags: ["Comments"],
   summary: "Comment on an issue",
-  description: "The body is markdown (ADR 0009). Agents also add records through MCP; this route is the API's.",
+  description: "The body is markdown (ADR 0009). Agents comment through the MCP comment tool, which calls this route.",
   request: { params: IssueParams, ...body(CreateComment) },
   responses: { 201: json(Comment, "The new comment"), ...errors("invalid_request", "unauthorized", "not_found") },
 });

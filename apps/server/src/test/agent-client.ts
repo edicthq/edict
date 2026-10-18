@@ -23,5 +23,6 @@ export async function runner(baseUrl: string, admin: ApiClient, org: string, tea
   const agent = await admin.post(`${org}/agents`, { name, teamIds });
   expect(agent.status).toBe(201);
   const key = await admin.post(`${org}/agents/${agent.body.id}/api-keys`, { name: "runner" });
-  return { id: agent.body.id as string, client: bearerClient(baseUrl, key.body.secret) };
+  const secret = key.body.secret as string;
+  return { id: agent.body.id as string, secret, client: bearerClient(baseUrl, secret) };
 }

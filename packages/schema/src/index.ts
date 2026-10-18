@@ -402,7 +402,7 @@ export const Issue = z
     // The agent doing the work. The assignee still answers for it.
     delegateId: Id.nullable(),
     // The delegate's or another agent's most recent progress update.
-    latestProgress: ProgressUpdate.nullable(),
+    latestProgress: z.union([ProgressUpdate, z.null()]),
     // Organization labels and labels of the issue's team.
     labelIds: z.array(Id),
     // Set on a sub-issue. The parent can be in any team.

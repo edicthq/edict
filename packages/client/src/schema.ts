@@ -2040,7 +2040,7 @@ export interface paths {
         put?: never;
         /**
          * Comment on an issue
-         * @description The body is markdown (ADR 0009). Agents also add records through MCP; this route is the API's.
+         * @description The body is markdown (ADR 0009). Agents comment through the MCP comment tool, which calls this route.
          */
         post: {
             parameters: {
@@ -4447,7 +4447,7 @@ export interface components {
             assigneeId: string | null;
             /** Format: uuid */
             delegateId: string | null;
-            latestProgress: components["schemas"]["ProgressUpdate"];
+            latestProgress: components["schemas"]["ProgressUpdate"] | null;
             labelIds: string[];
             /** Format: uuid */
             parentId: string | null;
@@ -4473,7 +4473,7 @@ export interface components {
             links: components["schemas"]["WebLink"][];
             /** Format: date-time */
             createdAt: string;
-        } | null;
+        };
         /**
          * @description working: under way. blocked: cannot go on. needs_input: waiting on a person. done: finished.
          * @enum {string}

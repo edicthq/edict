@@ -415,7 +415,14 @@
             "format": "uuid"
           },
           "latestProgress": {
-            "$ref": "#/components/schemas/ProgressUpdate"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProgressUpdate"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "labelIds": {
             "type": "array",
@@ -480,10 +487,7 @@
         ]
       },
       "ProgressUpdate": {
-        "type": [
-          "object",
-          "null"
-        ],
+        "type": "object",
         "properties": {
           "id": {
             "type": "string",
@@ -4183,7 +4187,7 @@
           "Comments"
         ],
         "summary": "Comment on an issue",
-        "description": "The body is markdown (ADR 0009). Agents also add records through MCP; this route is the API's.",
+        "description": "The body is markdown (ADR 0009). Agents comment through the MCP comment tool, which calls this route.",
         "parameters": [
           {
             "schema": {
