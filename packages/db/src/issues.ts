@@ -90,6 +90,8 @@ export const issues = pgTable(
     priority: priority("priority").notNull().default("none"),
     estimate: integer("estimate"),
     assigneeId: uuid("assignee_id"),
+    // The agent doing the work while the assignee answers for it (ADR 0008).
+    delegateId: uuid("delegate_id"),
     // Makes this a sub-issue. The parent can be in any team.
     parentId: uuid("parent_id"),
     creatorId: uuid("creator_id").notNull(),
@@ -113,6 +115,7 @@ export const issues = pgTable(
     }),
     unique("issues_team_id_number_unique").on(table.teamId, table.number),
     index("issues_assignee_id_idx").on(table.assigneeId),
+    index("issues_delegate_id_idx").on(table.delegateId),
     index("issues_parent_id_idx").on(table.parentId),
     check("issues_not_own_parent", sql`${table.parentId} <> ${table.id}`),
     check("issues_estimate_not_negative", sql`${table.estimate} >= 0`),
@@ -130,6 +133,11 @@ export const issues = pgTable(
     foreignKey({
       name: "issues_assignee_fk",
       columns: [table.orgId, table.assigneeId],
+      foreignColumns: [members.orgId, members.id],
+    }),
+    foreignKey({
+      name: "issues_delegate_fk",
+      columns: [table.orgId, table.delegateId],
       foreignColumns: [members.orgId, members.id],
     }),
     foreignKey({
@@ -331,6 +339,44 @@ export const attachments = pgTable(
     foreignKey({
       name: "attachments_creator_fk",
       columns: [table.orgId, table.creatorId],
+      foreignColumns: [members.orgId, members.id],
+    }),
+  ],
+);
+
+export const progressState = pgEnum("progress_state", ["working", "blocked", "needs_input", "done"]);
+
+export interface ProgressLink {
+  url: string;
+  title?: string;
+}
+
+// A structured report an agent posts on an issue: a state, a markdown message
+// and optional links. Reports are a record of what happened, so they are never
+// edited; they go when their issue is purged.
+export const progressUpdates = pgTable(
+  "progress_updates",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull(),
+    issueId: uuid("issue_id").notNull(),
+    agentId: uuid("agent_id").notNull(),
+    state: progressState("state").notNull(),
+    // Markdown (ADR 0009).
+    message: text("message").notNull(),
+    links: jsonb("links").$type<ProgressLink[]>().notNull().default([]),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("progress_updates_issue_id_id_idx").on(table.issueId, table.id),
+    foreignKey({
+      name: "progress_updates_issue_fk",
+      columns: [table.orgId, table.issueId],
+      foreignColumns: [issues.orgId, issues.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "progress_updates_agent_fk",
+      columns: [table.orgId, table.agentId],
       foreignColumns: [members.orgId, members.id],
     }),
   ],

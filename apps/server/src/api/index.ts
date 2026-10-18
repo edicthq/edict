@@ -12,6 +12,7 @@ import { inviteRoutes } from "./invites.js";
 import { issueRoutes } from "./issues.js";
 import { labelRoutes } from "./labels.js";
 import { organizationRoutes } from "./organizations.js";
+import { progressRoutes } from "./progress.js";
 import { relationRoutes } from "./relations.js";
 import { statusRoutes } from "./statuses.js";
 import { teamRoutes } from "./teams.js";
@@ -32,6 +33,7 @@ export function createApi(deps: AttachmentDeps) {
   api.route("/", teamRoutes(deps));
   api.route("/", statusRoutes(deps));
   api.route("/", issueRoutes(deps));
+  api.route("/", progressRoutes(deps));
   api.route("/", attachmentRoutes(deps));
   api.route("/", commentRoutes(deps));
   api.route("/", trashRoutes(deps));

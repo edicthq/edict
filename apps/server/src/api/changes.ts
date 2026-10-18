@@ -6,7 +6,7 @@ import type { Caller } from "./callers.js";
 import { visibleTeam } from "./access.js";
 import { errors, inOrg, json, OrgParams, router, type ApiDeps } from "./context.js";
 import { ApiError, conflict, forbidden, invalid, isUniqueViolation, notFound } from "./errors.js";
-import { checkAssignee, checkLabels, checkParent, checkStatus, labelSet, loadIssue, visibleIssue } from "./issue-data.js";
+import { checkAssignee, checkDelegate, checkLabels, checkParent, checkStatus, labelSet, loadIssue, visibleIssue } from "./issue-data.js";
 import { restoreComment, restoreIssues, trashComment, trashIssues } from "./trash.js";
 
 type EventRow = typeof events.$inferSelect;
@@ -156,6 +156,9 @@ async function setIssueBack(tx: Transaction, caller: Caller, event: EventRow, ma
   if (next.assigneeId && (fields.includes("assigneeId") || fields.includes("teamId"))) {
     await checkAssignee(tx, target, next.assigneeId);
   }
+  if (next.delegateId && (fields.includes("delegateId") || fields.includes("teamId"))) {
+    await checkDelegate(tx, target, next.delegateId);
+  }
   if (fields.includes("parentId") && next.parentId) await checkParent(tx, caller, next.parentId, row.id);
 
   const changes: Record<string, FieldChange> = Object.fromEntries(
@@ -176,6 +179,7 @@ async function setIssueBack(tx: Transaction, caller: Caller, event: EventRow, ma
       priority: next.priority,
       estimate: next.estimate,
       assigneeId: next.assigneeId,
+      delegateId: next.delegateId,
       parentId: next.parentId,
       teamId: target.id,
       number,

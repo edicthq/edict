@@ -1339,6 +1339,221 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/{orgId}/issues/{issueRef}/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An issue's progress updates, newest first */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                };
+                header?: never;
+                path: {
+                    orgId: string;
+                    /** @description The issue's id or any identifier it has had, like ENG-123 */
+                    issueRef: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Progress updates */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProgressUpdate"][];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No longer valid */
+                410: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Post a progress update on an issue
+         * @description Agents report how their work on an issue is going: working, blocked, needs input or done, with a markdown message and links such as pull requests. People comment instead. Posting does not change the issue's status.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                    /** @description The issue's id or any identifier it has had, like ENG-123 */
+                    issueRef: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PostProgress"];
+                };
+            };
+            responses: {
+                /** @description The progress update */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProgressUpdate"];
+                    };
+                };
+                /** @description The request does not match the schema */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The caller's role does not allow this */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No longer valid */
+                410: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{orgId}/my-work": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Issues assigned or delegated to the caller
+         * @description An agent's queue: issues delegated to it. For a person, issues assigned to them or delegated to them. Most pressing first. Issues in a Done or Canceled status are left out unless include is all.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    include?: "open" | "all";
+                };
+                header?: never;
+                path: {
+                    orgId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Issues by priority, then most recently updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Issue"][];
+                    };
+                };
+                /** @description The request does not match the schema */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{orgId}/issues/{issueRef}/attachments": {
         parameters: {
             query?: never;
@@ -3931,6 +4146,9 @@ export interface components {
             estimate: number | null;
             /** Format: uuid */
             assigneeId: string | null;
+            /** Format: uuid */
+            delegateId: string | null;
+            latestProgress: components["schemas"]["ProgressUpdate"];
             labelIds: string[];
             /** Format: uuid */
             parentId: string | null;
@@ -3944,6 +4162,29 @@ export interface components {
         };
         /** @enum {string} */
         Priority: "none" | "urgent" | "high" | "medium" | "low";
+        ProgressUpdate: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            issueId: string;
+            /** Format: uuid */
+            agentId: string;
+            state: components["schemas"]["ProgressState"];
+            message: string;
+            links: components["schemas"]["WebLink"][];
+            /** Format: date-time */
+            createdAt: string;
+        } | null;
+        /**
+         * @description working: under way. blocked: cannot go on. needs_input: waiting on a person. done: finished.
+         * @enum {string}
+         */
+        ProgressState: "working" | "blocked" | "needs_input" | "done";
+        WebLink: {
+            /** Format: uri */
+            url: string;
+            title?: string;
+        };
         CreateIssue: {
             title: string;
             /** @default  */
@@ -3958,6 +4199,11 @@ export interface components {
              * @default null
              */
             assigneeId: string | null;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            delegateId: string | null;
             /** @default [] */
             labelIds: string[];
             /**
@@ -4002,11 +4248,19 @@ export interface components {
             estimate?: number | null;
             /** Format: uuid */
             assigneeId?: string | null;
+            /** Format: uuid */
+            delegateId?: string | null;
             labelIds?: string[];
             /** Format: uuid */
             parentId?: string | null;
             /** Format: uuid */
             teamId?: string;
+        };
+        PostProgress: {
+            state: components["schemas"]["ProgressState"];
+            message: string;
+            /** @default [] */
+            links: components["schemas"]["WebLink"][];
         };
         Attachment: {
             /** Format: uuid */

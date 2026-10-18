@@ -7,6 +7,7 @@ import { body, errors, inOrg, json, OrgParams, router, type ApiDeps } from "./co
 import { changesOf, conflict, invalid } from "./errors.js";
 import {
   checkAssignee,
+  checkDelegate,
   checkLabels,
   checkParent,
   checkStatus,
@@ -109,6 +110,7 @@ export function issueRoutes(deps: ApiDeps) {
         statusId = fallback!.id;
       }
       if (input.assigneeId) await checkAssignee(tx, team, input.assigneeId);
+      if (input.delegateId) await checkDelegate(tx, team, input.delegateId);
       if (input.parentId) await checkParent(tx, caller, input.parentId);
       await checkLabels(tx, team, labelIds);
 
@@ -122,9 +124,16 @@ export function issueRoutes(deps: ApiDeps) {
         await tx.insert(issueLabels).values(labelIds.map((labelId) => ({ orgId, issueId: row!.id, labelId })));
       }
 
-      const created = toIssue(row!, key, labelIds);
-      const { id: _id, version: _version, createdAt: _createdAt, updatedAt: _updatedAt, number: _number, ...data } =
-        created;
+      const created = toIssue(row!, key, labelIds, null);
+      const {
+        id: _id,
+        version: _version,
+        createdAt: _createdAt,
+        updatedAt: _updatedAt,
+        number: _number,
+        latestProgress: _latestProgress,
+        ...data
+      } = created;
       await emit(tx, orgId, { type: "issue.created", actorId: caller.id, subjectId: row!.id, data });
       return created;
     });
@@ -200,6 +209,7 @@ export function issueRoutes(deps: ApiDeps) {
       }
       if (next.statusId !== current.statusId) await checkStatus(tx, target, next.statusId);
       if (next.assigneeId && (changes.teamId || changes.assigneeId)) await checkAssignee(tx, target, next.assigneeId);
+      if (next.delegateId && (changes.teamId || changes.delegateId)) await checkDelegate(tx, target, next.delegateId);
       if (changes.labelIds || changes.teamId) await checkLabels(tx, target, next.labelIds);
       if (changes.parentId && next.parentId) await checkParent(tx, caller, next.parentId, row.id);
 
@@ -231,6 +241,7 @@ export function issueRoutes(deps: ApiDeps) {
           priority: next.priority,
           estimate: next.estimate,
           assigneeId: next.assigneeId,
+          delegateId: next.delegateId,
           parentId: next.parentId,
           teamId: target.id,
           number,
@@ -252,7 +263,7 @@ export function issueRoutes(deps: ApiDeps) {
         subjectId: row.id,
         data: { version: nextVersion, changes },
       });
-      return toIssue(updated!, target.key, next.labelIds);
+      return toIssue(updated!, target.key, next.labelIds, current.latestProgress);
 
       // A moving issue keeps its organization labels and drops its old team's.
       async function keepOrgLabels(labelIds: string[]): Promise<string[]> {

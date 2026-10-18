@@ -1,6 +1,16 @@
 import { and, asc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
-import { issueLabels, issueNumbers, issues, labels, statuses, teamKeys, teams, type Transaction } from "@edicthq/db";
-import type { Issue, LinkedIssue } from "@edicthq/schema";
+import {
+  issueLabels,
+  issueNumbers,
+  issues,
+  labels,
+  progressUpdates,
+  statuses,
+  teamKeys,
+  teams,
+  type Transaction,
+} from "@edicthq/db";
+import type { Issue, LinkedIssue, ProgressUpdate } from "@edicthq/schema";
 import type { Caller } from "./callers.js";
 import { activeMember, canSeeTeam, teamVisibility, type TeamRow } from "./access.js";
 import { gone, invalid, notFound } from "./errors.js";
@@ -8,7 +18,7 @@ import { gone, invalid, notFound } from "./errors.js";
 export type IssueRow = typeof issues.$inferSelect;
 type StatusRow = typeof statuses.$inferSelect;
 
-export function toIssue(row: IssueRow, teamKey: string, labelIds: string[]): Issue {
+export function toIssue(row: IssueRow, teamKey: string, labelIds: string[], latestProgress: ProgressUpdate | null): Issue {
   return {
     id: row.id,
     identifier: `${teamKey}-${row.number}`,
@@ -20,6 +30,8 @@ export function toIssue(row: IssueRow, teamKey: string, labelIds: string[]): Iss
     priority: row.priority,
     estimate: row.estimate,
     assigneeId: row.assigneeId,
+    delegateId: row.delegateId,
+    latestProgress,
     labelIds,
     parentId: row.parentId,
     creatorId: row.creatorId,
@@ -43,8 +55,35 @@ export async function labelsOf(tx: Transaction, issueIds: string[]): Promise<Map
 }
 
 export async function toIssues(tx: Transaction, rows: IssueRow[], teamKey: (row: IssueRow) => string): Promise<Issue[]> {
-  const labelMap = await labelsOf(tx, rows.map((row) => row.id));
-  return rows.map((row) => toIssue(row, teamKey(row), labelMap.get(row.id) ?? []));
+  const ids = rows.map((row) => row.id);
+  const labelMap = await labelsOf(tx, ids);
+  const progressMap = await latestProgressOf(tx, ids);
+  return rows.map((row) => toIssue(row, teamKey(row), labelMap.get(row.id) ?? [], progressMap.get(row.id) ?? null));
+}
+
+export type ProgressRow = typeof progressUpdates.$inferSelect;
+
+export function toProgress(row: ProgressRow): ProgressUpdate {
+  return {
+    id: row.id,
+    issueId: row.issueId,
+    agentId: row.agentId,
+    state: row.state,
+    message: row.message,
+    links: row.links,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+// The newest progress update of each issue that has one.
+export async function latestProgressOf(tx: Transaction, issueIds: string[]): Promise<Map<string, ProgressUpdate>> {
+  if (issueIds.length === 0) return new Map();
+  const rows = await tx
+    .selectDistinctOn([progressUpdates.issueId])
+    .from(progressUpdates)
+    .where(inArray(progressUpdates.issueId, issueIds))
+    .orderBy(progressUpdates.issueId, sql`${progressUpdates.id} DESC`);
+  return new Map(rows.map((row) => [row.issueId, toProgress(row)]));
 }
 
 // A set of label ids as stored and compared: no duplicates, sorted.
@@ -104,8 +143,8 @@ export async function visibleIssue(
 }
 
 export async function loadIssue(tx: Transaction, issue: IssueRow, team: TeamRow): Promise<Issue> {
-  const labelMap = await labelsOf(tx, [issue.id]);
-  return toIssue(issue, team.key, labelMap.get(issue.id) ?? []);
+  const [issueWithExtras] = await toIssues(tx, [issue], () => team.key);
+  return issueWithExtras!;
 }
 
 // Issues as other issues show them, in teams the caller can see.
@@ -149,6 +188,20 @@ export async function checkAssignee(tx: Transaction, team: TeamRow, assigneeId: 
   const assignee = await activeMember(tx, team.orgId, assigneeId).catch(() => undefined);
   if (!assignee || assignee.kind !== "human" || !(await canSeeTeam(tx, assignee, team))) {
     throw invalid(`The assignee must be a human member who can see team ${team.key}.`);
+  }
+}
+
+// The delegate does the work, so it is an active agent who can see the team:
+// through its own team access, or its human's for a connected agent.
+export async function checkDelegate(tx: Transaction, team: TeamRow, delegateId: string): Promise<void> {
+  const agent = await activeMember(tx, team.orgId, delegateId).catch(() => undefined);
+  let sees = false;
+  if (agent?.kind === "agent" && !agent.pausedAt) {
+    const access = agent.connectedBy ? await activeMember(tx, team.orgId, agent.connectedBy).catch(() => undefined) : agent;
+    sees = access !== undefined && (await canSeeTeam(tx, access, team));
+  }
+  if (!sees) {
+    throw invalid(`The delegate must be an agent that is not paused and can see team ${team.key}. GET the organization's agents for the options.`);
   }
 }
 

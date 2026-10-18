@@ -336,6 +336,41 @@ const LabelIds = z.array(Id).max(50);
 const Description = z.string().max(100_000);
 const Estimate = z.number().int().min(0).max(1000);
 
+export const ProgressState = z
+  .enum(["working", "blocked", "needs_input", "done"])
+  .meta({ id: "ProgressState", description: "working: under way. blocked: cannot go on. needs_input: waiting on a person. done: finished." });
+export type ProgressState = z.infer<typeof ProgressState>;
+
+export const WebLink = z
+  .object({
+    url: z.url({ protocol: /^https?$/ }).max(2000),
+    title: z.string().trim().max(200).optional(),
+  })
+  .meta({ id: "WebLink" });
+
+// A structured report an agent posts on an issue.
+export const ProgressUpdate = z
+  .object({
+    id: Id,
+    issueId: Id,
+    agentId: Id,
+    state: ProgressState,
+    // Markdown.
+    message: z.string(),
+    links: z.array(WebLink),
+    createdAt: z.iso.datetime(),
+  })
+  .meta({ id: "ProgressUpdate" });
+export type ProgressUpdate = z.infer<typeof ProgressUpdate>;
+
+export const PostProgress = z
+  .object({
+    state: ProgressState,
+    message: z.string().trim().min(1).max(20_000),
+    links: z.array(WebLink).max(10).default([]),
+  })
+  .meta({ id: "PostProgress" });
+
 export const Issue = z
   .object({
     id: Id,
@@ -351,6 +386,10 @@ export const Issue = z
     estimate: z.number().int().nullable(),
     // The human who answers for the issue.
     assigneeId: Id.nullable(),
+    // The agent doing the work. The assignee still answers for it.
+    delegateId: Id.nullable(),
+    // The delegate's or another agent's most recent progress update.
+    latestProgress: ProgressUpdate.nullable(),
     // Organization labels and labels of the issue's team.
     labelIds: z.array(Id),
     // Set on a sub-issue. The parent can be in any team.
@@ -372,6 +411,7 @@ export const CreateIssue = z
     priority: Priority.default("none"),
     estimate: Estimate.nullable().default(null),
     assigneeId: Id.nullable().default(null),
+    delegateId: Id.nullable().default(null),
     labelIds: LabelIds.default([]),
     parentId: Id.nullable().default(null),
   })
@@ -387,6 +427,8 @@ export const UpdateIssue = z
     priority: Priority.optional(),
     estimate: Estimate.nullable().optional(),
     assigneeId: Id.nullable().optional(),
+    // An agent who can see the issue's team.
+    delegateId: Id.nullable().optional(),
     // Replaces the whole set.
     labelIds: LabelIds.optional(),
     parentId: Id.nullable().optional(),

@@ -134,6 +134,20 @@
       "when": 1792311678129,
       "tag": "0018_oauth_row_level_security",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792312192394,
+      "tag": "0019_delegates_and_progress",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1792312192640,
+      "tag": "0020_progress_row_level_security",
+      "breakpoints": true
     }
   ]
 }

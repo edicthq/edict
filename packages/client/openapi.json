@@ -407,6 +407,16 @@
             ],
             "format": "uuid"
           },
+          "delegateId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "latestProgress": {
+            "$ref": "#/components/schemas/ProgressUpdate"
+          },
           "labelIds": {
             "type": "array",
             "items": {
@@ -449,6 +459,8 @@
           "priority",
           "estimate",
           "assigneeId",
+          "delegateId",
+          "latestProgress",
           "labelIds",
           "parentId",
           "creatorId",
@@ -465,6 +477,78 @@
           "high",
           "medium",
           "low"
+        ]
+      },
+      "ProgressUpdate": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issueId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "agentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ProgressState"
+          },
+          "message": {
+            "type": "string"
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WebLink"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "issueId",
+          "agentId",
+          "state",
+          "message",
+          "links",
+          "createdAt"
+        ]
+      },
+      "ProgressState": {
+        "type": "string",
+        "enum": [
+          "working",
+          "blocked",
+          "needs_input",
+          "done"
+        ],
+        "description": "working: under way. blocked: cannot go on. needs_input: waiting on a person. done: finished."
+      },
+      "WebLink": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2000,
+            "format": "uri"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "url"
         ]
       },
       "CreateIssue": {
@@ -497,6 +581,14 @@
             "default": null
           },
           "assigneeId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "default": null
+          },
+          "delegateId": {
             "type": [
               "string",
               "null"
@@ -660,6 +752,13 @@
             ],
             "format": "uuid"
           },
+          "delegateId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
           "labelIds": {
             "type": "array",
             "items": {
@@ -682,6 +781,31 @@
         },
         "required": [
           "version"
+        ]
+      },
+      "PostProgress": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/ProgressState"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20000
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WebLink"
+            },
+            "maxItems": 10,
+            "default": []
+          }
+        },
+        "required": [
+          "state",
+          "message"
         ]
       },
       "Attachment": {
@@ -3062,6 +3186,273 @@
                   "items": {
                     "$ref": "#/components/schemas/LinkedIssue"
                   }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{orgId}/issues/{issueRef}/progress": {
+      "post": {
+        "tags": [
+          "Progress"
+        ],
+        "summary": "Post a progress update on an issue",
+        "description": "Agents report how their work on an issue is going: working, blocked, needs input or done, with a markdown message and links such as pull requests. People comment instead. Posting does not change the issue's status.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "The issue's id or any identifier it has had, like ENG-123"
+            },
+            "required": true,
+            "description": "The issue's id or any identifier it has had, like ENG-123",
+            "name": "issueRef",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostProgress"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The progress update",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressUpdate"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the schema",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller's role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "No longer valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Progress"
+        ],
+        "summary": "An issue's progress updates, newest first",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "The issue's id or any identifier it has had, like ENG-123"
+            },
+            "required": true,
+            "description": "The issue's id or any identifier it has had, like ENG-123",
+            "name": "issueRef",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Progress updates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProgressUpdate"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "No longer valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{orgId}/my-work": {
+      "get": {
+        "tags": [
+          "Issues"
+        ],
+        "summary": "Issues assigned or delegated to the caller",
+        "description": "An agent's queue: issues delegated to it. For a person, issues assigned to them or delegated to them. Most pressing first. Issues in a Done or Canceled status are left out unless include is all.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "all"
+              ],
+              "default": "open"
+            },
+            "required": false,
+            "name": "include",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Issues by priority, then most recently updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Issue"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the schema",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }

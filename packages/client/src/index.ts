@@ -33,6 +33,9 @@ export type Agent = Schemas["Agent"];
 export type AgentPower = Schemas["AgentPower"];
 export type ApiKey = Schemas["ApiKey"];
 export type CreatedApiKey = Schemas["CreatedApiKey"];
+export type ProgressUpdate = Schemas["ProgressUpdate"];
+export type ProgressState = Schemas["ProgressState"];
+export type WebLink = Schemas["WebLink"];
 export type ApiError = Schemas["Error"]["error"];
 
 export type EdictClient = ReturnType<typeof createEdictClient>;

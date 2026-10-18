@@ -81,7 +81,7 @@ function CreateIssueForm({
     }
     setFailure(null);
     try {
-      const issue = await create.mutateAsync({ title, description, statusId, priority, assigneeId, estimate, labelIds, parentId: parent?.id ?? null });
+      const issue = await create.mutateAsync({ title, description, statusId, priority, assigneeId, delegateId: null, estimate, labelIds, parentId: parent?.id ?? null });
       onDone();
       onCreated(issue.identifier);
     } catch (error) {
