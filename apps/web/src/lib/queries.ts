@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Agent, AgentPower, Attachment, Comment, Issue, Label, paths, Project, ProjectProgress, ProjectStatus, RelationType, Role, SavedView, SavedViewQuery, SignUpMode, Webhook, WebLink } from "@edicthq/client";
+import type { Agent, AgentPower, Attachment, Comment, InboxItem, Issue, Label, paths, Project, ProjectProgress, ProjectStatus, RelationType, Role, SavedView, SavedViewQuery, SignUpMode, Webhook, WebLink } from "@edicthq/client";
 import { ApiFailure, api, unwrap } from "./api.js";
 
 export const keys = {
@@ -29,6 +29,8 @@ export const keys = {
   project: (orgId: string, projectRef: string) => ["org", orgId, "projects", projectRef] as const,
   projectIssues: (orgId: string, projectRef: string) => ["org", orgId, "projects", projectRef, "issues"] as const,
   myWork: (orgId: string, include?: "open" | "all") => ["org", orgId, "my-work", include ?? "open"] as const,
+  inbox: (orgId: string, filter: "unread" | "all") => ["org", orgId, "inbox", filter] as const,
+  inboxUnread: (orgId: string) => ["org", orgId, "inbox", "unread-count"] as const,
 };
 
 const org = (orgId: string) => ({ params: { path: { orgId } } });
@@ -907,5 +909,75 @@ export function useMyWork(orgId: string, include: "open" | "all" = "open") {
   return useQuery({
     queryKey: keys.myWork(orgId, include),
     queryFn: () => unwrap(api.GET("/organizations/{orgId}/my-work", { params: { path: { orgId }, query: { include } } })),
+  });
+}
+
+// ---------- inbox ----------
+
+export function useInbox(orgId: string, filter: "unread" | "all") {
+  return useQuery({
+    queryKey: keys.inbox(orgId, filter),
+    queryFn: () =>
+      unwrap(
+        api.GET("/organizations/{orgId}/inbox", { params: { path: { orgId }, query: { filter } } }),
+      ),
+  });
+}
+
+export function useInboxUnreadCount(orgId: string) {
+  return useQuery({
+    queryKey: keys.inboxUnread(orgId),
+    queryFn: () => unwrap(api.GET("/organizations/{orgId}/inbox/unread-count", org(orgId))),
+    refetchInterval: 15_000,
+  });
+}
+
+// Both lists and the badge change on the same action.
+function useInboxChanged(orgId: string) {
+  const client = useQueryClient();
+  return () => {
+    void client.invalidateQueries({ queryKey: keys.inbox(orgId, "unread") });
+    void client.invalidateQueries({ queryKey: keys.inbox(orgId, "all") });
+    void client.invalidateQueries({ queryKey: keys.inboxUnread(orgId) });
+  };
+}
+
+export function useMarkInboxItem(orgId: string) {
+  const client = useQueryClient();
+  const changed = useInboxChanged(orgId);
+  return useMutation({
+    mutationFn: ({ itemId, read }: { itemId: string; read: boolean }) =>
+      unwrap(
+        api.PATCH("/organizations/{orgId}/inbox/{itemId}", {
+          params: { path: { orgId, itemId } },
+          body: { read },
+        }),
+      ),
+    onSettled: changed,
+    // Opening an issue from a row reads instantly even if the request is slow.
+    onMutate: ({ itemId, read }) => {
+      for (const filter of ["unread", "all"] as const) {
+        client.setQueryData(keys.inbox(orgId, filter), (list: InboxItem[] | undefined) =>
+          list?.map((item) =>
+            item.id === itemId ? { ...item, readAt: read ? (item.readAt ?? new Date().toISOString()) : null } : item,
+          ),
+        );
+      }
+    },
+  });
+}
+
+export function useMarkAllInboxRead(orgId: string) {
+  const client = useQueryClient();
+  const changed = useInboxChanged(orgId);
+  return useMutation({
+    mutationFn: () => unwrap(api.POST("/organizations/{orgId}/inbox/read-all", org(orgId))),
+    onSettled: changed,
+    onMutate: () => {
+      client.setQueryData(keys.inbox(orgId, "unread"), []);
+      client.setQueryData(keys.inbox(orgId, "all"), (list: InboxItem[] | undefined) =>
+        list?.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() })),
+      );
+    },
   });
 }

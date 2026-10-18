@@ -22,6 +22,7 @@ import { statusRoutes } from "./statuses.js";
 import { teamRoutes } from "./teams.js";
 import { trashRoutes } from "./trash.js";
 import { webhookRoutes, type WebhookDeps } from "./webhooks.js";
+import { inboxRoutes } from "./inbox.js";
 
 export type { ApiDeps, SessionUser } from "./context.js";
 export { fileRoutes, type AttachmentDeps } from "./attachments.js";
@@ -53,6 +54,7 @@ export function createApi(deps: AttachmentDeps & WebhookDeps) {
   api.route("/", inviteRoutes(deps));
   api.route("/", eventRoutes(deps));
   api.route("/", webhookRoutes(deps));
+  api.route("/", inboxRoutes(deps));
   api.route("/", savedViewRoutes(deps));
   api.route("/", instanceRoutes(deps));
 

@@ -867,3 +867,45 @@ export const UpdateSavedView = z
     query: SavedViewQuery.optional(),
   })
   .meta({ id: "UpdateSavedView" });
+
+export const InboxItemType = z
+  .enum(["assigned", "delegated", "status_changed", "comment_created", "mentioned"])
+  .meta({ id: "InboxItemType" });
+export type InboxItemType = z.infer<typeof InboxItemType>;
+
+export const InboxIssue = z
+  .object({
+    id: Id,
+    identifier: Identifier,
+    title: z.string(),
+    teamId: Id,
+  })
+  .meta({ id: "InboxIssue" });
+export type InboxIssue = z.infer<typeof InboxIssue>;
+
+export const InboxItem = z
+  .object({
+    id: Id,
+    type: InboxItemType,
+    actor: Member.nullable(),
+    issue: InboxIssue,
+    commentId: Id.nullable(),
+    readAt: z.iso.datetime().nullable(),
+    createdAt: z.iso.datetime(),
+  })
+  .meta({ id: "InboxItem" });
+export type InboxItem = z.infer<typeof InboxItem>;
+
+export const InboxSummary = z
+  .object({
+    unreadCount: z.number().int().min(0),
+  })
+  .meta({ id: "InboxSummary" });
+export type InboxSummary = z.infer<typeof InboxSummary>;
+
+export const UpdateInboxItem = z
+  .object({
+    read: z.boolean(),
+  })
+  .meta({ id: "UpdateInboxItem" });
+export type UpdateInboxItem = z.infer<typeof UpdateInboxItem>;

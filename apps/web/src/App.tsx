@@ -21,6 +21,7 @@ import { TeamMembersPage, TeamsPage } from "./routes/teams.js";
 import { TrashPage } from "./routes/trash.js";
 import { ProjectDetailPage, ProjectsPage } from "./routes/projects.js";
 import { MyIssuesPage } from "./routes/my-issues.js";
+import { InboxPage } from "./routes/inbox.js";
 
 // Pages for signed-in users. Others go to sign-in, or to sign-up on a fresh instance.
 function SignedIn() {
@@ -82,6 +83,7 @@ const router = createBrowserRouter([
           { path: "projects", element: <ProjectsPage /> },
           { path: "projects/:projectRef", element: <ProjectDetailPage /> },
           { path: "my-issues", element: <MyIssuesPage /> },
+          { path: "inbox", element: <InboxPage /> },
           { path: "members", element: <MembersPage /> },
           { path: "agents", element: <AgentsPage /> },
           { path: "connect", element: <ConnectPage /> },

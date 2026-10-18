@@ -2333,6 +2333,120 @@
           "createdAt"
         ]
       },
+      "InboxItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "$ref": "#/components/schemas/InboxItemType"
+          },
+          "actor": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Member"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "issue": {
+            "$ref": "#/components/schemas/InboxIssue"
+          },
+          "commentId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "readAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "actor",
+          "issue",
+          "commentId",
+          "readAt",
+          "createdAt"
+        ]
+      },
+      "InboxItemType": {
+        "type": "string",
+        "enum": [
+          "assigned",
+          "delegated",
+          "status_changed",
+          "comment_created",
+          "mentioned"
+        ]
+      },
+      "InboxIssue": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "identifier": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9]{1,6}-[1-9][0-9]*$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id",
+          "identifier",
+          "title",
+          "teamId"
+        ]
+      },
+      "InboxSummary": {
+        "type": "object",
+        "properties": {
+          "unreadCount": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "unreadCount"
+        ]
+      },
+      "UpdateInboxItem": {
+        "type": "object",
+        "properties": {
+          "read": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "read"
+        ]
+      },
       "SavedView": {
         "type": "object",
         "properties": {
@@ -8799,6 +8913,160 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{orgId}/inbox": {
+      "get": {
+        "summary": "List inbox notifications for the current member",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "unread",
+                "all"
+              ],
+              "default": "unread"
+            },
+            "required": false,
+            "name": "filter",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inbox items",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InboxItem"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{orgId}/inbox/unread-count": {
+      "get": {
+        "summary": "Get unread count for current member",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inbox unread summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{orgId}/inbox/{itemId}": {
+      "patch": {
+        "summary": "Mark an inbox item read or unread",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "itemId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateInboxItem"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated inbox item",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxItem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{orgId}/inbox/read-all": {
+      "post": {
+        "summary": "Mark all inbox items as read",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Marked items count",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "count"
+                  ]
                 }
               }
             }

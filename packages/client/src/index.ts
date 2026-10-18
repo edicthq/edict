@@ -61,3 +61,9 @@ export function createEdictClient(baseUrl = "", options: Omit<ClientOptions, "ba
     ...options,
   });
 }
+
+export type InboxItem = Schemas["InboxItem"];
+export type InboxItemType = Schemas["InboxItemType"];
+export type InboxIssue = Schemas["InboxIssue"];
+export type InboxSummary = Schemas["InboxSummary"];
+export type UpdateInboxItem = Schemas["UpdateInboxItem"];

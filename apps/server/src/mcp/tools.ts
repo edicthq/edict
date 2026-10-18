@@ -437,6 +437,30 @@ export function registerTools(server: McpServer, session: Session): void {
     }),
   );
 
+
+  server.registerTool(
+    "get_inbox",
+    {
+      title: "Get inbox",
+      description: "List unread notifications for the caller in this organization.",
+      inputSchema: {},
+    },
+    tool(async () => {
+      const items = await ok(session.api.GET("/organizations/{orgId}/inbox", { params: { path: session.path, query: { filter: "unread" } } }));
+      if (!items.length) {
+        return "# Inbox\n\nNo unread notifications.";
+      }
+      return [
+        `# Inbox (${items.length} unread)`,
+        "",
+        ...items.map((item) => {
+          const actor = item.actor ? item.actor.name : "Someone";
+          return `- **${item.issue.identifier}** (${item.issue.title}): ${actor} ${item.type.replace(/_/g, " ")}`;
+        }),
+      ].join("\n");
+    }),
+  );
+
   server.registerTool(
     "get_project",
     {

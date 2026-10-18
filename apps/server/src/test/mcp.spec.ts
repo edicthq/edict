@@ -65,6 +65,7 @@ describe("/mcp", () => {
     expect(tools).toEqual([
       "comment",
       "create_issue",
+      "get_inbox",
       "get_issue",
       "get_project",
       "get_team_context",

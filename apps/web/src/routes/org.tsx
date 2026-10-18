@@ -1,4 +1,4 @@
-import { CheckSquare, ChevronDown, FolderKanban, LogOut, Plus, Server, Settings, Trash2 } from "lucide-react";
+import { CheckSquare, ChevronDown, FolderKanban, Inbox, LogOut, Plus, Server, Settings, Trash2 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import type { Membership } from "@edicthq/client";
 import { Link, NavLink, Outlet, useNavigate, useOutletContext, useParams } from "react-router";
@@ -15,7 +15,7 @@ import { mod } from "../lib/labels.js";
 import { useRealtime } from "../lib/realtime.js";
 import type { Agent, Member } from "@edicthq/client";
 import { agentState, connectionLine } from "../lib/agents.js";
-import { useAgentQueue, useAgents, useMembers, useMemberships, useTeams } from "../lib/queries.js";
+import { useAgentQueue, useAgents, useInboxUnreadCount, useMembers, useMemberships, useTeams } from "../lib/queries.js";
 
 export interface OrgContext {
   membership: Membership;
@@ -147,6 +147,16 @@ const railLink = ({ isActive }: { isActive: boolean }) =>
       : "text-ink-2 hover:text-ink",
   );
 
+// Unread inbox count in the rail, none shown when the inbox is empty.
+function InboxBadge({ orgId }: { orgId: string }) {
+  const unread = useInboxUnreadCount(orgId);
+  const count = unread.data?.unreadCount ?? 0;
+  if (count) {
+    return <span className="ms-auto rounded-full bg-agent-wash px-1.5 py-0.5 text-xs font-medium text-agent-ink tabular-nums">{count}</span>;
+  }
+  return null;
+}
+
 function Rail({ context, others }: { context: OrgContext; others: Membership[] }) {
   const { orgId, slug, canManage, membership, instanceAdmin } = context;
   const teams = useTeams(orgId);
@@ -178,6 +188,11 @@ function Rail({ context, others }: { context: OrgContext; others: Membership[] }
         <NavLink to={`/${slug}/my-issues`} className={railLink}>
           <CheckSquare aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
           My issues
+        </NavLink>
+        <NavLink to={`/${slug}/inbox`} className={railLink}>
+          <Inbox aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+          Inbox
+          <InboxBadge orgId={orgId} />
         </NavLink>
         <NavLink to={`/${slug}/projects`} className={railLink}>
           <FolderKanban aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
@@ -383,6 +398,9 @@ function MobileBar({ context }: { context: OrgContext }) {
         </NavLink>
         <NavLink to={`/${slug}/my-issues`} className={link}>
           My issues
+        </NavLink>
+        <NavLink to={`/${slug}/inbox`} className={link}>
+          Inbox
         </NavLink>
         <NavLink to={`/${slug}/projects`} className={link}>
           Projects

@@ -5407,6 +5407,167 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/{orgId}/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List inbox notifications for the current member */
+        get: {
+            parameters: {
+                query?: {
+                    filter?: "unread" | "all";
+                };
+                header?: never;
+                path: {
+                    orgId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Inbox items */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["InboxItem"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{orgId}/inbox/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get unread count for current member */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Inbox unread summary */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["InboxSummary"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{orgId}/inbox/{itemId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Mark an inbox item read or unread */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                    itemId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpdateInboxItem"];
+                };
+            };
+            responses: {
+                /** @description Updated inbox item */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["InboxItem"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/organizations/{orgId}/inbox/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark all inbox items as read */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Marked items count */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            count: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{orgId}/teams/{teamId}/saved-views": {
         parameters: {
             query?: never;
@@ -6491,6 +6652,35 @@ export interface components {
             deliveredAt: string | null;
             /** Format: date-time */
             createdAt: string;
+        };
+        InboxItem: {
+            /** Format: uuid */
+            id: string;
+            type: components["schemas"]["InboxItemType"];
+            actor: components["schemas"]["Member"] & (Record<string, never> | null);
+            issue: components["schemas"]["InboxIssue"];
+            /** Format: uuid */
+            commentId: string | null;
+            /** Format: date-time */
+            readAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @enum {string} */
+        InboxItemType: "assigned" | "delegated" | "status_changed" | "comment_created" | "mentioned";
+        InboxIssue: {
+            /** Format: uuid */
+            id: string;
+            identifier: string;
+            title: string;
+            /** Format: uuid */
+            teamId: string;
+        };
+        InboxSummary: {
+            unreadCount: number;
+        };
+        UpdateInboxItem: {
+            read: boolean;
         };
         SavedView: {
             /** Format: uuid */
