@@ -263,9 +263,11 @@ function TitleField({ issue, onSave }: { issue: Issue; onSave: (title: string) =
             event.preventDefault();
             event.currentTarget.blur();
           } else if (event.key === "Escape") {
+            // Escape puts the title back; Enter saves it.
             event.stopPropagation();
             setDraft(issue.title);
-            requestAnimationFrame(() => event.currentTarget?.blur());
+            const field = event.currentTarget;
+            requestAnimationFrame(() => field.blur());
           }
         }}
         className="field-sizing-content w-full resize-none bg-transparent text-2xl font-semibold text-ink text-balance focus-visible:outline-none"
