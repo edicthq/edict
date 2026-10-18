@@ -13,6 +13,7 @@ import type { ServerConfig } from "./env.js";
 import { ensureInstanceSettings } from "./instance.js";
 import { mcpRoutes } from "./mcp/index.js";
 import { oauthDiscovery, oauthRoutes } from "./oauth.js";
+import { DEFAULT_WEBHOOK_RETRY } from "./webhooks.js";
 import { purgeTrash, startJobs, type PurgeResult } from "./jobs.js";
 import { localDiskStorage, s3Storage } from "./storage.js";
 
@@ -57,6 +58,9 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
     maxAttachmentBytes: config.maxAttachmentBytes,
     agentLimits,
     requestLimiter: new RequestLimiter(agentLimits.requestsPerMinute),
+    queueDelivery: async (job: { orgId: string; deliveryId: string }) => {
+      await jobs?.queueDelivery(job);
+    },
     storage: config.s3 ? s3Storage(config.s3) : localDiskStorage(config.dataDir),
     getUser: async (headers: Headers) => {
       const session = await auth?.api.getSession({ headers });
@@ -103,7 +107,7 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
       );
 
       if (config.jobs !== false) {
-        jobs = await startJobs(config.databaseUrl, db, deps.storage);
+        jobs = await startJobs(config.databaseUrl, db, pool, deps.storage, config.webhookRetry ?? DEFAULT_WEBHOOK_RETRY);
       }
 
       server = await listen(app, config.port);
@@ -119,7 +123,7 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
       if (jobs) {
         const stopping = jobs;
         jobs = undefined;
-        await stopping.stop({ graceful: true });
+        await stopping.stop();
       }
       if (!poolEnded) {
         poolEnded = true;

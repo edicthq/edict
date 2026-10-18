@@ -30,6 +30,7 @@ describe("OpenAPI document", () => {
       "DELETE /organizations/{orgId}/labels/{labelId}",
       "DELETE /organizations/{orgId}/members/{memberId}",
       "DELETE /organizations/{orgId}/teams/{teamId}/members/{memberId}",
+      "DELETE /organizations/{orgId}/webhooks/{webhookId}",
       "GET /instance",
       "GET /invites/{token}",
       "GET /organizations",
@@ -56,6 +57,9 @@ describe("OpenAPI document", () => {
       "GET /organizations/{orgId}/teams/{teamId}/members",
       "GET /organizations/{orgId}/teams/{teamId}/statuses",
       "GET /organizations/{orgId}/trash",
+      "GET /organizations/{orgId}/webhooks",
+      "GET /organizations/{orgId}/webhooks/{webhookId}",
+      "GET /organizations/{orgId}/webhooks/{webhookId}/deliveries",
       "PATCH /instance",
       "PATCH /organizations/{orgId}/agents/{agentId}",
       "PATCH /organizations/{orgId}/comments/{commentId}",
@@ -64,6 +68,7 @@ describe("OpenAPI document", () => {
       "PATCH /organizations/{orgId}/members/{memberId}",
       "PATCH /organizations/{orgId}/teams/{teamId}",
       "PATCH /organizations/{orgId}/teams/{teamId}/statuses/{statusId}",
+      "PATCH /organizations/{orgId}/webhooks/{webhookId}",
       "POST /invites/{token}/accept",
       "POST /oauth/organization",
       "POST /organizations",
@@ -86,6 +91,9 @@ describe("OpenAPI document", () => {
       "POST /organizations/{orgId}/teams/{teamId}/labels",
       "POST /organizations/{orgId}/teams/{teamId}/members",
       "POST /organizations/{orgId}/teams/{teamId}/statuses",
+      "POST /organizations/{orgId}/webhooks",
+      "POST /organizations/{orgId}/webhooks/{webhookId}/deliveries/{deliveryId}/redeliver",
+      "POST /organizations/{orgId}/webhooks/{webhookId}/rotate-secret",
     ]);
     expect(Object.keys(doc.components.schemas)).toEqual(
       expect.arrayContaining([

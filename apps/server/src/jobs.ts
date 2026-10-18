@@ -1,9 +1,10 @@
-// Background jobs on pg-boss, which keeps its queue in Postgres (ADR 0007).
-// The trash purge is the first (ADR 0019); M3's webhook deliveries join it.
+// Background jobs on pg-boss, which keeps its queue in Postgres (ADR 0007):
+// the daily trash purge (ADR 0019) and webhook deliveries (ADR 0022).
 import { PgBoss } from "pg-boss";
 import { and, inArray, isNotNull, lt, notInArray, sql } from "drizzle-orm";
-import { attachments, comments, inScope, issues, type Database } from "@edicthq/db";
+import { attachments, comments, inScope, issues, webhookDeliveries, WEBHOOK_CHANNEL, type Database, type Pool } from "@edicthq/db";
 import type { AttachmentStorage } from "./storage.js";
+import { DELIVERY_QUEUE, startWebhooks, type DeliveryJob, type WebhookRetry } from "./webhooks.js";
 
 // How long the trash keeps what it holds.
 export const TRASH_DAYS = 30;
@@ -66,9 +67,34 @@ export async function purgeTrash(db: Database, storage: AttachmentStorage, now =
 
 const purgeQueue = "trash-purge";
 
+// The delivery log keeps each delivery this long.
+export const DELIVERY_LOG_DAYS = 30;
+
+export async function purgeDeliveries(db: Database, now = new Date()): Promise<void> {
+  const cutoff = new Date(now.getTime() - DELIVERY_LOG_DAYS * 24 * 60 * 60 * 1000);
+  const { rows: orgs } = await db.execute<{ org_id: string }>(
+    sql`SELECT DISTINCT org_id FROM webhook_deliveries WHERE created_at < ${cutoff}`,
+  );
+  for (const { org_id: orgId } of orgs) {
+    await inScope(db, { orgId }, (tx) => tx.delete(webhookDeliveries).where(lt(webhookDeliveries.createdAt, cutoff)));
+  }
+}
+
+export interface Jobs {
+  queueDelivery: (job: DeliveryJob) => Promise<void>;
+  stop: () => Promise<void>;
+}
+
 // Starts pg-boss with its schema beside Edict's, schedules the daily purge and
-// works it. pg-boss's own lock keeps replicas from running it twice.
-export async function startJobs(databaseUrl: string, db: Database, storage: AttachmentStorage): Promise<PgBoss> {
+// works it, and delivers webhooks. pg-boss's own lock keeps replicas from
+// running the purge twice.
+export async function startJobs(
+  databaseUrl: string,
+  db: Database,
+  pool: Pool,
+  storage: AttachmentStorage,
+  webhookRetry: WebhookRetry,
+): Promise<Jobs> {
   const boss = new PgBoss({ connectionString: databaseUrl, schema: "pgboss" });
   boss.on("error", (error) => console.error("background jobs:", error));
   await boss.start();
@@ -79,6 +105,28 @@ export async function startJobs(databaseUrl: string, db: Database, storage: Atta
     if (purged.issues || purged.comments) {
       console.info(`trash purge: ${purged.issues} issues, ${purged.comments} comments, ${purged.files} files`);
     }
+    await purgeDeliveries(db);
   });
-  return boss;
+  const stopWebhooks = await startWebhooks(db, boss, (onNotify) => listen(pool, onNotify), webhookRetry);
+  return {
+    queueDelivery: async (job) => {
+      await boss.send(DELIVERY_QUEUE, job, { id: job.deliveryId });
+    },
+    stop: async () => {
+      await stopWebhooks();
+      await boss.stop({ graceful: true });
+    },
+  };
+}
+
+// Holds one connection that LISTENs for emit's notifications.
+async function listen(pool: Pool, onNotify: () => void): Promise<() => Promise<void>> {
+  const client = await pool.connect();
+  client.on("notification", onNotify);
+  await client.query(`LISTEN ${WEBHOOK_CHANNEL}`);
+  return async () => {
+    client.off("notification", onNotify);
+    await client.query(`UNLISTEN ${WEBHOOK_CHANNEL}`).catch(() => undefined);
+    client.release();
+  };
 }

@@ -19,6 +19,7 @@ import { searchRoutes } from "./search.js";
 import { statusRoutes } from "./statuses.js";
 import { teamRoutes } from "./teams.js";
 import { trashRoutes } from "./trash.js";
+import { webhookRoutes, type WebhookDeps } from "./webhooks.js";
 
 export type { ApiDeps, SessionUser } from "./context.js";
 export { fileRoutes, type AttachmentDeps } from "./attachments.js";
@@ -26,7 +27,7 @@ export { consentOrganization } from "./connections.js";
 
 // The public API, mounted at /api/v1. Its OpenAPI document is served at
 // /api/v1/openapi.json.
-export function createApi(deps: AttachmentDeps) {
+export function createApi(deps: AttachmentDeps & WebhookDeps) {
   const api = router();
 
   api.use(identify(deps));
@@ -48,6 +49,7 @@ export function createApi(deps: AttachmentDeps) {
   api.route("/", connectionRoutes(deps));
   api.route("/", inviteRoutes(deps));
   api.route("/", eventRoutes(deps));
+  api.route("/", webhookRoutes(deps));
   api.route("/", instanceRoutes(deps));
 
   api.doc31("/openapi.json", documentConfig);

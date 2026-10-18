@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import {
   apiKeys,
   emit,
@@ -10,6 +10,7 @@ import {
   oauthRefreshToken,
   teamMembers,
   teams,
+  webhooks,
   type Transaction,
 } from "@edicthq/db";
 import {
@@ -24,12 +25,13 @@ import {
 import { requireRole, type MemberRow } from "./access.js";
 import { newApiKey, type Caller } from "./callers.js";
 import { OrgParams, body, errors, inOrg, json, noContent, router, type ApiDeps } from "./context.js";
+import { disableAgentWebhooks } from "./webhooks.js";
 import { changesOf, conflict, forbidden, invalid, notFound, requireVersion } from "./errors.js";
 
 const AgentParams = OrgParams.extend({ agentId: Id });
 const ApiKeyParams = AgentParams.extend({ keyId: Id });
 
-export function toAgent(row: MemberRow): Agent {
+export function toAgent(row: MemberRow, webhook = false): Agent {
   return {
     id: row.id,
     name: row.name ?? "Agent",
@@ -39,6 +41,7 @@ export function toAgent(row: MemberRow): Agent {
     connectedBy: row.connectedBy,
     clientName: row.clientName,
     pausedAt: row.pausedAt?.toISOString() ?? null,
+    webhook,
     version: row.version,
     createdAt: row.createdAt.toISOString(),
   };
@@ -174,20 +177,24 @@ export function agentRoutes(deps: ApiDeps) {
 
   app.openapi(listAgents, async (c) => {
     const { orgId } = c.req.valid("param");
-    const rows = await inOrg(deps, c, orgId, (tx) =>
-      tx
+    const { rows, hooked } = await inOrg(deps, c, orgId, async (tx) => ({
+      rows: await tx
         .select()
         .from(members)
         .where(and(eq(members.orgId, orgId), eq(members.kind, "agent"), isNull(members.removedAt)))
         .orderBy(asc(members.createdAt)),
-    );
-    return c.json(rows.map(toAgent), 200);
+      hooked: await agentsWithWebhooks(tx),
+    }));
+    return c.json(rows.map((row) => toAgent(row, hooked.has(row.id))), 200);
   });
 
   app.openapi(getAgent, async (c) => {
     const { orgId, agentId } = c.req.valid("param");
-    const row = await inOrg(deps, c, orgId, (tx) => agentRow(tx, orgId, agentId));
-    return c.json(toAgent(row), 200);
+    const { row, hooked } = await inOrg(deps, c, orgId, async (tx) => ({
+      row: await agentRow(tx, orgId, agentId),
+      hooked: await agentsWithWebhooks(tx),
+    }));
+    return c.json(toAgent(row, hooked.has(row.id)), 200);
   });
 
   app.openapi(createAgent, async (c) => {
@@ -349,6 +356,15 @@ export function agentRoutes(deps: ApiDeps) {
   return app;
 }
 
+// Agents with an active webhook, whose runners start right away.
+async function agentsWithWebhooks(tx: Transaction): Promise<Set<string>> {
+  const rows = await tx
+    .selectDistinct({ agentId: webhooks.agentId })
+    .from(webhooks)
+    .where(and(isNotNull(webhooks.agentId), isNull(webhooks.disabledAt)));
+  return new Set(rows.map((row) => row.agentId!));
+}
+
 async function agentRow(tx: Transaction, orgId: string, agentId: string, options: { forUpdate?: boolean } = {}) {
   const query = tx
     .select()
@@ -383,6 +399,7 @@ export async function pause(tx: Transaction, actorId: string, agent: MemberRow):
     .where(and(eq(apiKeys.agentId, agent.id), isNull(apiKeys.revokedAt)))
     .returning({ id: apiKeys.id });
   const revokedGrants = agent.connectedBy ? await revokeGrants(tx, agent) : 0;
+  const disabledWebhooks = await disableAgentWebhooks(tx, agent.id);
   const [paused] = await tx
     .update(members)
     .set({ pausedAt: new Date(), version: sql`${members.version} + 1` })
@@ -392,7 +409,7 @@ export async function pause(tx: Transaction, actorId: string, agent: MemberRow):
     type: "agent.paused",
     actorId,
     subjectId: agent.id,
-    data: { revokedApiKeys: revoked.length, revokedGrants, version: paused!.version },
+    data: { revokedApiKeys: revoked.length, revokedGrants, disabledWebhooks, version: paused!.version },
   });
   return paused!;
 }

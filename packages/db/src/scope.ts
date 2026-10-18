@@ -69,8 +69,11 @@ export interface NewEvent {
 
 // Records a change in the event log (ADR 0005). Call it inside the same scope
 // as the change, so both commit or neither does.
+// When the organization has an active webhook, also queues the event for
+// delivery in the same transaction (ADR 0022) and wakes the dispatcher once it
+// commits.
 export async function emit(tx: Transaction, orgId: string, event: NewEvent): Promise<void> {
-  await tx.insert(events).values({
+  const [row] = await tx.insert(events).values({
     orgId,
     type: event.type,
     actorId: event.actorId,
@@ -78,5 +81,16 @@ export async function emit(tx: Transaction, orgId: string, event: NewEvent): Pro
     onBehalfOfId: event.onBehalfOfId ?? undefined,
     subjectId: event.subjectId,
     data: event.data ?? {},
-  });
+  }).returning({ id: events.id });
+  await tx.execute(sql`
+    WITH queued AS (
+      INSERT INTO webhook_outbox (event_id, org_id)
+      SELECT ${row!.id}, ${orgId}
+      WHERE EXISTS (SELECT 1 FROM webhooks WHERE org_id = ${orgId} AND disabled_at IS NULL)
+      RETURNING org_id
+    )
+    SELECT pg_notify(${WEBHOOK_CHANNEL}, org_id::text) FROM queued`);
 }
+
+// Where emit tells the webhook dispatcher there is work.
+export const WEBHOOK_CHANNEL = "edict_webhooks";

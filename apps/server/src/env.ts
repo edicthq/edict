@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { DEFAULT_AGENT_LIMITS, type AgentLimits } from "./api/rate-limit.js";
 import type { S3Config } from "./storage.js";
+import type { WebhookRetry } from "./webhooks.js";
 
 export interface ServerConfig {
   port: number;
@@ -36,6 +37,9 @@ export interface ServerConfig {
   authRateLimit?: boolean;
   // Requests per minute per agent token, and issues per hour per agent.
   agentLimits?: AgentLimits;
+  // How webhook deliveries retry. DEFAULT_WEBHOOK_RETRY otherwise; tests
+  // shorten it.
+  webhookRetry?: WebhookRetry;
 }
 
 export class ConfigError extends Error {}

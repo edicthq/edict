@@ -105,6 +105,9 @@ export const Agent = z
     // The MCP client a connected agent connected as, e.g. "Claude Code".
     clientName: z.string().nullable(),
     pausedAt: z.iso.datetime().nullable(),
+    // Whether the agent has an active webhook, which wakes its agent runner
+    // when work is delegated to it. Without one it picks work up when asked.
+    webhook: z.boolean(),
     version: Version,
     createdAt: z.iso.datetime(),
   })
@@ -160,6 +163,73 @@ export const CreatedApiKey = z
     secret: z.string(),
   })
   .meta({ id: "CreatedApiKey" });
+
+const WebhookUrl = z.url({ protocol: /^https?$/ }).max(2000);
+const EventTypes = z.array(z.string().regex(/^[a-z_]+\.[a-z_]+$/, "an event type, like issue.updated")).max(50);
+
+// ADR 0022.
+export const Webhook = z
+  .object({
+    id: Id,
+    url: z.string(),
+    // An agent's webhook also gets every event about issues delegated to it.
+    agentId: Id.nullable(),
+    // Empty sends every type.
+    eventTypes: z.array(z.string()),
+    // Set when deliveries ran out of retries or the agent was paused.
+    disabledAt: z.iso.datetime().nullable(),
+    disabledReason: z.string().nullable(),
+    version: Version,
+    createdAt: z.iso.datetime(),
+  })
+  .meta({ id: "Webhook" });
+export type Webhook = z.infer<typeof Webhook>;
+
+export const CreateWebhook = z
+  .object({
+    url: WebhookUrl,
+    agentId: Id.nullable().default(null),
+    eventTypes: EventTypes.default([]),
+  })
+  .meta({ id: "CreateWebhook" });
+
+export const CreatedWebhook = z
+  .object({
+    webhook: Webhook,
+    // Shown only here and when rotated. Verify Edict-Signature with it.
+    secret: z.string(),
+  })
+  .meta({ id: "CreatedWebhook" });
+
+export const UpdateWebhook = z
+  .object({
+    version: Version,
+    url: WebhookUrl.optional(),
+    eventTypes: EventTypes.optional(),
+    // true turns a disabled webhook back on.
+    enabled: z.boolean().optional(),
+  })
+  .meta({ id: "UpdateWebhook" });
+
+export const WebhookDelivery = z
+  .object({
+    id: Id,
+    webhookId: Id,
+    eventId: Id,
+    eventType: z.string(),
+    redeliveryOf: Id.nullable(),
+    status: z.enum(["pending", "delivered", "failed"]),
+    requestBody: z.string(),
+    attempts: z.number().int(),
+    responseStatus: z.number().int().nullable(),
+    responseBody: z.string().nullable(),
+    durationMs: z.number().int().nullable(),
+    lastAttemptAt: z.iso.datetime().nullable(),
+    deliveredAt: z.iso.datetime().nullable(),
+    createdAt: z.iso.datetime(),
+  })
+  .meta({ id: "WebhookDelivery" });
+export type WebhookDelivery = z.infer<typeof WebhookDelivery>;
 
 // The consent page's choice of organization for an MCP client being connected
 // through OAuth (ADR 0021).

@@ -169,6 +169,20 @@
       "when": 1792313843301,
       "tag": "0023_events_by_actor",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792313955943,
+      "tag": "0024_webhooks",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1792313956210,
+      "tag": "0025_webhooks_row_level_security",
+      "breakpoints": true
     }
   ]
 }
