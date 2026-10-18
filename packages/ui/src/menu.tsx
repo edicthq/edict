@@ -29,6 +29,7 @@ export function Menu<T extends string>({
   open: controlledOpen,
   onOpenChange,
   align = "start",
+  side = "bottom",
   className,
 }: {
   label: string;
@@ -47,6 +48,7 @@ export function Menu<T extends string>({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   align?: "start" | "end";
+  side?: "top" | "bottom";
   className?: string;
 }) {
   const [ownOpen, setOwnOpen] = useState(false);
@@ -114,7 +116,8 @@ export function Menu<T extends string>({
       {open ? (
         <div
           className={cn(
-            "absolute top-[calc(100%+4px)] z-30 flex w-60 flex-col rounded-md bg-surface p-1 shadow-overlay",
+            "absolute z-30 flex w-60 flex-col rounded-md bg-surface p-1 shadow-overlay",
+            side === "top" ? "bottom-[calc(100%+6px)]" : "top-[calc(100%+4px)]",
             align === "end" ? "end-0" : "start-0",
           )}
         >

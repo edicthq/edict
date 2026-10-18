@@ -3,8 +3,9 @@ import { useMemo, useState, type KeyboardEvent } from "react";
 import type { Membership } from "@edicthq/client";
 import { useNavigate } from "react-router";
 import { Dialog, Kbd, TeamKey, cn } from "@edicthq/ui";
-import { accentNames, accents, setAppearance, themes } from "../lib/appearance.js";
-import { useTeams } from "../lib/queries.js";
+import { PriorityIcon } from "@edicthq/ui";
+import { accentNames, accents, cycleAccent, cycleTheme, setAppearance, themes } from "../lib/appearance.js";
+import { useSearchIssues, useTeams } from "../lib/queries.js";
 import type { OrgContext } from "../routes/org.js";
 
 interface Command {
@@ -12,6 +13,7 @@ interface Command {
   group: string;
   label: string;
   lead?: React.ReactNode;
+  hint?: string;
   run: () => void;
 }
 
@@ -39,6 +41,7 @@ function PaletteBody({ context, others, onClose }: { context: OrgContext; others
   const navigate = useNavigate();
   const teams = useTeams(context.orgId);
   const [query, setQuery] = useState("");
+  const searchResults = useSearchIssues(context.orgId, { q: query.trim() }, query.trim().length > 0);
   const [active, setActive] = useState(0);
 
   const commands = useMemo<Command[]>(() => {
@@ -78,6 +81,11 @@ function PaletteBody({ context, others, onClose }: { context: OrgContext; others
       }
     }
     list.push({ id: "new-org", group: "Organizations", label: "Create organization", run: go("/new") });
+
+    list.push(
+      { id: "toggle-theme", group: "Appearance", label: "Toggle theme", hint: "T", run: cycleTheme },
+      { id: "cycle-accent", group: "Appearance", label: "Cycle agent color", hint: "G", run: cycleAccent },
+    );
     for (const theme of themes) {
       list.push({
         id: `theme-${theme}`,
@@ -99,7 +107,27 @@ function PaletteBody({ context, others, onClose }: { context: OrgContext; others
     return list;
   }, [teams.data, context, others, navigate, onClose]);
 
-  const matches = commands.filter((c) => c.label.toLowerCase().includes(query.trim().toLowerCase()));
+  const issueCommands = useMemo<Command[]>(() => {
+    return (searchResults.data ?? []).map((issue) => ({
+      id: `issue-${issue.id}`,
+      group: "Issues",
+      label: `${issue.identifier} ${issue.title}`,
+      lead: <PriorityIcon priority={issue.priority} />,
+      run: () => {
+        onClose();
+        navigate(`/${context.slug}/teams/${issue.teamId}?issue=${issue.identifier}`);
+      },
+    }));
+  }, [searchResults.data, context.slug, navigate, onClose]);
+
+  const matches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const staticMatches = commands.filter((c) => c.label.toLowerCase().includes(q));
+    if (q.length > 0) {
+      return [...issueCommands, ...staticMatches];
+    }
+    return staticMatches;
+  }, [commands, issueCommands, query]);
   const current = Math.min(active, Math.max(matches.length - 1, 0));
 
   const run = (command: Command | undefined) => {
@@ -169,6 +197,7 @@ function PaletteBody({ context, others, onClose }: { context: OrgContext; others
                 >
                   {command.lead}
                   <span className="truncate">{command.label}</span>
+                  {command.hint ? <Kbd className="ms-auto">{command.hint}</Kbd> : null}
                 </div>
               </li>
             );

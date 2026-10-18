@@ -68,3 +68,39 @@ export function useAppearance(): Appearance {
     () => current,
   );
 }
+
+export function cycleTheme() {
+  const isDark = current.theme === "dark" || (current.theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const nextTheme: Theme = isDark ? "light" : "dark";
+  setAppearance({ theme: nextTheme });
+}
+
+export function cycleAccent() {
+  const idx = accents.indexOf(current.accent);
+  const nextAccent = accents[(idx + 1) % accents.length]!;
+  setAppearance({ accent: nextAccent });
+}
+
+export function getOrgDefaultAccent(orgId: string): Accent {
+  try {
+    const val = localStorage.getItem(`edict.orgAccent.${orgId}`);
+    return accents.includes(val as Accent) ? (val as Accent) : "violet";
+  } catch {
+    return "violet";
+  }
+}
+
+export function setOrgDefaultAccent(orgId: string, accent: Accent) {
+  localStorage.setItem(`edict.orgAccent.${orgId}`, accent);
+  for (const listener of listeners) listener();
+}
+
+export function isTyping(event: KeyboardEvent): boolean {
+  const target = event.target as HTMLElement | null;
+  if (!target) return false;
+  return (
+    target.isContentEditable ||
+    ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) ||
+    document.querySelector("dialog[open]") !== null
+  );
+}

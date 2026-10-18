@@ -285,6 +285,61 @@ export function useUpdateIssue(orgId: string) {
   });
 }
 
+export type BulkUpdateChanges = Omit<
+  NonNullable<paths["/organizations/{orgId}/issues/bulk-update"]["post"]["requestBody"]>["content"]["application/json"],
+  "issues"
+>;
+
+export function useBulkUpdateIssues(orgId: string) {
+  const client = useQueryClient();
+  const listKey = (teamId: string) => keys.issues(orgId, teamId);
+  return useMutation({
+    mutationFn: ({ targets, changes }: { targets: { id: string; version: number }[]; changes: BulkUpdateChanges }) =>
+      unwrap(
+        api.POST("/organizations/{orgId}/issues/bulk-update", {
+          params: { path: { orgId } },
+          body: { issues: targets, ...changes },
+        }),
+      ),
+    onSuccess: (data) => {
+      for (const updated of data.updated) {
+        client.setQueryData<Issue[]>(listKey(updated.teamId), (list) => replaceIssue(list, updated));
+      }
+      void client.invalidateQueries({ queryKey: ["org", orgId] });
+      return data;
+    },
+  });
+}
+
+export function useBulkDeleteIssues(orgId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (issueIds: string[]) =>
+      unwrap(
+        api.POST("/organizations/{orgId}/issues/bulk-delete", {
+          params: { path: { orgId } },
+          body: { issueIds },
+        }),
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["org", orgId] });
+    },
+  });
+}
+
+export function useSearchIssues(orgId: string, query: { q?: string; limit?: number }, enabled = true) {
+  return useQuery({
+    queryKey: ["org", orgId, "search-issues", query] as const,
+    queryFn: () =>
+      unwrap(
+        api.GET("/organizations/{orgId}/issues", {
+          params: { path: { orgId }, query: { ...query, limit: query.limit ?? 20 } },
+        }),
+      ),
+    enabled: enabled && Boolean(query.q && query.q.trim().length > 0),
+  });
+}
+
 export function useTeamLabels(orgId: string, teamId: string) {
   return useQuery({
     queryKey: keys.teamLabels(orgId, teamId),

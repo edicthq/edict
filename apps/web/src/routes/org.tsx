@@ -6,6 +6,7 @@ import { Avatar, Button, Count, Kbd, LogoMark, ProgressBadge, TeamKey, cn } from
 import { CreateTeamDialog } from "../components/create-team-dialog.js";
 import { InviteDialog } from "../components/invite-dialog.js";
 import { CommandPalette } from "../components/palette.js";
+import { cycleAccent, cycleTheme, isTyping } from "../lib/appearance.js";
 import { UndoProvider } from "../components/undo.js";
 import { VerifyBanner } from "../components/verify-banner.js";
 import { AuthShell, Loading } from "../components/shell.js";
@@ -46,6 +47,15 @@ export function OrgLayout() {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setDialog((open) => (open === "palette" ? null : "palette"));
+        return;
+      }
+      if (isTyping(event) || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key.toLowerCase() === "t") {
+        event.preventDefault();
+        cycleTheme();
+      } else if (event.key.toLowerCase() === "g") {
+        event.preventDefault();
+        cycleAccent();
       }
     };
     window.addEventListener("keydown", onKey);

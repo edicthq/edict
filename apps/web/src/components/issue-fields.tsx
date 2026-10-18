@@ -8,12 +8,25 @@ import { categoryLabel, estimates, priorities, priorityLabel, statusFill } from 
 export const chipClass =
   "inline-flex h-7 items-center gap-1.5 rounded-full ps-2 pe-2.5 text-ui font-medium text-ink shadow-[inset_0_0_0_1px_var(--line-strong)] transition-[background-color] duration-[140ms] ease-standard hover:bg-hover";
 
-type Open = { open?: boolean; onOpenChange?: (open: boolean) => void };
+type TriggerProps = {
+  ref: React.Ref<HTMLButtonElement>;
+  onClick: () => void;
+  "aria-haspopup": "listbox";
+  "aria-expanded": boolean;
+};
+
+type Open = {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  side?: "top" | "bottom";
+  trigger?: (props: TriggerProps) => React.ReactNode;
+};
 
 export function StatusPicker({
   statuses,
   value,
   onChange,
+  trigger,
   ...open
 }: { statuses: Status[]; value: string; onChange: (statusId: string) => void } & Open) {
   const current = statuses.find((s) => s.id === value);
@@ -29,17 +42,17 @@ export function StatusPicker({
         keywords: categoryLabel[status.category],
         icon: <StatusIcon category={status.category} fill={statusFill(statuses, status)} />,
       }))}
-      trigger={(props) => (
+      trigger={trigger ?? ((props) => (
         <button type="button" {...props} className={chipClass} aria-label={`Status: ${current?.name ?? "none"}. Change status`}>
           {current ? <StatusIcon category={current.category} fill={statusFill(statuses, current)} /> : null}
           {current?.name ?? "Status"}
         </button>
-      )}
+      ))}
     />
   );
 }
 
-export function PriorityPicker({ value, onChange, ...open }: { value: Priority; onChange: (p: Priority) => void } & Open) {
+export function PriorityPicker({ value, onChange, trigger, ...open }: { value: Priority; onChange: (p: Priority) => void } & Open) {
   return (
     <Menu
       label="Set priority"
@@ -47,12 +60,12 @@ export function PriorityPicker({ value, onChange, ...open }: { value: Priority; 
       onSelect={onChange}
       {...open}
       items={priorities.map((p) => ({ value: p, label: priorityLabel[p], icon: <PriorityIcon priority={p} /> }))}
-      trigger={(props) => (
+      trigger={trigger ?? ((props) => (
         <button type="button" {...props} className={chipClass} aria-label={`Priority: ${priorityLabel[value]}. Set priority`}>
           <PriorityIcon priority={value} />
           {value === "none" ? "Priority" : priorityLabel[value]}
         </button>
-      )}
+      ))}
     />
   );
 }
@@ -63,6 +76,7 @@ export function AssigneePicker({
   members,
   value,
   onChange,
+  trigger,
   ...open
 }: { members: Member[]; value: string | null; onChange: (memberId: string | null) => void } & Open) {
   const current = members.find((m) => m.id === value);
@@ -76,7 +90,7 @@ export function AssigneePicker({
         { value: nobody, label: "No assignee", icon: <NoAssignee /> },
         ...members.map((m) => ({ value: m.id, label: m.name, keywords: m.email ?? "", icon: <Avatar name={m.name} size={18} /> })),
       ]}
-      trigger={(props) => (
+      trigger={trigger ?? ((props) => (
         <button
           type="button"
           {...props}
@@ -86,7 +100,7 @@ export function AssigneePicker({
           {current ? <Avatar name={current.name} size={18} /> : <NoAssignee />}
           {current?.name ?? "Assignee"}
         </button>
-      )}
+      ))}
     />
   );
 }
@@ -98,6 +112,7 @@ export function DelegatePicker({
   members,
   value,
   onChange,
+  trigger,
   ...open
 }: { agents: Agent[]; members: Member[]; value: string | null; onChange: (agentId: string | null) => void } & Open) {
   const current = agents.find((a) => a.id === value);
@@ -118,7 +133,7 @@ export function DelegatePicker({
           icon: <Avatar name={agent.name} kind="agent" size={18} />,
         })),
       ]}
-      trigger={(props) => (
+      trigger={trigger ?? ((props) => (
         <button
           type="button"
           {...props}
@@ -128,7 +143,7 @@ export function DelegatePicker({
           {current ? <Avatar name={current.name} kind="agent" size={18} /> : <NoAssignee />}
           {current?.name ?? "Delegate"}
         </button>
-      )}
+      ))}
     />
   );
 }

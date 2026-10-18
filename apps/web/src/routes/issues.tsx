@@ -3,9 +3,9 @@ import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-r
 import type { Agent, Issue, Label, Member, Priority, SavedViewQuery, Status, Team } from "@edicthq/client";
 import { Avatar, Button, Kbd, LabelPill, Menu, PriorityIcon, ProgressBadge, StatusIcon, TeamKey, cn } from "@edicthq/ui";
 import type { MenuItem } from "@edicthq/ui";
-import { ArrowDown, ArrowUp, Bookmark, ListFilter, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Bookmark, CheckSquare, ListFilter, Search, Square, Trash2, X } from "lucide-react";
 import { CreateIssueDialog } from "../components/create-issue-dialog.js";
-import { NoAssignee } from "../components/issue-fields.js";
+import { AssigneePicker, DelegatePicker, NoAssignee, PriorityPicker, StatusPicker } from "../components/issue-fields.js";
 import { IssuePeek, type PeekMenu } from "../components/issue-peek.js";
 import { EmptyState, Loading, PageBody, PageHeader } from "../components/shell.js";
 import { useToast } from "../components/toast.js";
@@ -14,6 +14,9 @@ import { agentState, plainLine, waitingLine } from "../lib/agents.js";
 import { ago, assignable, boardColumns, categoryLabel, priorityLabel, statusFill, type StatusGroup } from "../lib/issues.js";
 import {
   useAgents,
+  useBulkDeleteIssues,
+  useBulkUpdateIssues,
+  type BulkUpdateChanges,
   useCreateSavedView,
   useDeleteSavedView,
   useIssue,
@@ -46,6 +49,7 @@ import {
   type IssueGroup,
   type IssueView,
 } from "../lib/views.js";
+import { isTyping } from "../lib/appearance.js";
 import { useOrg } from "./org.js";
 
 type View = "list" | "board";
@@ -101,6 +105,74 @@ function TeamIssues({ team }: { team: Team }) {
   const [creating, setCreating] = useState<{ parent?: Issue } | null>(null);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [menu, setMenu] = useState<PeekMenu>(null);
+  const bulkUpdate = useBulkUpdateIssues(orgId);
+  const bulkDelete = useBulkDeleteIssues(orgId);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
+  const [bulkMenu, setBulkMenu] = useState<PeekMenu>(null);
+
+  const toggleSelect = (id: string, shift = false) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (shift && lastSelectedId) {
+        const allIds = filtered.map((i) => i.id);
+        const start = allIds.indexOf(lastSelectedId);
+        const end = allIds.indexOf(id);
+        if (start !== -1 && end !== -1) {
+          const [min, max] = [Math.min(start, end), Math.max(start, end)];
+          for (let i = min; i <= max; i++) next.add(allIds[i]!);
+        }
+      } else {
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+      }
+      return next;
+    });
+    setLastSelectedId(id);
+  };
+
+  const selectAll = () => {
+    setSelectedIds(new Set(filtered.map((i) => i.id)));
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+    setLastSelectedId(null);
+    setBulkMenu(null);
+  };
+
+  const selectedIssues = useMemo(
+    () => (issues.data ?? []).filter((i) => selectedIds.has(i.id)),
+    [issues.data, selectedIds],
+  );
+
+  const applyBulkUpdate = (changes: BulkUpdateChanges, description: string) => {
+    if (selectedIssues.length === 0) return;
+    const targets = selectedIssues.map((i) => ({ id: i.id, version: i.version }));
+    bulkUpdate.mutate(
+      { targets, changes },
+      {
+        onSuccess: () => {
+          offerUndo(description);
+          clearSelection();
+        },
+        onError: (error) => toast(error.message),
+      },
+    );
+  };
+
+  const applyBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    const ids = Array.from(selectedIds);
+    bulkDelete.mutate(ids, {
+      onSuccess: () => {
+        offerUndo(`Moved ${count} ${count === 1 ? "issue" : "issues"} to the trash`);
+        clearSelection();
+      },
+      onError: (error) => toast(error.message),
+    });
+  };
 
   const filtered = useMemo(
     () => (issues.data ?? []).filter((issue) => matches(issue, issueView)),
@@ -236,7 +308,18 @@ function TeamIssues({ team }: { team: Team }) {
   // so it never acts on stale issues or search params.
   const onKey = useRef<(event: KeyboardEvent) => void>(() => {});
   onKey.current = (event) => {
-    if (typing(event)) return;
+    if (isTyping(event)) return;
+    const key = event.key.toLowerCase();
+
+    // ⌘A / Ctrl+A: select all visible issues
+    if ((event.metaKey || event.ctrlKey) && key === "a") {
+      event.preventDefault();
+      selectAll();
+      return;
+    }
+
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+
     const index = order.findIndex((i) => i.id === (peeked?.id ?? focusId));
     const move = (by: number) => {
       event.preventDefault();
@@ -246,14 +329,59 @@ function TeamIssues({ team }: { team: Team }) {
       if (peeked) openIssue(next);
       else document.getElementById(`issue-${next.id}`)?.focus();
     };
-    const key = event.key.toLowerCase();
-    if (key === "j" || event.key === "ArrowDown") move(1);
-    else if (key === "k" || event.key === "ArrowUp") move(-1);
-    else if (event.key === "Escape" && peeked) {
+
+    if (key === "j" || event.key === "ArrowDown") {
+      move(1);
+    } else if (key === "k" || event.key === "ArrowUp") {
+      move(-1);
+    } else if (view === "board" && (key === "h" || event.key === "ArrowLeft")) {
       event.preventDefault();
-      closePeek();
-      requestAnimationFrame(() => document.getElementById(`issue-${peeked.id}`)?.focus());
-    } else if (key === "c") {
+      const currentId = peeked?.id ?? focusId;
+      const colIdx = boardGroups.findIndex((g) => g.issues.some((i) => i.id === currentId));
+      if (colIdx > 0) {
+        const prevCol = boardGroups[colIdx - 1];
+        if (prevCol && prevCol.issues.length > 0) {
+          const rowIdx = boardGroups[colIdx]!.issues.findIndex((i) => i.id === currentId);
+          const target = prevCol.issues[Math.min(Math.max(0, rowIdx), prevCol.issues.length - 1)]!;
+          setFocusId(target.id);
+          if (peeked) openIssue(target);
+          else document.getElementById(`issue-${target.id}`)?.focus();
+        }
+      }
+    } else if (view === "board" && (key === "l" || event.key === "ArrowRight")) {
+      event.preventDefault();
+      const currentId = peeked?.id ?? focusId;
+      const colIdx = boardGroups.findIndex((g) => g.issues.some((i) => i.id === currentId));
+      if (colIdx >= 0 && colIdx < boardGroups.length - 1) {
+        const nextCol = boardGroups[colIdx + 1];
+        if (nextCol && nextCol.issues.length > 0) {
+          const rowIdx = boardGroups[colIdx]!.issues.findIndex((i) => i.id === currentId);
+          const target = nextCol.issues[Math.min(Math.max(0, rowIdx), nextCol.issues.length - 1)]!;
+          setFocusId(target.id);
+          if (peeked) openIssue(target);
+          else document.getElementById(`issue-${target.id}`)?.focus();
+        }
+      }
+    } else if (event.key === "Enter" && !peeked) {
+      const target = order.find((i) => i.id === focusId);
+      if (target) {
+        event.preventDefault();
+        openIssue(target);
+      }
+    } else if (key === "x") {
+      event.preventDefault();
+      const targetId = peeked?.id ?? focusId;
+      if (targetId) toggleSelect(targetId);
+    } else if (event.key === "Escape") {
+      if (peeked) {
+        event.preventDefault();
+        closePeek();
+        requestAnimationFrame(() => document.getElementById(`issue-${peeked.id}`)?.focus());
+      } else if (selectedIds.size > 0) {
+        event.preventDefault();
+        clearSelection();
+      }
+        } else if (key === "c") {
       event.preventDefault();
       setCreating({});
     } else if (key === "/") {
@@ -261,10 +389,28 @@ function TeamIssues({ team }: { team: Team }) {
       searchRef.current?.focus();
     } else if (key === "v") {
       event.preventDefault();
-      setParam("view", view === "list" ? "board" : null);
-    } else if (peeked && (key === "s" || key === "p" || key === "a" || key === "d")) {
+      setParams((current) => {
+        const next = new URLSearchParams(current);
+        if (next.get("view") === "board") next.delete("view");
+        else next.set("view", "board");
+        return next;
+      });
+    } else if (key === "s" || key === "p" || key === "a" || key === "d") {
+      const menuType: PeekMenu = key === "s" ? "status" : key === "p" ? "priority" : key === "a" ? "assignee" : "delegate";
       event.preventDefault();
-      setMenu(key === "s" ? "status" : key === "p" ? "priority" : key === "a" ? "assignee" : "delegate");
+      if (peeked) {
+        setMenu(menuType);
+      } else if (selectedIds.size > 0) {
+        setBulkMenu(menuType);
+      } else if (focusId) {
+        setSelectedIds(new Set([focusId]));
+        setBulkMenu(menuType);
+      }
+    } else if (event.key === "Backspace" || event.key === "Delete") {
+      if (selectedIds.size > 0) {
+        event.preventDefault();
+        applyBulkDelete();
+      }
     }
   };
   useEffect(() => {
@@ -557,8 +703,10 @@ function TeamIssues({ team }: { team: Team }) {
             agents={agents.data ?? []}
             focusId={focusId}
             openId={peeked?.id}
+            selectedIds={selectedIds}
             onOpen={openIssue}
             onFocus={setFocusId}
+            onToggleSelect={toggleSelect}
           />
         ) : (
           <IssueBoard
@@ -568,8 +716,10 @@ function TeamIssues({ team }: { team: Team }) {
             orgMembers={orgMembers.data ?? []}
             agents={agents.data ?? []}
             focusId={focusId}
+            selectedIds={selectedIds}
             onOpen={openIssue}
             onFocus={setFocusId}
+            onToggleSelect={toggleSelect}
             onMove={(issue, statusId) =>
               update.mutate(
                 { issue, changes: { statusId } },
@@ -583,6 +733,100 @@ function TeamIssues({ team }: { team: Team }) {
           />
         )}
       </div>
+
+      {selectedIds.size > 0 && statuses.data ? (
+        <div
+          role="toolbar"
+          aria-label="Bulk actions"
+          className="fixed bottom-6 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-line-strong bg-surface px-3 py-1.5 shadow-xl"
+        >
+          <span className="ps-1 pe-2 text-ui font-semibold text-ink tabular-nums">
+            {selectedIds.size} selected
+          </span>
+          <StatusPicker
+            side="top"
+            statuses={statusList}
+            value={selectedIssues[0]?.statusId ?? ""}
+            onChange={(statusId) => {
+              const st = statusList.find((s) => s.id === statusId);
+              applyBulkUpdate({ statusId }, `Updated status to ${st?.name ?? "new status"} on ${selectedIds.size} issues`);
+            }}
+            open={bulkMenu === "status"}
+            onOpenChange={(open) => setBulkMenu(open ? "status" : null)}
+            trigger={(props) => (
+              <Button variant="ghost" className="h-7 gap-1 px-2 text-ui" {...props}>
+                Status <Kbd>S</Kbd>
+              </Button>
+            )}
+          />
+          <PriorityPicker
+            side="top"
+            value={selectedIssues[0]?.priority ?? "none"}
+            onChange={(priority) => {
+              applyBulkUpdate({ priority }, `Updated priority to ${priority} on ${selectedIds.size} issues`);
+            }}
+            open={bulkMenu === "priority"}
+            onOpenChange={(open) => setBulkMenu(open ? "priority" : null)}
+            trigger={(props) => (
+              <Button variant="ghost" className="h-7 gap-1 px-2 text-ui" {...props}>
+                Priority <Kbd>P</Kbd>
+              </Button>
+            )}
+          />
+          <AssigneePicker
+            side="top"
+            members={members}
+            value={selectedIssues[0]?.assigneeId ?? null}
+            onChange={(assigneeId) => {
+              const mem = members.find((m) => m.id === assigneeId);
+              applyBulkUpdate({ assigneeId }, `Assigned ${selectedIds.size} issues to ${mem?.name ?? "nobody"}`);
+            }}
+            open={bulkMenu === "assignee"}
+            onOpenChange={(open) => setBulkMenu(open ? "assignee" : null)}
+            trigger={(props) => (
+              <Button variant="ghost" className="h-7 gap-1 px-2 text-ui" {...props}>
+                Assignee <Kbd>A</Kbd>
+              </Button>
+            )}
+          />
+          <DelegatePicker
+            side="top"
+            agents={agents.data ?? []}
+            members={orgMembers.data ?? []}
+            value={selectedIssues[0]?.delegateId ?? null}
+            onChange={(delegateId) => {
+              const ag = (agents.data ?? []).find((a) => a.id === delegateId);
+              applyBulkUpdate({ delegateId }, `Delegated ${selectedIds.size} issues to ${ag?.name ?? "nobody"}`);
+            }}
+            open={bulkMenu === "delegate"}
+            onOpenChange={(open) => setBulkMenu(open ? "delegate" : null)}
+            trigger={(props) => (
+              <Button variant="ghost" className="h-7 gap-1 px-2 text-ui" {...props}>
+                Delegate <Kbd>D</Kbd>
+              </Button>
+            )}
+          />
+          <Button
+            variant="ghost"
+            
+            className="h-7 gap-1 px-2 text-ui text-ink hover:text-red-500"
+            onClick={applyBulkDelete}
+            title="Move selected to trash (Delete)"
+          >
+            <Trash2 className="size-3.5" />
+            Trash
+          </Button>
+          <button
+            type="button"
+            onClick={clearSelection}
+            aria-label="Clear selection"
+            title="Clear selection (Esc)"
+            className="grid size-6 place-items-center rounded-full text-ink-2 hover:bg-hover hover:text-ink"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      ) : null}
 
       {peeked && statuses.data ? (
         <IssuePeek
@@ -734,20 +978,23 @@ function IssueList({
   agents,
   focusId,
   openId,
+  selectedIds,
   onOpen,
   onFocus,
+  onToggleSelect,
 }: {
   groups: IssueGroup[];
   statuses: Status[];
   labels: Label[];
-  // The whole team's issues, to name a row's parent.
   issues: Issue[];
   orgMembers: Member[];
   agents: Agent[];
   focusId: string | null;
   openId?: string;
+  selectedIds: Set<string>;
   onOpen: (issue: Issue) => void;
   onFocus: (id: string) => void;
+  onToggleSelect: (id: string, shift: boolean) => void;
 }) {
   const parentOf = (issue: Issue) => issues.find((i) => i.id === issue.parentId)?.identifier;
   return (
@@ -760,25 +1007,52 @@ function IssueList({
           <ul className="flex flex-col gap-px">
             {group.issues.map((issue) => {
               const status = statuses.find((s) => s.id === issue.statusId)!;
+              const isSelected = selectedIds.has(issue.id);
               return (
-                <li key={issue.id}>
+                <li key={issue.id} className="group/row">
                   <button
                     id={`issue-${issue.id}`}
                     type="button"
-                    onClick={() => onOpen(issue)}
+                    onClick={(e) => {
+                      if (e.shiftKey) {
+                        e.preventDefault();
+                        onToggleSelect(issue.id, true);
+                      } else {
+                        onOpen(issue);
+                      }
+                    }}
                     onFocus={() => onFocus(issue.id)}
                     aria-current={openId === issue.id ? "true" : undefined}
+                    aria-selected={isSelected || undefined}
                     data-focused={focusId === issue.id || undefined}
+                    data-selected={isSelected || undefined}
                     className={cn(
                       "relative grid min-h-10 w-full grid-cols-[16px_58px_16px_minmax(0,1fr)_auto_auto_30px] items-center gap-x-3 gap-y-1 rounded-sm py-2 ps-4 pe-3 text-start",
                       agentState(issue, agents.find((a) => a.id === issue.delegateId)) === "working" &&
                         "before:absolute before:inset-y-1.5 before:start-0 before:w-[3px] before:rounded-full before:bg-agent",
                       "transition-[background-color] duration-[140ms] ease-standard hover:bg-hover",
+                      isSelected && "bg-hover shadow-[inset_2px_0_0_0_var(--ink)]",
                       "data-focused:bg-hover focus-visible:shadow-[inset_0_0_0_1.5px_var(--ink)] focus-visible:outline-none",
                     )}
                   >
-                    <span title={priorityLabel[issue.priority]}>
-                      <PriorityIcon priority={issue.priority} />
+                    <span
+                      title={isSelected ? "Deselect" : "Select"}
+                      className="relative flex size-4 items-center justify-center cursor-pointer"
+                    >
+                      <span className={cn("transition-opacity", isSelected || selectedIds.size > 0 ? "opacity-0 pointer-events-none" : "group-hover/row:opacity-0")}>
+                        <PriorityIcon priority={issue.priority} />
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => onToggleSelect(issue.id, (e.nativeEvent as MouseEvent).shiftKey)}
+                        className={cn(
+                          "absolute inset-0 size-4 accent-[var(--ink)] cursor-pointer transition-opacity",
+                          isSelected || selectedIds.size > 0 ? "opacity-100" : "opacity-0 group-hover/row:opacity-100",
+                        )}
+                        aria-label={`Select ${issue.identifier}`}
+                      />
                     </span>
                     <span className="text-sm font-medium whitespace-nowrap text-ink-2 tabular-nums">{issue.identifier}</span>
                     <span title={status.name}>
@@ -821,8 +1095,10 @@ function IssueBoard({
   orgMembers,
   agents,
   focusId,
+  selectedIds,
   onOpen,
   onFocus,
+  onToggleSelect,
   onMove,
 }: {
   groups: StatusGroup[];
@@ -831,8 +1107,10 @@ function IssueBoard({
   orgMembers: Member[];
   agents: Agent[];
   focusId: string | null;
+  selectedIds: Set<string>;
   onOpen: (issue: Issue) => void;
   onFocus: (id: string) => void;
+  onToggleSelect: (id: string, shift: boolean) => void;
   onMove: (issue: Issue, statusId: string) => void;
 }) {
   const [dragging, setDragging] = useState<Issue | null>(null);
@@ -862,8 +1140,10 @@ function IssueBoard({
         >
           <GroupHeading group={column} statuses={statuses} />
           <ul className="flex min-h-0 flex-col gap-2 overflow-y-auto px-0.5 pt-0.5 pb-28">
-            {column.issues.map((issue) => (
-              <li key={issue.id}>
+            {column.issues.map((issue) => {
+              const isSelected = selectedIds.has(issue.id);
+              return (
+              <li key={issue.id} className="group/card">
                 <button
                   id={`issue-${issue.id}`}
                   type="button"
@@ -874,17 +1154,40 @@ function IssueBoard({
                     setDragging(issue);
                   }}
                   onDragEnd={() => setDragging(null)}
-                  onClick={() => onOpen(issue)}
+                  onClick={(e) => {
+                    if (e.shiftKey) {
+                      e.preventDefault();
+                      onToggleSelect(issue.id, true);
+                    } else {
+                      onOpen(issue);
+                    }
+                  }}
                   onFocus={() => onFocus(issue.id)}
+                  aria-selected={isSelected || undefined}
                   data-focused={focusId === issue.id || undefined}
+                  data-selected={isSelected || undefined}
                   className={cn(
                     "flex w-full flex-col gap-2 rounded-md bg-surface px-3 pt-2.5 pb-3 text-start shadow-[inset_0_0_0_1px_var(--line)]",
                     "focus-visible:shadow-[inset_0_0_0_2px_var(--ink)] focus-visible:outline-none data-focused:shadow-[inset_0_0_0_1px_var(--line-strong)]",
+                    isSelected && "bg-hover shadow-[inset_0_0_0_2px_var(--ink)]",
                     dragging?.id === issue.id && "opacity-50",
                   )}
                 >
                   <span className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-ink-2 tabular-nums">{issue.identifier}</span>
+                    <span className="flex items-center gap-1.5">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => onToggleSelect(issue.id, (e.nativeEvent as MouseEvent).shiftKey)}
+                        className={cn(
+                          "size-3.5 accent-[var(--ink)] cursor-pointer transition-opacity",
+                          isSelected || selectedIds.size > 0 ? "opacity-100" : "opacity-0 group-hover/card:opacity-100",
+                        )}
+                        aria-label={`Select ${issue.identifier}`}
+                      />
+                      <span className="text-sm font-medium text-ink-2 tabular-nums">{issue.identifier}</span>
+                    </span>
                     <span title={priorityLabel[issue.priority]}>
                       <PriorityIcon priority={issue.priority} />
                     </span>
@@ -910,7 +1213,8 @@ function IssueBoard({
                   ) : null}
                 </button>
               </li>
-            ))}
+              );
+            })}
             {column.issues.length === 0 ? <li className="px-1 py-2 text-sm text-ink-3">Nothing here</li> : null}
           </ul>
         </section>
