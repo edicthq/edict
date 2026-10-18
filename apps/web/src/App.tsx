@@ -14,6 +14,8 @@ import { Home, NewOrganization } from "./routes/onboarding.js";
 import { OrgLayout } from "./routes/org.js";
 import { ForgotPassword, ResetPassword } from "./routes/password.js";
 import { SettingsPage } from "./routes/settings.js";
+import { AgentsPage } from "./routes/agents.js";
+import { ConnectPage, ConsentPage } from "./routes/connect.js";
 import { TeamMembersPage, TeamsPage } from "./routes/teams.js";
 import { TrashPage } from "./routes/trash.js";
 
@@ -75,6 +77,7 @@ const router = createBrowserRouter([
     children: [
       { path: "/", element: <Home /> },
       { path: "/new", element: <NewOrganization /> },
+      { path: "/oauth/consent", element: <ConsentPage /> },
       {
         path: "/:slug",
         element: <OrgLayout />,
@@ -84,6 +87,8 @@ const router = createBrowserRouter([
           { path: "teams/:teamId/members", element: <TeamMembersPage /> },
           { path: "issue/:issueRef", element: <IssueLink /> },
           { path: "members", element: <MembersPage /> },
+          { path: "agents", element: <AgentsPage /> },
+          { path: "connect", element: <ConnectPage /> },
           { path: "trash", element: <TrashPage /> },
           { path: "settings", element: <SettingsPage /> },
           { path: "instance", element: <InstancePage /> },

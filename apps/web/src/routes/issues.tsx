@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router";
-import type { Issue, Label, Member, Status, Team } from "@edicthq/client";
-import { Avatar, Button, Kbd, LabelPill, PriorityIcon, StatusIcon, TeamKey, cn } from "@edicthq/ui";
+import type { Agent, Issue, Label, Member, Status, Team } from "@edicthq/client";
+import { Avatar, Button, Kbd, LabelPill, PriorityIcon, ProgressBadge, StatusIcon, TeamKey, cn } from "@edicthq/ui";
 import { CreateIssueDialog } from "../components/create-issue-dialog.js";
 import { NoAssignee } from "../components/issue-fields.js";
 import { IssuePeek, type PeekMenu } from "../components/issue-peek.js";
 import { EmptyState, Loading, PageBody, PageHeader } from "../components/shell.js";
 import { useToast } from "../components/toast.js";
 import { useOfferUndo } from "../components/undo.js";
+import { agentState, plainLine, waitingLine } from "../lib/agents.js";
 import { ago, assignable, boardColumns, listGroups, priorityLabel, statusFill, type StatusGroup } from "../lib/issues.js";
 import {
+  useAgents,
   useIssue,
   useMembers,
   useStatuses,
@@ -61,6 +63,7 @@ function TeamIssues({ team }: { team: Team }) {
   const teamMembers = useTeamMembers(orgId, team.id);
   const labels = useTeamLabels(orgId, team.id);
   const teams = useTeams(orgId);
+  const agents = useAgents(orgId);
   const update = useUpdateIssue(orgId);
   const toast = useToast();
   const offerUndo = useOfferUndo();
@@ -161,9 +164,9 @@ function TeamIssues({ team }: { team: Team }) {
     } else if (key === "v") {
       event.preventDefault();
       setParam("view", view === "list" ? "board" : null);
-    } else if (peeked && (key === "s" || key === "p" || key === "a")) {
+    } else if (peeked && (key === "s" || key === "p" || key === "a" || key === "d")) {
       event.preventDefault();
-      setMenu(key === "s" ? "status" : key === "p" ? "priority" : "assignee");
+      setMenu(key === "s" ? "status" : key === "p" ? "priority" : key === "a" ? "assignee" : "delegate");
     }
   };
   useEffect(() => {
@@ -234,6 +237,7 @@ function TeamIssues({ team }: { team: Team }) {
             labels={labels.data ?? []}
             issues={issues.data ?? []}
             orgMembers={orgMembers.data ?? []}
+            agents={agents.data ?? []}
             focusId={focusId}
             openId={peeked?.id}
             onOpen={openIssue}
@@ -245,6 +249,7 @@ function TeamIssues({ team }: { team: Team }) {
             statuses={statusList}
             labels={labels.data ?? []}
             orgMembers={orgMembers.data ?? []}
+            agents={agents.data ?? []}
             focusId={focusId}
             onOpen={openIssue}
             onFocus={setFocusId}
@@ -265,6 +270,7 @@ function TeamIssues({ team }: { team: Team }) {
       {peeked && statuses.data ? (
         <IssuePeek
           orgId={orgId}
+          slug={slug}
           myId={membership.member.id}
           issue={peeked}
           statuses={statuses.data}
@@ -272,6 +278,7 @@ function TeamIssues({ team }: { team: Team }) {
           orgMembers={orgMembers.data ?? []}
           labels={labels.data ?? []}
           teams={teams.data ?? []}
+          agents={agents.data ?? []}
           menu={menu}
           onMenu={setMenu}
           onClose={closePeek}
@@ -307,15 +314,44 @@ function GroupHeading({ group, statuses }: { group: StatusGroup; statuses: Statu
   );
 }
 
-function Assignee({ issue, orgMembers }: { issue: Issue; orgMembers: Member[] }) {
+// The assignee, with the delegate overlapping it as in the concept.
+function Assignee({ issue, orgMembers, agents }: { issue: Issue; orgMembers: Member[]; agents: Agent[] }) {
   const assignee = orgMembers.find((m) => m.id === issue.assigneeId);
-  return assignee ? (
-    <span title={assignee.name}>
-      <Avatar name={assignee.name} />
+  const delegate = agents.find((a) => a.id === issue.delegateId);
+  return (
+    <span className="flex items-center">
+      {assignee ? (
+        <span title={assignee.name}>
+          <Avatar name={assignee.name} />
+        </span>
+      ) : (
+        <span title="No assignee">
+          <NoAssignee size={22} />
+        </span>
+      )}
+      {delegate ? (
+        <span title={`Delegated to ${delegate.name}`} className="-ms-1.5 rounded-[7px] ring-2 ring-bg">
+          <Avatar name={delegate.name} kind="agent" />
+        </span>
+      ) : null}
     </span>
-  ) : (
-    <span title="No assignee">
-      <NoAssignee size={22} />
+  );
+}
+
+// The delegate's latest words under the title: its name, its state and what
+// it last said, or that it has not picked the issue up yet.
+function AgentLine({ issue, agents }: { issue: Issue; agents: Agent[] }) {
+  const agent = agents.find((a) => a.id === issue.delegateId);
+  if (!agent) return null;
+  const state = agentState(issue, agent);
+  const latest = issue.latestProgress?.agentId === agent.id ? issue.latestProgress : null;
+  return (
+    <span className="col-span-4 col-start-4 flex min-w-0 items-center gap-2 text-sm">
+      <span className="shrink-0 font-medium text-agent-ink">{agent.name}</span>
+      <ProgressBadge state={state} />
+      <span className="min-w-0 truncate text-ink-2">
+        {latest ? plainLine(latest.message) : state === "waiting" ? waitingLine(agent) : null}
+      </span>
     </span>
   );
 }
@@ -338,6 +374,7 @@ function IssueList({
   labels,
   issues,
   orgMembers,
+  agents,
   focusId,
   openId,
   onOpen,
@@ -349,6 +386,7 @@ function IssueList({
   // The whole team's issues, to name a row's parent.
   issues: Issue[];
   orgMembers: Member[];
+  agents: Agent[];
   focusId: string | null;
   openId?: string;
   onOpen: (issue: Issue) => void;
@@ -375,7 +413,9 @@ function IssueList({
                     aria-current={openId === issue.id ? "true" : undefined}
                     data-focused={focusId === issue.id || undefined}
                     className={cn(
-                      "grid min-h-10 w-full grid-cols-[16px_58px_16px_minmax(0,1fr)_auto_auto_30px] items-center gap-x-3 rounded-sm py-2 ps-4 pe-3 text-start",
+                      "relative grid min-h-10 w-full grid-cols-[16px_58px_16px_minmax(0,1fr)_auto_auto_30px] items-center gap-x-3 gap-y-1 rounded-sm py-2 ps-4 pe-3 text-start",
+                      agentState(issue, agents.find((a) => a.id === issue.delegateId)) === "working" &&
+                        "before:absolute before:inset-y-1.5 before:start-0 before:w-[3px] before:rounded-full before:bg-agent",
                       "transition-[background-color] duration-[140ms] ease-standard hover:bg-hover",
                       "data-focused:bg-hover focus-visible:shadow-[inset_0_0_0_1.5px_var(--ink)] focus-visible:outline-none",
                     )}
@@ -401,10 +441,11 @@ function IssueList({
                       ) : null}
                     </span>
                     <IssueLabels issue={issue} labels={labels} />
-                    <Assignee issue={issue} orgMembers={orgMembers} />
+                    <Assignee issue={issue} orgMembers={orgMembers} agents={agents} />
                     <time dateTime={issue.updatedAt} className="text-end text-sm text-ink-2">
                       {ago(issue.updatedAt)}
                     </time>
+                    <AgentLine issue={issue} agents={agents} />
                   </button>
                 </li>
               );
@@ -421,6 +462,7 @@ function IssueBoard({
   statuses,
   labels,
   orgMembers,
+  agents,
   focusId,
   onOpen,
   onFocus,
@@ -430,6 +472,7 @@ function IssueBoard({
   statuses: Status[];
   labels: Label[];
   orgMembers: Member[];
+  agents: Agent[];
   focusId: string | null;
   onOpen: (issue: Issue) => void;
   onFocus: (id: string) => void;
@@ -498,8 +541,16 @@ function IssueBoard({
                           <LabelPill key={label.id} name={label.name} hue={label.hue} />
                         ))}
                     </span>
-                    <Assignee issue={issue} orgMembers={orgMembers} />
+                    <Assignee issue={issue} orgMembers={orgMembers} agents={agents} />
                   </span>
+                  {issue.delegateId ? (
+                    <span className="flex min-w-0 items-center gap-2 text-sm">
+                      <ProgressBadge state={agentState(issue, agents.find((a) => a.id === issue.delegateId))} />
+                      <span className="min-w-0 truncate text-ink-2">
+                        {issue.latestProgress?.agentId === issue.delegateId ? plainLine(issue.latestProgress.message) : null}
+                      </span>
+                    </span>
+                  ) : null}
                 </button>
               </li>
             ))}

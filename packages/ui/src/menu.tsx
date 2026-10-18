@@ -7,6 +7,8 @@ export interface MenuItem<T extends string> {
   icon?: ReactNode;
   // Extra words the filter matches, like a status's category.
   keywords?: string;
+  // Quieter text after the label, like how a delegate connects.
+  detail?: string;
 }
 
 // A picker that opens under its trigger with a filter field, like the
@@ -184,7 +186,8 @@ export function Menu<T extends string>({
                   </span>
                 ) : null}
                 {item.icon}
-                <span className="truncate">{item.label}</span>
+                <span className={item.detail ? "shrink-0" : "truncate"}>{item.label}</span>
+                {item.detail ? <span className="truncate text-sm text-ink-2">{item.detail}</span> : null}
               </li>
             ))}
             {shown.length === 0 ? <li className="px-2 py-1.5 text-ui text-ink-2">No match</li> : null}

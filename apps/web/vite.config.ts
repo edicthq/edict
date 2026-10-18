@@ -16,6 +16,9 @@ export default defineConfig({
       // Attachment bytes (ADR 0020), fetched during image preview.
       "/files": toApi,
       "/health": toApi,
+      // MCP clients and their OAuth discovery (ADR 0021).
+      "/mcp": toApi,
+      "/.well-known": toApi,
     },
   },
   build: {

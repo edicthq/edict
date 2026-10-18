@@ -2,7 +2,7 @@ import { ChevronDown, LogOut, Plus, Server, Settings, Trash2 } from "lucide-reac
 import { useEffect, useState, type ReactNode } from "react";
 import type { Membership } from "@edicthq/client";
 import { Link, NavLink, Outlet, useNavigate, useOutletContext, useParams } from "react-router";
-import { Avatar, Button, Count, Kbd, LogoMark, TeamKey, cn } from "@edicthq/ui";
+import { Avatar, Button, Count, Kbd, LogoMark, ProgressBadge, TeamKey, cn } from "@edicthq/ui";
 import { CreateTeamDialog } from "../components/create-team-dialog.js";
 import { InviteDialog } from "../components/invite-dialog.js";
 import { CommandPalette } from "../components/palette.js";
@@ -11,7 +11,8 @@ import { VerifyBanner } from "../components/verify-banner.js";
 import { AuthShell, Loading } from "../components/shell.js";
 import { authClient, useSession } from "../lib/auth.js";
 import { mod } from "../lib/labels.js";
-import { useMembers, useMemberships, useTeams } from "../lib/queries.js";
+import { connectionLine } from "../lib/agents.js";
+import { useAgents, useMembers, useMemberships, useTeams } from "../lib/queries.js";
 
 export interface OrgContext {
   membership: Membership;
@@ -138,7 +139,7 @@ function Rail({ context, others }: { context: OrgContext; others: Membership[] }
   const teams = useTeams(orgId);
   const members = useMembers(orgId);
   const humans = members.data?.filter((m) => m.kind === "human") ?? [];
-  const agents = members.data?.filter((m) => m.kind === "agent") ?? [];
+  const agents = useAgents(orgId).data ?? [];
 
   return (
     <nav
@@ -182,17 +183,38 @@ function Rail({ context, others }: { context: OrgContext; others: Membership[] }
         )}
       </RailSection>
 
-      <RailSection title="Agents">
+      <RailSection
+        title="Agents"
+        aside={
+          <NavLink to={`/${slug}/agents`} aria-label="All agents" className="rounded-xs px-1 text-sm text-ink-2 hover:text-ink aria-[current=page]:text-ink">
+            All
+          </NavLink>
+        }
+      >
         {agents.length ? (
           agents.map((agent) => (
-            <div key={agent.id} className="flex min-h-[30px] items-center gap-2 px-2 text-ui">
+            <NavLink
+              key={agent.id}
+              to={`/${slug}/agents#${agent.id}`}
+              className="flex items-start gap-2 rounded-sm px-2 py-1.5 text-ui hover:bg-hover"
+            >
               <Avatar name={agent.name} kind="agent" />
-              <span className="truncate">{agent.name}</span>
-            </div>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-2">
+                  <span className="truncate font-medium">{agent.name}</span>
+                  {agent.pausedAt ? <ProgressBadge state="paused" className="ms-auto" /> : null}
+                </span>
+                <span className="block text-sm text-ink-2 text-pretty">{connectionLine(agent, members.data ?? [])}</span>
+              </span>
+            </NavLink>
           ))
         ) : (
           <p className="px-2 text-sm text-ink-2 text-pretty">
-            Agents join when someone connects an MCP client like Claude Code.
+            Agents join when someone{" "}
+            <Link to={`/${slug}/connect`} className="underline decoration-line-strong underline-offset-2 hover:text-ink">
+              connects an MCP client
+            </Link>{" "}
+            like Claude Code.
           </p>
         )}
       </RailSection>
@@ -300,6 +322,9 @@ function MobileBar({ context }: { context: OrgContext }) {
         </NavLink>
         <NavLink to={`/${slug}/members`} className={link}>
           Members
+        </NavLink>
+        <NavLink to={`/${slug}/agents`} className={link}>
+          Agents
         </NavLink>
         <NavLink to={`/${slug}/settings`} className={link}>
           Settings

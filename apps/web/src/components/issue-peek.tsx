@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
-import type { Attachment, Comment, Issue, Label, LinkedIssue, Member, RelationType, Status, Team } from "@edicthq/client";
+import type { Agent, Attachment, Comment, Issue, Label, LinkedIssue, Member, RelationType, Status, Team } from "@edicthq/client";
 import { Avatar, Button, Dialog, Kbd, Menu, PriorityIcon, Select, StatusIcon, TeamKey } from "@edicthq/ui";
-import { CornerLeftUp, Paperclip, Plus, Trash2, X } from "lucide-react";
+import { CornerLeftUp, Link2, Paperclip, Plus, Trash2, X } from "lucide-react";
 import { ApiFailure } from "../lib/api.js";
 import { ago, priorityLabel } from "../lib/issues.js";
 import {
@@ -14,24 +14,29 @@ import {
   useDeleteComment,
   useDeleteIssue,
   useDeleteRelation,
+  useAddLink,
   useIssue,
+  useLinks,
   useRelations,
+  useRemoveLink,
   useSubIssues,
   useUpdateComment,
   useUpdateIssue,
   type IssueChanges,
 } from "../lib/queries.js";
-import { AssigneePicker, EstimatePicker, LabelPicker, NoAssignee, PriorityPicker, StatusPicker } from "./issue-fields.js";
+import { AgentLane } from "./agent-lane.js";
+import { AssigneePicker, DelegatePicker, EstimatePicker, LabelPicker, NoAssignee, PriorityPicker, StatusPicker } from "./issue-fields.js";
 import { Markdown } from "./markdown.js";
 import { useToast } from "./toast.js";
 import { useOfferUndo } from "./undo.js";
 
-export type PeekMenu = "status" | "priority" | "assignee" | null;
+export type PeekMenu = "status" | "priority" | "assignee" | "delegate" | null;
 
 // The issue over the list, from the right, as in the prototype. The list stays
 // put behind it, and J/K move the peek through it.
 export function IssuePeek({
   orgId,
+  slug,
   myId,
   issue,
   statuses,
@@ -39,6 +44,7 @@ export function IssuePeek({
   orgMembers,
   labels,
   teams,
+  agents,
   menu,
   onMenu,
   onClose,
@@ -46,6 +52,7 @@ export function IssuePeek({
   onAddSubIssue,
 }: {
   orgId: string;
+  slug: string;
   // The signed-in member, so the peek knows which comments are theirs.
   myId: string;
   issue: Issue;
@@ -58,6 +65,8 @@ export function IssuePeek({
   labels: Label[];
   // Teams the issue can move to.
   teams: Team[];
+  // Who can be the delegate.
+  agents: Agent[];
   menu: PeekMenu;
   onMenu: (menu: PeekMenu) => void;
   onClose: () => void;
@@ -77,6 +86,10 @@ export function IssuePeek({
   const said = (changes: IssueChanges): string | undefined => {
     if (changes.statusId) return `${issue.identifier} moved to ${statuses.find((s) => s.id === changes.statusId)?.name ?? "a new status"}`;
     if (changes.priority) return `${issue.identifier} set to ${priorityLabel[changes.priority]}`;
+    if (changes.delegateId !== undefined) {
+      const name = agents.find((a) => a.id === changes.delegateId)?.name;
+      return name ? `${issue.identifier} delegated to ${name}` : `${issue.identifier} no longer delegated`;
+    }
     if (changes.assigneeId !== undefined) {
       const name = members.find((m) => m.id === changes.assigneeId)?.name;
       return name ? `${issue.identifier} assigned to ${name}` : `${issue.identifier} unassigned`;
@@ -113,7 +126,7 @@ export function IssuePeek({
   return (
     <aside
       aria-label={`${issue.identifier} ${issue.title}`}
-      className="absolute inset-2 z-20 flex flex-col overflow-hidden rounded-md bg-surface shadow-overlay outline outline-line md:start-auto md:w-[min(760px,calc(100%-96px))] motion-safe:animate-[peek-slide_220ms_cubic-bezier(0.2,0,0,1)]"
+      className="absolute inset-2 z-20 flex flex-col overflow-hidden rounded-md bg-surface shadow-overlay outline outline-line md:start-auto md:w-[min(760px,calc(100%-96px))] lg:w-[min(1100px,calc(100%-96px))] motion-safe:animate-[peek-slide_220ms_cubic-bezier(0.2,0,0,1)]"
     >
       <header className="flex h-[46px] shrink-0 items-center gap-2 border-b border-line ps-6 pe-3">
         {parent.data ? (
@@ -183,7 +196,8 @@ export function IssuePeek({
           Close <Kbd>Esc</Kbd>
         </Button>
       </header>
-      <div className="flex-1 overflow-y-auto px-6 pt-6 pb-24 sm:px-8">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
+      <div className="px-6 pt-6 pb-24 sm:px-8 lg:min-w-0 lg:flex-1 lg:overflow-y-auto">
         <TitleField key={`${issue.id}-title`} issue={issue} onSave={(title) => save({ title })} />
         <div className="mt-4 mb-6 flex flex-wrap items-center gap-1.5">
           <StatusPicker
@@ -206,6 +220,14 @@ export function IssuePeek({
             open={menu === "assignee"}
             onOpenChange={(open) => onMenu(open ? "assignee" : null)}
           />
+          <DelegatePicker
+            agents={agents}
+            members={orgMembers}
+            value={issue.delegateId}
+            onChange={(delegateId) => save({ delegateId })}
+            open={menu === "delegate"}
+            onOpenChange={(open) => onMenu(open ? "delegate" : null)}
+          />
           <EstimatePicker value={issue.estimate} onChange={(estimate) => save({ estimate })} />
           <LabelPicker
             labels={labels}
@@ -218,8 +240,11 @@ export function IssuePeek({
 
         <SubIssues orgId={orgId} issue={issue} orgMembers={orgMembers} onOpen={onOpen} onAdd={onAddSubIssue} />
         <Relations orgId={orgId} issue={issue} orgMembers={orgMembers} onOpen={onOpen} />
+        <Links orgId={orgId} issue={issue} />
         <Attachments orgId={orgId} issue={issue} />
         <Discussion orgId={orgId} myId={myId} issue={issue} orgMembers={orgMembers} />
+      </div>
+      <AgentLane orgId={orgId} slug={slug} issue={issue} agents={agents} members={orgMembers} />
       </div>
       {merge ? (
         <MergeDialog
@@ -576,6 +601,98 @@ function Relations({
 // Attached files (ADR 0020). Uploading keeps the bytes under the issue, so
 // descriptions and comments can link at /files paths, and markdown shows
 // images by their path.
+// URLs attached to the issue, such as pull requests agents link.
+function Links({ orgId, issue }: { orgId: string; issue: Issue }) {
+  const links = useLinks(orgId, issue.id);
+  const add = useAddLink(orgId, issue.id);
+  const remove = useRemoveLink(orgId, issue.id);
+  const toast = useToast();
+  const [adding, setAdding] = useState(false);
+  const [url, setUrl] = useState("");
+  const list = links.data ?? [];
+  if (list.length === 0 && !adding) {
+    return (
+      <div className="mt-8">
+        <Button variant="ghost" onClick={() => setAdding(true)}>
+          <Link2 aria-hidden="true" className="size-3.5" strokeWidth={2} />
+          Add link
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <section className="mt-8" aria-labelledby="peek-links">
+      <SectionHeading
+        id="peek-links"
+        aside={
+          <Button variant="ghost" aria-label="Add link" className="size-7 px-0" onClick={() => setAdding(true)}>
+            <Plus aria-hidden="true" className="size-3.5" strokeWidth={2} />
+          </Button>
+        }
+      >
+        Links
+      </SectionHeading>
+      <ul className="mt-2 flex flex-col gap-px">
+        {list.map((link) => (
+          <li key={link.id} className="group flex min-h-9 items-center gap-2 rounded-sm px-2 hover:bg-hover">
+            <Link2 aria-hidden="true" className="size-3.5 shrink-0 text-ink-2" strokeWidth={2} />
+            <a href={link.url} target="_blank" rel="noreferrer" className="min-w-0 truncate text-ui font-medium hover:underline">
+              {link.title ?? link.url}
+            </a>
+            {link.title ? <span className="min-w-0 truncate text-sm text-ink-2">{new URL(link.url).host}</span> : null}
+            <Button
+              variant="ghost"
+              aria-label={`Remove link ${link.title ?? link.url}`}
+              className="ms-auto size-7 px-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+              onClick={() => remove.mutate(link.id, { onError: (error) => toast(error.message) })}
+            >
+              <X aria-hidden="true" className="size-3.5" strokeWidth={2} />
+            </Button>
+          </li>
+        ))}
+      </ul>
+      {adding ? (
+        <form
+          className="mt-2 flex items-center gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            add.mutate(
+              { url: url.trim() },
+              {
+                onSuccess: () => {
+                  setUrl("");
+                  setAdding(false);
+                },
+                onError: (error) => toast(error.message),
+              },
+            );
+          }}
+        >
+          <input
+            autoFocus
+            type="url"
+            required
+            aria-label="Link URL"
+            placeholder="https://github.com/…/pull/318"
+            value={url}
+            onChange={(event) => setUrl(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.stopPropagation();
+                setAdding(false);
+              }
+            }}
+            className="h-8 min-w-0 flex-1 rounded-sm bg-surface px-2.5 text-ui shadow-[inset_0_0_0_1px_var(--line-strong)] outline-none focus-visible:shadow-[inset_0_0_0_1.5px_var(--ink)]"
+          />
+          <Button type="submit" disabled={add.isPending}>
+            Add
+          </Button>
+        </form>
+      ) : null}
+    </section>
+  );
+}
+
 function Attachments({ orgId, issue }: { orgId: string; issue: Issue }) {
   const attachments = useAttachments(orgId, issue.id);
   const create = useCreateAttachment(orgId, issue.id);

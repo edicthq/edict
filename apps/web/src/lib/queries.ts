@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Attachment, Comment, Issue, Label, paths, RelationType, Role, SignUpMode } from "@edicthq/client";
+import type { Agent, AgentPower, Attachment, Comment, Issue, Label, paths, RelationType, Role, SignUpMode, Webhook, WebLink } from "@edicthq/client";
 import { ApiFailure, api, unwrap } from "./api.js";
 
 export const keys = {
@@ -18,6 +18,12 @@ export const keys = {
   relations: (orgId: string, issueId: string) => ["org", orgId, "issue", issueId, "relations"] as const,
   comments: (orgId: string, issueId: string) => ["org", orgId, "issue", issueId, "comments"] as const,
   attachments: (orgId: string, issueId: string) => ["org", orgId, "issue", issueId, "attachments"] as const,
+  progress: (orgId: string, issueId: string) => ["org", orgId, "issue", issueId, "progress"] as const,
+  links: (orgId: string, issueId: string) => ["org", orgId, "issue", issueId, "links"] as const,
+  agents: (orgId: string) => ["org", orgId, "agents"] as const,
+  apiKeys: (orgId: string, agentId: string) => ["org", orgId, "agents", agentId, "api-keys"] as const,
+  webhooks: (orgId: string) => ["org", orgId, "webhooks"] as const,
+  deliveries: (orgId: string, webhookId: string) => ["org", orgId, "webhooks", webhookId, "deliveries"] as const,
 };
 
 const org = (orgId: string) => ({ params: { path: { orgId } } });
@@ -199,6 +205,8 @@ export function useTeamIssues(orgId: string, teamId: string) {
     queryKey: keys.issues(orgId, teamId),
     queryFn: () =>
       unwrap(api.GET("/organizations/{orgId}/teams/{teamId}/issues", { params: { path: { orgId, teamId } } })),
+    // Agents' progress shows up without a reload until realtime arrives (M4).
+    refetchInterval: 10_000,
   });
 }
 
@@ -483,5 +491,229 @@ export function useDeleteComment(orgId: string, issueId: string) {
       client.setQueryData(keys.comments(orgId, issueId), (list: Comment[] | undefined) =>
         list?.filter((item) => item.id !== comment.id),
       ),
+  });
+}
+
+// ---------- agents (ADR 0008, ADR 0015, ADR 0021) ----------
+
+export function useAgents(orgId: string) {
+  return useQuery({
+    queryKey: keys.agents(orgId),
+    queryFn: () => unwrap(api.GET("/organizations/{orgId}/agents", org(orgId))),
+  });
+}
+
+// Agents are members too, so the member lists refresh with them.
+function useAgentsChanged(orgId: string) {
+  const client = useQueryClient();
+  return () => {
+    void client.invalidateQueries({ queryKey: keys.agents(orgId) });
+    void client.invalidateQueries({ queryKey: keys.members(orgId) });
+  };
+}
+
+export function useCreateAgent(orgId: string) {
+  const changed = useAgentsChanged(orgId);
+  return useMutation({
+    mutationFn: (body: { name: string; description: string; role: "member" | "guest"; teamIds: string[]; grants: AgentPower[] }) =>
+      unwrap(api.POST("/organizations/{orgId}/agents", { ...org(orgId), body })),
+    onSuccess: changed,
+  });
+}
+
+export function useUpdateAgent(orgId: string) {
+  const changed = useAgentsChanged(orgId);
+  return useMutation({
+    mutationFn: ({ agent, changes }: { agent: Agent; changes: { name?: string; description?: string; grants?: AgentPower[] } }) =>
+      unwrap(
+        api.PATCH("/organizations/{orgId}/agents/{agentId}", {
+          params: { path: { orgId, agentId: agent.id } },
+          body: { version: agent.version, ...changes },
+        }),
+      ),
+    onSuccess: changed,
+  });
+}
+
+export function usePauseAgent(orgId: string) {
+  const changed = useAgentsChanged(orgId);
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ agentId, pause }: { agentId: string; pause: boolean }) =>
+      unwrap(
+        pause
+          ? api.POST("/organizations/{orgId}/agents/{agentId}/pause", { params: { path: { orgId, agentId } } })
+          : api.POST("/organizations/{orgId}/agents/{agentId}/resume", { params: { path: { orgId, agentId } } }),
+      ),
+    onSuccess: (_, { agentId }) => {
+      changed();
+      void client.invalidateQueries({ queryKey: keys.apiKeys(orgId, agentId) });
+      void client.invalidateQueries({ queryKey: keys.webhooks(orgId) });
+    },
+  });
+}
+
+export function useApiKeys(orgId: string, agentId: string, enabled = true) {
+  return useQuery({
+    queryKey: keys.apiKeys(orgId, agentId),
+    queryFn: () =>
+      unwrap(api.GET("/organizations/{orgId}/agents/{agentId}/api-keys", { params: { path: { orgId, agentId } } })),
+    enabled,
+  });
+}
+
+export function useCreateApiKey(orgId: string, agentId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { name: string; teamIds: string[] | null }) =>
+      unwrap(api.POST("/organizations/{orgId}/agents/{agentId}/api-keys", { params: { path: { orgId, agentId } }, body })),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.apiKeys(orgId, agentId) }),
+  });
+}
+
+export function useRevokeApiKey(orgId: string, agentId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (keyId: string) =>
+      unwrap(
+        api.DELETE("/organizations/{orgId}/agents/{agentId}/api-keys/{keyId}", { params: { path: { orgId, agentId, keyId } } }),
+      ),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.apiKeys(orgId, agentId) }),
+  });
+}
+
+// ---------- progress updates and links ----------
+
+export function useProgress(orgId: string, issueId: string) {
+  return useQuery({
+    queryKey: keys.progress(orgId, issueId),
+    queryFn: () =>
+      unwrap(
+        api.GET("/organizations/{orgId}/issues/{issueRef}/progress", {
+          params: { path: { orgId, issueRef: issueId }, query: { limit: 100 } },
+        }),
+      ),
+    // Agents post while the peek is open.
+    refetchInterval: 5000,
+  });
+}
+
+export function useLinks(orgId: string, issueId: string) {
+  return useQuery({
+    queryKey: keys.links(orgId, issueId),
+    queryFn: () =>
+      unwrap(api.GET("/organizations/{orgId}/issues/{issueRef}/links", { params: { path: { orgId, issueRef: issueId } } })),
+  });
+}
+
+export function useAddLink(orgId: string, issueId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: WebLink) =>
+      unwrap(api.POST("/organizations/{orgId}/issues/{issueRef}/links", { params: { path: { orgId, issueRef: issueId } }, body })),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.links(orgId, issueId) }),
+  });
+}
+
+export function useRemoveLink(orgId: string, issueId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (linkId: string) =>
+      unwrap(
+        api.DELETE("/organizations/{orgId}/issues/{issueRef}/links/{linkId}", {
+          params: { path: { orgId, issueRef: issueId, linkId } },
+        }),
+      ),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.links(orgId, issueId) }),
+  });
+}
+
+// ---------- webhooks (ADR 0022) ----------
+
+export function useWebhooks(orgId: string, enabled = true) {
+  return useQuery({
+    queryKey: keys.webhooks(orgId),
+    queryFn: () => unwrap(api.GET("/organizations/{orgId}/webhooks", org(orgId))),
+    enabled,
+  });
+}
+
+function useWebhooksChanged(orgId: string) {
+  const client = useQueryClient();
+  return () => {
+    void client.invalidateQueries({ queryKey: keys.webhooks(orgId) });
+    void client.invalidateQueries({ queryKey: keys.agents(orgId) });
+  };
+}
+
+export function useCreateWebhook(orgId: string) {
+  const changed = useWebhooksChanged(orgId);
+  return useMutation({
+    mutationFn: (body: { url: string; agentId: string | null; eventTypes: string[] }) =>
+      unwrap(api.POST("/organizations/{orgId}/webhooks", { ...org(orgId), body })),
+    onSuccess: changed,
+  });
+}
+
+export function useUpdateWebhook(orgId: string) {
+  const changed = useWebhooksChanged(orgId);
+  return useMutation({
+    mutationFn: ({ webhook, changes }: { webhook: Webhook; changes: { url?: string; eventTypes?: string[]; enabled?: boolean } }) =>
+      unwrap(
+        api.PATCH("/organizations/{orgId}/webhooks/{webhookId}", {
+          params: { path: { orgId, webhookId: webhook.id } },
+          body: { version: webhook.version, ...changes },
+        }),
+      ),
+    onSuccess: changed,
+  });
+}
+
+export function useDeleteWebhook(orgId: string) {
+  const changed = useWebhooksChanged(orgId);
+  return useMutation({
+    mutationFn: (webhookId: string) =>
+      unwrap(api.DELETE("/organizations/{orgId}/webhooks/{webhookId}", { params: { path: { orgId, webhookId } } })),
+    onSuccess: changed,
+  });
+}
+
+export function useRotateWebhookSecret(orgId: string) {
+  return useMutation({
+    mutationFn: (webhookId: string) =>
+      unwrap(api.POST("/organizations/{orgId}/webhooks/{webhookId}/rotate-secret", { params: { path: { orgId, webhookId } } })),
+  });
+}
+
+export function useDeliveries(orgId: string, webhookId: string) {
+  return useQuery({
+    queryKey: keys.deliveries(orgId, webhookId),
+    queryFn: () =>
+      unwrap(
+        api.GET("/organizations/{orgId}/webhooks/{webhookId}/deliveries", {
+          params: { path: { orgId, webhookId }, query: { limit: 50 } },
+        }),
+      ),
+    refetchInterval: 5000,
+  });
+}
+
+export function useRedeliver(orgId: string, webhookId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (deliveryId: string) =>
+      unwrap(
+        api.POST("/organizations/{orgId}/webhooks/{webhookId}/deliveries/{deliveryId}/redeliver", {
+          params: { path: { orgId, webhookId, deliveryId } },
+        }),
+      ),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.deliveries(orgId, webhookId) }),
+  });
+}
+
+// The organization an MCP client being connected joins (ADR 0021).
+export function useChooseConnectionOrganization() {
+  return useMutation({
+    mutationFn: (orgId: string) => unwrap(api.POST("/oauth/organization", { body: { orgId } })),
   });
 }

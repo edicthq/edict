@@ -48,7 +48,7 @@ export function MembersPage() {
               ) : (
                 <EmptyState
                   title="No agents yet"
-                  body="When someone connects an MCP client such as Claude Code, Edict adds an agent for that connection, named after the client and the person. Admins will also be able to add agents for agent runners."
+                  body="When someone connects an MCP client such as Claude Code, Edict adds an agent for that connection, named after the client and the person. Admins add agents for agent runners under Agents."
                 />
               )}
             </section>

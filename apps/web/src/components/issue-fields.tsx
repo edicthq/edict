@@ -1,6 +1,7 @@
-import type { Label, Member, Priority, Status } from "@edicthq/client";
+import type { Agent, Label, Member, Priority, Status } from "@edicthq/client";
 import { Avatar, LabelDot, LabelPill, Menu, PriorityIcon, StatusIcon, cn } from "@edicthq/ui";
 import { CircleDashed, Hash, Tag } from "lucide-react";
+import { connectionLine } from "../lib/agents.js";
 import { categoryLabel, estimates, priorities, priorityLabel, statusFill } from "../lib/issues.js";
 
 // The prototype's property chip: an outlined pill with an icon and a value.
@@ -84,6 +85,48 @@ export function AssigneePicker({
         >
           {current ? <Avatar name={current.name} size={18} /> : <NoAssignee />}
           {current?.name ?? "Assignee"}
+        </button>
+      )}
+    />
+  );
+}
+
+// The agent doing the work (ADR 0008). Each option says how the agent
+// connects and when it will start.
+export function DelegatePicker({
+  agents,
+  members,
+  value,
+  onChange,
+  ...open
+}: { agents: Agent[]; members: Member[]; value: string | null; onChange: (agentId: string | null) => void } & Open) {
+  const current = agents.find((a) => a.id === value);
+  const available = agents.filter((a) => !a.pausedAt || a.id === value);
+  return (
+    <Menu
+      label="Delegate to an agent"
+      value={value ?? nobody}
+      onSelect={(id) => onChange(id === nobody ? null : id)}
+      {...open}
+      items={[
+        { value: nobody, label: "No delegate", icon: <NoAssignee /> },
+        ...available.map((agent) => ({
+          value: agent.id,
+          label: agent.name,
+          detail: connectionLine(agent, members),
+          keywords: agent.clientName ?? "",
+          icon: <Avatar name={agent.name} kind="agent" size={18} />,
+        })),
+      ]}
+      trigger={(props) => (
+        <button
+          type="button"
+          {...props}
+          className={cn(chipClass, current && "bg-agent-wash shadow-[inset_0_0_0_1px_var(--agent-edge)]", !current && "text-ink-2")}
+          aria-label={`Delegate: ${current?.name ?? "none"}. Delegate to an agent`}
+        >
+          {current ? <Avatar name={current.name} kind="agent" size={18} /> : <NoAssignee />}
+          {current?.name ?? "Delegate"}
         </button>
       )}
     />
