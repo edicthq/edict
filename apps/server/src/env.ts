@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { DEFAULT_AGENT_LIMITS, type AgentLimits } from "./api/rate-limit.js";
 import type { S3Config } from "./storage.js";
 
 export interface ServerConfig {
@@ -33,6 +34,8 @@ export interface ServerConfig {
   // over ten seconds by default). Off only for tests that create several
   // users from one address, like the browser end-to-end suite.
   authRateLimit?: boolean;
+  // Requests per minute per agent token, and issues per hour per agent.
+  agentLimits?: AgentLimits;
 }
 
 export class ConfigError extends Error {}
@@ -76,6 +79,10 @@ export function readConfig(env: NodeJS.ProcessEnv): ServerConfig {
     emailFrom,
     authRateLimit: env.AUTH_RATE_LIMIT !== "off",
     jobs: env.JOBS !== "off",
+    agentLimits: {
+      requestsPerMinute: readLimit("AGENT_REQUESTS_PER_MINUTE", env.AGENT_REQUESTS_PER_MINUTE, DEFAULT_AGENT_LIMITS.requestsPerMinute),
+      issuesPerHour: readLimit("AGENT_ISSUES_PER_HOUR", env.AGENT_ISSUES_PER_HOUR, DEFAULT_AGENT_LIMITS.issuesPerHour),
+    },
   };
 }
 
@@ -102,6 +109,17 @@ function readAttachmentMax(raw: string | undefined): number {
   const parsed = Number(raw);
   if (!Number.isSafeInteger(parsed) || parsed <= 0) {
     throw new ConfigError(`ATTACHMENT_MAX_BYTES is not a positive byte count: ${raw}`);
+  }
+  return parsed;
+}
+
+function readLimit(name: string, raw: string | undefined, fallback: number): number {
+  if (raw === undefined || raw === "") {
+    return fallback;
+  }
+  const parsed = Number(raw);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new ConfigError(`${name} is not a positive whole number: ${raw}`);
   }
   return parsed;
 }

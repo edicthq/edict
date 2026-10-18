@@ -29,6 +29,8 @@ export const events = pgTable(
     index("events_org_id_id_idx").on(table.orgId, table.id),
     index("events_subject_id_idx").on(table.subjectId),
     index("events_change_id_idx").on(table.changeId),
+    // The per-agent issue rate limit counts an actor's recent events.
+    index("events_actor_id_type_created_at_idx").on(table.actorId, table.type, table.createdAt),
     foreignKey({
       name: "events_org_fk",
       columns: [table.orgId],

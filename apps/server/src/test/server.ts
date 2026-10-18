@@ -7,6 +7,7 @@ import { Pool } from "pg";
 import { createApp, type App } from "../app.js";
 import { DEFAULT_MAX_ATTACHMENT_BYTES } from "../env.js";
 import type { Mailer } from "../email.js";
+import type { AgentLimits } from "../api/rate-limit.js";
 import type { S3Config } from "../storage.js";
 
 export interface TestDatabase {
@@ -53,6 +54,8 @@ export async function startTestServer(
     maxAttachmentBytes?: number;
     // Start pg-boss and its schedules. Off: tests call app.purgeTrash.
     jobs?: boolean;
+    // Agents' rate limits. Production's by default.
+    agentLimits?: AgentLimits;
   } = {},
 ): Promise<TestServer> {
   const database = options.database ?? (await createTestDatabase());
@@ -68,6 +71,7 @@ export async function startTestServer(
     s3: options.s3,
     maxAttachmentBytes: options.maxAttachmentBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES,
     jobs: options.jobs ?? false,
+    agentLimits: options.agentLimits,
   }, { mailer: options.mailer });
   await app.start();
 

@@ -1,0 +1,1 @@
+CREATE INDEX "events_actor_id_type_created_at_idx" ON "events" USING btree ("actor_id","type","created_at");

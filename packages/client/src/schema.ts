@@ -4365,7 +4365,7 @@ export interface components {
         Error: {
             error: {
                 /** @enum {string} */
-                code: "unauthorized" | "forbidden" | "not_found" | "conflict" | "gone" | "invalid_request" | "too_large";
+                code: "unauthorized" | "forbidden" | "not_found" | "conflict" | "gone" | "invalid_request" | "too_large" | "rate_limited";
                 message: string;
             };
         };

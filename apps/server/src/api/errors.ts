@@ -10,6 +10,7 @@ const statusOf: Record<ErrorCode, ContentfulStatusCode> = {
   conflict: 409,
   gone: 410,
   too_large: 413,
+  rate_limited: 429,
 };
 
 // Thrown anywhere in a handler; onApiError turns it into the error response.
@@ -33,6 +34,7 @@ export const conflict = (message: string, details?: Record<string, unknown>) =>
 export const gone = (message: string) => new ApiError("gone", message);
 export const invalid = (message: string) => new ApiError("invalid_request", message);
 export const tooLarge = (message: string) => new ApiError("too_large", message);
+export const rateLimited = (message: string) => new ApiError("rate_limited", message);
 
 export function errorResponse(c: Context, code: ErrorCode, message: string, details?: Record<string, unknown>) {
   return c.json({ error: { code, message, ...details } }, statusOf[code]);

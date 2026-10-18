@@ -6,6 +6,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono, type Context } from "hono";
 import { createDatabase, createPool, migrateToLatest } from "@edicthq/db";
 import { consentOrganization, createApi, fileRoutes } from "./api/index.js";
+import { DEFAULT_AGENT_LIMITS, RequestLimiter } from "./api/rate-limit.js";
 import { createAuth, type EdictAuth } from "./auth.js";
 import { createSmtpMailer, type Mailer } from "./email.js";
 import type { ServerConfig } from "./env.js";
@@ -47,12 +48,15 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
   app.on(["POST", "GET"], "/api/auth/*", (c) =>
     auth ? auth.handler(withClientIp(c, config.trustedProxies)) : c.json({ error: "starting" }, 503),
   );
+  const agentLimits = config.agentLimits ?? DEFAULT_AGENT_LIMITS;
   const deps = {
     db,
     mailer,
     publicUrl: config.baseUrl,
     // Attached files (ADR 0020): a bucket when one is configured, else disk.
     maxAttachmentBytes: config.maxAttachmentBytes,
+    agentLimits,
+    requestLimiter: new RequestLimiter(agentLimits.requestsPerMinute),
     storage: config.s3 ? s3Storage(config.s3) : localDiskStorage(config.dataDir),
     getUser: async (headers: Headers) => {
       const session = await auth?.api.getSession({ headers });

@@ -6,6 +6,7 @@ import { ErrorResponse, Id, type ErrorCode } from "@edicthq/schema";
 import type { Mailer } from "../email.js";
 import { callerIn, credentialOf, scopeFor, type Caller, type Credential, type SessionUser } from "./callers.js";
 import { errorResponse, forbidden, onApiError, unauthorized } from "./errors.js";
+import type { AgentLimits, RequestLimiter } from "./rate-limit.js";
 
 export type { Caller, Credential, SessionUser } from "./callers.js";
 
@@ -16,15 +17,27 @@ export interface ApiDeps {
   mailer?: Mailer;
   // Where links in responses point. Defaults to the request's origin.
   publicUrl?: string;
+  // Agents' rate limits. Defaults to DEFAULT_AGENT_LIMITS.
+  agentLimits?: AgentLimits;
+  // Counts agents' requests per token, shared by every route.
+  requestLimiter?: RequestLimiter;
 }
 
 export type ApiEnv = { Variables: { user: SessionUser | null; credential: Credential | null } };
 
-// Reads who is calling: an API key, else the session (ADR 0021).
-export function identify(deps: Pick<ApiDeps, "getUser">) {
+// Reads who is calling: an API key or OAuth token, else the session (ADR
+// 0021). Agents' tokens are rate-limited here.
+export function identify(deps: Pick<ApiDeps, "getUser" | "requestLimiter">) {
   return async (c: Context<ApiEnv>, next: () => Promise<void>) => {
     const user = await deps.getUser(c.req.raw.headers);
     const credential = credentialOf(c.req.raw.headers, user);
+    if (credential && credential.kind !== "session" && deps.requestLimiter) {
+      const wait = deps.requestLimiter.take(credential.hash);
+      if (wait > 0) {
+        c.header("retry-after", String(wait));
+        return errorResponse(c, "rate_limited", `Too many requests with this token. Wait ${wait} seconds.`);
+      }
+    }
     c.set("credential", credential);
     c.set("user", credential?.kind === "session" ? credential.user : null);
     await next();
@@ -106,6 +119,7 @@ const errorDescriptions: Record<ErrorCode, string> = {
   conflict: "Conflicts with the current state",
   gone: "No longer valid",
   too_large: "Larger than the attachment limit (ATTACHMENT_MAX_BYTES)",
+  rate_limited: "An agent went over a rate limit. Retry-After gives the seconds to wait",
 };
 
 const errorStatus = {
@@ -116,6 +130,7 @@ const errorStatus = {
   conflict: 409,
   gone: 410,
   too_large: 413,
+  rate_limited: 429,
 } as const;
 
 export function errors(...codes: ErrorCode[]) {

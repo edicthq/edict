@@ -12,6 +12,8 @@ export const ErrorCode = z.enum([
   "invalid_request",
   // An upload is larger than ATTACHMENT_MAX_BYTES (ADR 0020).
   "too_large",
+  // An agent went over a rate limit; Retry-After says when to try again.
+  "rate_limited",
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;
 

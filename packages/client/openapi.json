@@ -120,7 +120,8 @@
                   "conflict",
                   "gone",
                   "invalid_request",
-                  "too_large"
+                  "too_large",
+                  "rate_limited"
                 ]
               },
               "message": {

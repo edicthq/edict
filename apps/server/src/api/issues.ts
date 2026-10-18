@@ -1,10 +1,11 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { and, desc, eq, isNull } from "drizzle-orm";
-import { emit, issueLabels, issueNumbers, issues, statuses } from "@edicthq/db";
+import { and, count, desc, eq, gt, isNull, sql } from "drizzle-orm";
+import { emit, events, issueLabels, issueNumbers, issues, statuses, type Transaction } from "@edicthq/db";
 import { CreateIssue, Id, Issue, IssueConflict, IssueRef, LinkedIssue, UpdateIssue } from "@edicthq/schema";
 import { visibleTeam } from "./access.js";
 import { body, errors, inOrg, json, OrgParams, router, type ApiDeps } from "./context.js";
-import { changesOf, conflict, invalid } from "./errors.js";
+import { changesOf, conflict, invalid, rateLimited } from "./errors.js";
+import { DEFAULT_AGENT_LIMITS } from "./rate-limit.js";
 import {
   checkAssignee,
   checkDelegate,
@@ -90,6 +91,18 @@ const listSubIssues = createRoute({
   },
 });
 
+// An agent creates at most `perHour` issues in any hour, counted from the
+// event log so every replica agrees.
+async function requireIssueBudget(tx: Transaction, agentId: string, perHour: number): Promise<void> {
+  const [row] = await tx
+    .select({ n: count() })
+    .from(events)
+    .where(and(eq(events.actorId, agentId), eq(events.type, "issue.created"), gt(events.createdAt, sql`now() - interval '1 hour'`)));
+  if ((row?.n ?? 0) >= perHour) {
+    throw rateLimited(`Agents create at most ${perHour} issues an hour. Try again later, or ask an admin to raise AGENT_ISSUES_PER_HOUR.`);
+  }
+}
+
 export function issueRoutes(deps: ApiDeps) {
   const app = router();
 
@@ -98,6 +111,9 @@ export function issueRoutes(deps: ApiDeps) {
     const { labelIds: rawLabels, ...input } = c.req.valid("json");
     const labelIds = labelSet(rawLabels);
     const issue = await inOrg(deps, c, orgId, async (tx, caller) => {
+      if (caller.kind === "agent") {
+        await requireIssueBudget(tx, caller.id, (deps.agentLimits ?? DEFAULT_AGENT_LIMITS).issuesPerHour);
+      }
       const team = await visibleTeam(tx, caller, teamId);
       let statusId = input.statusId;
       if (statusId) {
