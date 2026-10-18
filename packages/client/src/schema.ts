@@ -1339,6 +1339,87 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/{orgId}/issues/bulk-update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Update fields on multiple issues at once
+         * @description Applies field updates to listed issues within a single transaction and change id. If any issue has a conflict, rolls back and returns 409.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["BulkUpdateIssues"];
+                };
+            };
+            responses: {
+                /** @description The updated issues */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BulkUpdateResult"];
+                    };
+                };
+                /** @description The request does not match the schema */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Fields in one of the issues changed after the version sent */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["IssueConflict"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{orgId}/issues/{issueRef}/progress": {
         parameters: {
             query?: never;
@@ -2261,6 +2342,76 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/organizations/{orgId}/issues/bulk-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move multiple issues and their sub-issues to the trash
+         * @description Trashed issues leave every list and answer 410 until restored. The trash keeps them for 30 days. The Edict-Change-Id response header names the change, for undo.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["BulkDeleteIssues"];
+                };
+            };
+            responses: {
+                /** @description Done */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The request does not match the schema */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/organizations/{orgId}/issues/{issueRef}/restore": {
@@ -5399,6 +5550,27 @@ export interface components {
             /** Format: uuid */
             teamId?: string;
         };
+        BulkUpdateResult: {
+            updated: components["schemas"]["Issue"][];
+        };
+        BulkUpdateIssues: {
+            issues: components["schemas"]["BulkIssueTarget"][];
+            /** Format: uuid */
+            statusId?: string;
+            priority?: components["schemas"]["Priority"];
+            /** Format: uuid */
+            assigneeId?: string | null;
+            /** Format: uuid */
+            delegateId?: string | null;
+            labelIds?: string[];
+            /** Format: uuid */
+            teamId?: string;
+        };
+        BulkIssueTarget: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+        };
         PostProgress: {
             state: components["schemas"]["ProgressState"];
             message: string;
@@ -5459,6 +5631,9 @@ export interface components {
         UpdateComment: {
             version: number;
             body: string;
+        };
+        BulkDeleteIssues: {
+            issueIds: string[];
         };
         TrashedIssue: {
             /** Format: uuid */

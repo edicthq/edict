@@ -156,6 +156,28 @@ describe("trash", () => {
     expect((await owner.get(`${org}/issues/ENG-2`)).body).toMatchObject({ parentId: null });
   });
 
+  it("trashes multiple issues in a single request and change", async () => {
+    const t = await startTestServer();
+    const { owner, org } = await orgWithOwner(t.baseUrl);
+    const eng = await createTeam(owner, org, "ENG");
+    const one = await issue(owner, org, eng.id, { title: "One" });
+    const two = await issue(owner, org, eng.id, { title: "Two" });
+
+    const res = await owner.post(`${org}/issues/bulk-delete`, {
+      issueIds: [one.id, two.id],
+    });
+    expect(res.status).toBe(204);
+    const changeId = res.headers.get("edict-change-id");
+    expect(changeId).toBeTruthy();
+
+    expect((await owner.get(`${org}/issues/${one.identifier}`)).status).toBe(410);
+    expect((await owner.get(`${org}/issues/${two.identifier}`)).status).toBe(410);
+
+    const trash = (await owner.get(`${org}/trash`)).body as { identifier: string }[];
+    expect(identifiers(trash)).toContain(one.identifier);
+    expect(identifiers(trash)).toContain(two.identifier);
+  });
+
   it("starts and stops the background jobs with the server", async () => {
     const t = await startTestServer({ jobs: true });
     expect((await fetch(`${t.baseUrl}/health`)).status).toBe(200);

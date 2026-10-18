@@ -1,7 +1,9 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { and, count, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import { emit, events, issueLabels, issueNumbers, issues, statuses, type Transaction } from "@edicthq/db";
-import { CreateIssue, Id, Issue, IssueConflict, IssueRef, LinkedIssue, UpdateIssue } from "@edicthq/schema";
+import { BulkUpdateIssues, BulkUpdateResult, CreateIssue, Id, Issue, IssueConflict, IssueRef, LinkedIssue, UpdateIssue } from "@edicthq/schema";
+import type { teams } from "@edicthq/db";
+import type { Caller } from "./callers.js";
 import { visibleTeam } from "./access.js";
 import { body, errors, inOrg, json, OrgParams, router, type ApiDeps } from "./context.js";
 import { changesOf, conflict, invalid, rateLimited } from "./errors.js";
@@ -78,6 +80,21 @@ const updateIssue = createRoute({
   },
 });
 
+const bulkUpdateIssues = createRoute({
+  method: "post",
+  path: "/organizations/{orgId}/issues/bulk-update",
+  tags: ["Issues"],
+  summary: "Update fields on multiple issues at once",
+  description:
+    "Applies field updates to listed issues within a single transaction and change id. If any issue has a conflict, rolls back and returns 409.",
+  request: { params: OrgParams, ...body(BulkUpdateIssues) },
+  responses: {
+    200: json(BulkUpdateResult, "The updated issues"),
+    409: json(IssueConflict, "Fields in one of the issues changed after the version sent"),
+    ...errors("invalid_request", "unauthorized", "not_found"),
+  },
+});
+
 const listSubIssues = createRoute({
   method: "get",
   path: "/organizations/{orgId}/issues/{issueRef}/sub-issues",
@@ -100,6 +117,113 @@ async function requireIssueBudget(tx: Transaction, agentId: string, perHour: num
     .where(and(eq(events.actorId, agentId), eq(events.type, "issue.created"), gt(events.createdAt, sql`now() - interval '1 hour'`)));
   if ((row?.n ?? 0) >= perHour) {
     throw rateLimited(`Agents create at most ${perHour} issues an hour. Try again later, or ask an admin to raise AGENT_ISSUES_PER_HOUR.`);
+  }
+}
+
+export async function applyIssueUpdate(
+  tx: Transaction,
+  caller: Caller,
+  orgId: string,
+  row: typeof issues.$inferSelect,
+  team: typeof teams.$inferSelect,
+  version: number,
+  fields: Partial<Omit<UpdateIssue, "version">>,
+): Promise<Issue> {
+  const current = await loadIssue(tx, row, team);
+  const changes: Record<string, { from: unknown; to: unknown }> = changesOf(current, fields);
+  const changed = Object.keys(changes) as (keyof typeof fields)[];
+
+  // ADR 0018: stale only if a field this request changes was changed
+  // after the version it read.
+  const stale = changed.filter((field) => (row.fieldVersions[field] ?? 1) > version);
+  if (version > row.version || stale.length > 0) {
+    throw conflict(
+      version > row.version
+        ? `The issue is at version ${row.version}, not ${version}.`
+        : `${stale.join(", ")} changed after version ${version}. Read the issue again and retry.`,
+      { fields: stale, current },
+    );
+  }
+  if (changed.length === 0) {
+    return current;
+  }
+
+  // The values after this change, and the team they must fit.
+  const next = { ...current, ...Object.fromEntries(changed.map((field) => [field, fields[field]])) };
+  let target = team;
+  if (changes.teamId) {
+    target = await visibleTeam(tx, caller, fields.teamId!).catch(() => {
+      throw invalid("teamId is not a team you can see.");
+    });
+    if (!changes.statusId) next.statusId = await mapStatus(tx, current.statusId, target);
+    if (!changes.labelIds) next.labelIds = await keepOrgLabels(current.labelIds);
+  }
+  if (next.statusId !== current.statusId) await checkStatus(tx, target, next.statusId);
+  if (next.assigneeId && (changes.teamId || changes.assigneeId)) await checkAssignee(tx, target, next.assigneeId);
+  if (next.delegateId && (changes.teamId || changes.delegateId)) await checkDelegate(tx, target, next.delegateId);
+  if (changes.labelIds || changes.teamId) await checkLabels(tx, target, next.labelIds);
+  if (changes.parentId && next.parentId) await checkParent(tx, caller, next.parentId, row.id);
+
+  // Changes the move made without being asked, recorded like the rest.
+  for (const field of ["statusId", "labelIds"] as const) {
+    if (!changes[field] && JSON.stringify(next[field]) !== JSON.stringify(current[field])) {
+      changes[field] = { from: current[field], to: next[field] };
+    }
+  }
+
+  let number = row.number;
+  if (changes.teamId) {
+    ({ number } = await nextNumber(tx, target.id));
+    await tx.insert(issueNumbers).values({ orgId, teamId: target.id, number, issueId: row.id });
+    changes.identifier = { from: current.identifier, to: `${target.key}-${number}` };
+  }
+
+  const nextVersion = row.version + 1;
+  const fieldVersions = { ...row.fieldVersions };
+  for (const field of Object.keys(changes)) {
+    if (field !== "identifier") fieldVersions[field] = nextVersion;
+  }
+  const [updated] = await tx
+    .update(issues)
+    .set({
+      title: next.title,
+      description: next.description,
+      statusId: next.statusId,
+      priority: next.priority,
+      estimate: next.estimate,
+      assigneeId: next.assigneeId,
+      delegateId: next.delegateId,
+      parentId: next.parentId,
+      teamId: target.id,
+      number,
+      version: nextVersion,
+      fieldVersions,
+      updatedAt: new Date(),
+    })
+    .where(eq(issues.id, row.id))
+    .returning();
+  if (changes.labelIds) {
+    await tx.delete(issueLabels).where(eq(issueLabels.issueId, row.id));
+    if (next.labelIds.length) {
+      await tx.insert(issueLabels).values(next.labelIds.map((labelId) => ({ orgId, issueId: row.id, labelId })));
+    }
+  }
+  await emit(tx, orgId, {
+    type: "issue.updated",
+    actorId: caller.id,
+    subjectId: row.id,
+    data: { version: nextVersion, changes },
+  });
+  return toIssue(updated!, target.key, next.labelIds, current.latestProgress);
+
+  // A moving issue keeps its organization labels and drops its old team's.
+  async function keepOrgLabels(labelIds: string[]): Promise<string[]> {
+    if (labelIds.length === 0) return [];
+    const kept = await tx.query.labels.findMany({
+      columns: { id: true },
+      where: (labels, { and, inArray, isNull }) => and(inArray(labels.id, labelIds), isNull(labels.teamId)),
+    });
+    return labelSet(kept.map((label) => label.id));
   }
 }
 
@@ -194,104 +318,25 @@ export function issueRoutes(deps: ApiDeps) {
     const fields = { ...input, labelIds: input.labelIds && labelSet(input.labelIds) };
     const issue = await inOrg(deps, c, orgId, async (tx, caller) => {
       const { issue: row, team } = await visibleIssue(tx, caller, issueRef, { forUpdate: true });
-      const current = await loadIssue(tx, row, team);
-      const changes: Record<string, { from: unknown; to: unknown }> = changesOf(current, fields);
-      const changed = Object.keys(changes) as (keyof typeof fields)[];
-
-      // ADR 0018: stale only if a field this request changes was changed
-      // after the version it read.
-      const stale = changed.filter((field) => (row.fieldVersions[field] ?? 1) > version);
-      if (version > row.version || stale.length > 0) {
-        throw conflict(
-          version > row.version
-            ? `The issue is at version ${row.version}, not ${version}.`
-            : `${stale.join(", ")} changed after version ${version}. Read the issue again and retry.`,
-          { fields: stale, current },
-        );
-      }
-      if (changed.length === 0) {
-        return current;
-      }
-
-      // The values after this change, and the team they must fit.
-      const next = { ...current, ...Object.fromEntries(changed.map((field) => [field, fields[field]])) };
-      let target = team;
-      if (changes.teamId) {
-        target = await visibleTeam(tx, caller, fields.teamId!).catch(() => {
-          throw invalid("teamId is not a team you can see.");
-        });
-        if (!changes.statusId) next.statusId = await mapStatus(tx, current.statusId, target);
-        if (!changes.labelIds) next.labelIds = await keepOrgLabels(current.labelIds);
-      }
-      if (next.statusId !== current.statusId) await checkStatus(tx, target, next.statusId);
-      if (next.assigneeId && (changes.teamId || changes.assigneeId)) await checkAssignee(tx, target, next.assigneeId);
-      if (next.delegateId && (changes.teamId || changes.delegateId)) await checkDelegate(tx, target, next.delegateId);
-      if (changes.labelIds || changes.teamId) await checkLabels(tx, target, next.labelIds);
-      if (changes.parentId && next.parentId) await checkParent(tx, caller, next.parentId, row.id);
-
-      // Changes the move made without being asked, recorded like the rest.
-      for (const field of ["statusId", "labelIds"] as const) {
-        if (!changes[field] && JSON.stringify(next[field]) !== JSON.stringify(current[field])) {
-          changes[field] = { from: current[field], to: next[field] };
-        }
-      }
-
-      let number = row.number;
-      if (changes.teamId) {
-        ({ number } = await nextNumber(tx, target.id));
-        await tx.insert(issueNumbers).values({ orgId, teamId: target.id, number, issueId: row.id });
-        changes.identifier = { from: current.identifier, to: `${target.key}-${number}` };
-      }
-
-      const nextVersion = row.version + 1;
-      const fieldVersions = { ...row.fieldVersions };
-      for (const field of Object.keys(changes)) {
-        if (field !== "identifier") fieldVersions[field] = nextVersion;
-      }
-      const [updated] = await tx
-        .update(issues)
-        .set({
-          title: next.title,
-          description: next.description,
-          statusId: next.statusId,
-          priority: next.priority,
-          estimate: next.estimate,
-          assigneeId: next.assigneeId,
-          delegateId: next.delegateId,
-          parentId: next.parentId,
-          teamId: target.id,
-          number,
-          version: nextVersion,
-          fieldVersions,
-          updatedAt: new Date(),
-        })
-        .where(eq(issues.id, row.id))
-        .returning();
-      if (changes.labelIds) {
-        await tx.delete(issueLabels).where(eq(issueLabels.issueId, row.id));
-        if (next.labelIds.length) {
-          await tx.insert(issueLabels).values(next.labelIds.map((labelId) => ({ orgId, issueId: row.id, labelId })));
-        }
-      }
-      await emit(tx, orgId, {
-        type: "issue.updated",
-        actorId: caller.id,
-        subjectId: row.id,
-        data: { version: nextVersion, changes },
-      });
-      return toIssue(updated!, target.key, next.labelIds, current.latestProgress);
-
-      // A moving issue keeps its organization labels and drops its old team's.
-      async function keepOrgLabels(labelIds: string[]): Promise<string[]> {
-        if (labelIds.length === 0) return [];
-        const kept = await tx.query.labels.findMany({
-          columns: { id: true },
-          where: (labels, { and, inArray, isNull }) => and(inArray(labels.id, labelIds), isNull(labels.teamId)),
-        });
-        return labelSet(kept.map((label) => label.id));
-      }
+      return applyIssueUpdate(tx, caller, orgId, row, team, version, fields);
     });
     return c.json(issue, 200);
+  });
+
+  app.openapi(bulkUpdateIssues, async (c) => {
+    const { orgId } = c.req.valid("param");
+    const { issues: items, ...fields } = c.req.valid("json");
+    const cleaned = { ...fields, labelIds: fields.labelIds && labelSet(fields.labelIds) };
+    const updated = await inOrg(deps, c, orgId, async (tx, caller) => {
+      const results: Issue[] = [];
+      for (const item of items) {
+        const { issue: row, team } = await visibleIssue(tx, caller, item.id, { forUpdate: true });
+        const res = await applyIssueUpdate(tx, caller, orgId, row, team, item.version, cleaned);
+        results.push(res);
+      }
+      return results;
+    });
+    return c.json({ updated }, 200);
   });
 
   return app;

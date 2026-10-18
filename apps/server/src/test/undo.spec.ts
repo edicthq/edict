@@ -162,4 +162,56 @@ describe("undo", () => {
     expect(unsupported.body.error.message).toMatch(/team\.created/);
     expect((await undo(owner, org, "00000000-0000-7000-8000-000000000000")).status).toBe(404);
   });
+
+  it("undoes a bulk edit across multiple issues in a single undo change", async () => {
+    const t = await startTestServer();
+    const { owner, org } = await orgWithOwner(t.baseUrl);
+    const eng = await createTeam(owner, org, "ENG");
+    const one = await issue(owner, org, eng.id, { title: "Issue 1", priority: "low" });
+    const two = await issue(owner, org, eng.id, { title: "Issue 2", priority: "medium" });
+
+    const bulk = await owner.post(`${org}/issues/bulk-update`, {
+      issues: [
+        { id: one.id, version: one.version },
+        { id: two.id, version: two.version },
+      ],
+      priority: "urgent",
+    });
+    expect(bulk.status).toBe(200);
+
+    const firstAfter = (await owner.get(`${org}/issues/${one.identifier}`)).body;
+    const secondAfter = (await owner.get(`${org}/issues/${two.identifier}`)).body;
+    expect(firstAfter.priority).toBe("urgent");
+    expect(secondAfter.priority).toBe("urgent");
+
+    const undone = await undo(owner, org, changeOf(bulk));
+    expect(undone.status).toBe(200);
+
+    const firstUndone = (await owner.get(`${org}/issues/${one.identifier}`)).body;
+    const secondUndone = (await owner.get(`${org}/issues/${two.identifier}`)).body;
+    expect(firstUndone.priority).toBe("low");
+    expect(secondUndone.priority).toBe("medium");
+  });
+
+  it("undoes a bulk delete, bringing back all trashed issues together", async () => {
+    const t = await startTestServer();
+    const { owner, org } = await orgWithOwner(t.baseUrl);
+    const eng = await createTeam(owner, org, "ENG");
+    const one = await issue(owner, org, eng.id, { title: "Issue 1" });
+    const two = await issue(owner, org, eng.id, { title: "Issue 2" });
+
+    const bulkDel = await owner.post(`${org}/issues/bulk-delete`, {
+      issueIds: [one.id, two.id],
+    });
+    expect(bulkDel.status).toBe(204);
+
+    expect((await owner.get(`${org}/issues/${one.identifier}`)).status).toBe(410);
+    expect((await owner.get(`${org}/issues/${two.identifier}`)).status).toBe(410);
+
+    const undone = await undo(owner, org, changeOf(bulkDel));
+    expect(undone.status).toBe(200);
+
+    expect((await owner.get(`${org}/issues/${one.identifier}`)).status).toBe(200);
+    expect((await owner.get(`${org}/issues/${two.identifier}`)).status).toBe(200);
+  });
 });

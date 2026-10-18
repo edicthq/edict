@@ -83,6 +83,8 @@ describe("OpenAPI document", () => {
       "POST /organizations/{orgId}/changes/{changeId}/undo",
       "POST /organizations/{orgId}/comments/{commentId}/restore",
       "POST /organizations/{orgId}/invites",
+      "POST /organizations/{orgId}/issues/bulk-delete",
+      "POST /organizations/{orgId}/issues/bulk-update",
       "POST /organizations/{orgId}/issues/{issueRef}/attachments",
       "POST /organizations/{orgId}/issues/{issueRef}/comments",
       "POST /organizations/{orgId}/issues/{issueRef}/links",

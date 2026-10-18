@@ -1,11 +1,11 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { comments, emit, issues, teams, type Transaction } from "@edicthq/db";
-import { Comment, Id, Issue, IssueRef, TrashedIssue } from "@edicthq/schema";
+import { BulkDeleteIssues, Comment, Id, Issue, IssueRef, TrashedIssue } from "@edicthq/schema";
 import type { Caller } from "./callers.js";
 import { atLeast, requireAgentPower, teamVisibility } from "./access.js";
 import { toComment } from "./comments.js";
-import { errors, inOrg, json, noContent, OrgParams, router, type ApiDeps } from "./context.js";
+import { body, errors, inOrg, json, noContent, OrgParams, router, type ApiDeps } from "./context.js";
 import { conflict, forbidden, notFound } from "./errors.js";
 import { loadIssue, visibleIssue } from "./issue-data.js";
 
@@ -130,6 +130,17 @@ const deleteIssue = createRoute({
   responses: { ...noContent, ...errors("unauthorized", "not_found", "gone") },
 });
 
+const bulkDeleteIssues = createRoute({
+  method: "post",
+  path: "/organizations/{orgId}/issues/bulk-delete",
+  tags: ["Trash"],
+  summary: "Move multiple issues and their sub-issues to the trash",
+  description:
+    "Trashed issues leave every list and answer 410 until restored. The trash keeps them for 30 days. The Edict-Change-Id response header names the change, for undo.",
+  request: { params: OrgParams, ...body(BulkDeleteIssues) },
+  responses: { ...noContent, ...errors("invalid_request", "unauthorized", "not_found") },
+});
+
 const restoreIssue = createRoute({
   method: "post",
   path: "/organizations/{orgId}/issues/{issueRef}/restore",
@@ -183,6 +194,21 @@ export function trashRoutes(deps: ApiDeps) {
       requireAgentPower(caller, "delete", "delete issues");
       const { issue } = await visibleIssue(tx, caller, issueRef, { forUpdate: true });
       await trashIssues(tx, caller, [issue.id]);
+    });
+    return c.body(null, 204);
+  });
+
+  app.openapi(bulkDeleteIssues, async (c) => {
+    const { orgId } = c.req.valid("param");
+    const { issueIds } = c.req.valid("json");
+    await inOrg(deps, c, orgId, async (tx, caller) => {
+      requireAgentPower(caller, "delete", "delete issues");
+      const rootIds: string[] = [];
+      for (const id of issueIds) {
+        const { issue } = await visibleIssue(tx, caller, id, { forUpdate: true });
+        rootIds.push(issue.id);
+      }
+      await trashIssues(tx, caller, rootIds);
     });
     return c.body(null, 204);
   });

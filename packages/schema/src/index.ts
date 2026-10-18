@@ -526,6 +526,42 @@ export const UpdateIssue = z
   .meta({ id: "UpdateIssue" });
 export type UpdateIssue = z.infer<typeof UpdateIssue>;
 
+export const BulkIssueTarget = z
+  .object({
+    id: Id,
+    version: Version,
+  })
+  .meta({ id: "BulkIssueTarget" });
+export type BulkIssueTarget = z.infer<typeof BulkIssueTarget>;
+
+export const BulkUpdateIssues = z
+  .object({
+    issues: z.array(BulkIssueTarget).min(1).max(100),
+    statusId: Id.optional(),
+    priority: Priority.optional(),
+    assigneeId: Id.nullable().optional(),
+    delegateId: Id.nullable().optional(),
+    labelIds: LabelIds.optional(),
+    teamId: Id.optional(),
+  })
+  .meta({ id: "BulkUpdateIssues" });
+export type BulkUpdateIssues = z.infer<typeof BulkUpdateIssues>;
+
+export const BulkUpdateResult = z
+  .object({
+    updated: z.array(Issue),
+  })
+  .meta({ id: "BulkUpdateResult" });
+export type BulkUpdateResult = z.infer<typeof BulkUpdateResult>;
+
+export const BulkDeleteIssues = z
+  .object({
+    issueIds: z.array(Id).min(1).max(100),
+  })
+  .meta({ id: "BulkDeleteIssues" });
+export type BulkDeleteIssues = z.infer<typeof BulkDeleteIssues>;
+
+
 // A stale update: fields it changes were changed after the version it sent.
 // Re-read, then retry or merge.
 export const IssueConflict = z

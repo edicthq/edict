@@ -317,6 +317,61 @@ describe("identifiers", () => {
     expect((await owner.patch(`${org}/teams/${eng.id}`, { version: eng.version, name: "Engineering" })).status).toBe(200);
     expect((await owner.patch(`${org}/teams/${eng.id}`, { version: eng.version, name: "Stale" })).status).toBe(409);
   });
+
+  it("bulk updates multiple issues in one transaction and change", async () => {
+    const t = await startTestServer();
+    const { owner, org } = await orgWithOwner(t.baseUrl);
+    const eng = await createTeam(owner, org, "ENG");
+    const inProgress = await statusNamed(owner, org, eng.id, "In Progress");
+    const first = await createIssue(owner, org, eng.id, { title: "First" });
+    const second = await createIssue(owner, org, eng.id, { title: "Second" });
+
+    const bulk = await owner.post(`${org}/issues/bulk-update`, {
+      issues: [
+        { id: first.id, version: first.version },
+        { id: second.id, version: second.version },
+      ],
+      statusId: inProgress.id,
+      priority: "high",
+    });
+    expect(bulk.status).toBe(200);
+    expect(bulk.body.updated).toHaveLength(2);
+    expect(bulk.body.updated[0].statusId).toBe(inProgress.id);
+    expect(bulk.body.updated[0].priority).toBe("high");
+    expect(bulk.body.updated[1].statusId).toBe(inProgress.id);
+    expect(bulk.body.updated[1].priority).toBe("high");
+
+    const changeId = bulk.headers.get("edict-change-id");
+    expect(changeId).toBeTruthy();
+    const events: { type: string; changeId: string }[] = (await owner.get(`${org}/events?limit=2`)).body;
+    expect(events[0]!.changeId).toBe(changeId);
+    expect(events[1]!.changeId).toBe(changeId);
+  });
+
+  it("bulk update refuses with 409 and rolls back if an issue version is stale", async () => {
+    const t = await startTestServer();
+    const { owner, org } = await orgWithOwner(t.baseUrl);
+    const eng = await createTeam(owner, org, "ENG");
+    const first = await createIssue(owner, org, eng.id, { title: "First" });
+    const second = await createIssue(owner, org, eng.id, { title: "Second" });
+
+    await owner.patch(`${org}/issues/${second.identifier}`, {
+      version: second.version,
+      priority: "low",
+    });
+
+    const bulk = await owner.post(`${org}/issues/bulk-update`, {
+      issues: [
+        { id: first.id, version: first.version },
+        { id: second.id, version: second.version },
+      ],
+      priority: "urgent",
+    });
+    expect(bulk.status).toBe(409);
+
+    const firstCheck = (await owner.get(`${org}/issues/${first.identifier}`)).body;
+    expect(firstCheck.priority).toBe("none");
+  });
 });
 
 describe("changes", () => {
