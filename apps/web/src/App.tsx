@@ -15,6 +15,7 @@ import { OrgLayout } from "./routes/org.js";
 import { ForgotPassword, ResetPassword } from "./routes/password.js";
 import { SettingsPage } from "./routes/settings.js";
 import { TeamMembersPage, TeamsPage } from "./routes/teams.js";
+import { TrashPage } from "./routes/trash.js";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -83,6 +84,7 @@ const router = createBrowserRouter([
           { path: "teams/:teamId/members", element: <TeamMembersPage /> },
           { path: "issue/:issueRef", element: <IssueLink /> },
           { path: "members", element: <MembersPage /> },
+          { path: "trash", element: <TrashPage /> },
           { path: "settings", element: <SettingsPage /> },
           { path: "instance", element: <InstancePage /> },
         ],

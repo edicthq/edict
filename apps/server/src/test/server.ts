@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { onTestFinished } from "vitest";
 import { Pool } from "pg";
-import { createApp } from "../app.js";
+import { createApp, type App } from "../app.js";
 import { DEFAULT_MAX_ATTACHMENT_BYTES } from "../env.js";
 import type { Mailer } from "../email.js";
 
@@ -15,6 +15,7 @@ export interface TestDatabase {
 export interface TestServer {
   baseUrl: string;
   close: () => Promise<void>;
+  purgeTrash: App["purgeTrash"];
 }
 
 // A throwaway Postgres database, dropped when the current test finishes.
@@ -47,6 +48,8 @@ export async function startTestServer(
     dataDir?: string;
     // The attachment size limit. Defaults to production's.
     maxAttachmentBytes?: number;
+    // Start pg-boss and its schedules. Off: tests call app.purgeTrash.
+    jobs?: boolean;
   } = {},
 ): Promise<TestServer> {
   const database = options.database ?? (await createTestDatabase());
@@ -60,6 +63,7 @@ export async function startTestServer(
     webDir: options.webDir,
     dataDir,
     maxAttachmentBytes: options.maxAttachmentBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES,
+    jobs: options.jobs ?? false,
   }, { mailer: options.mailer });
   await app.start();
 
@@ -72,7 +76,7 @@ export async function startTestServer(
   };
   onTestFinished(close);
 
-  return { baseUrl: `http://127.0.0.1:${app.port}`, close };
+  return { baseUrl: `http://127.0.0.1:${app.port}`, close, purgeTrash: app.purgeTrash };
 }
 
 async function adminQuery(adminUrl: string, sql: string): Promise<void> {
@@ -92,6 +96,7 @@ export function cookieHeader(response: Response): string {
 export interface ApiResponse<T = any> {
   status: number;
   body: T;
+  headers: Headers;
 }
 
 // A caller of /api/v1, signed in when given a cookie.
@@ -106,12 +111,12 @@ export function apiClient(baseUrl: string, cookie?: string) {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const text = await res.text();
-    return { status: res.status, body: text ? JSON.parse(text) : undefined };
+    return { status: res.status, body: text ? JSON.parse(text) : undefined, headers: res.headers };
   };
   const callForm = async <T = any>(method: string, path: string, form: FormData): Promise<ApiResponse<T>> => {
     const res = await fetch(`${baseUrl}/api/v1${path}`, { method, headers: headers(), body: form });
     const text = await res.text();
-    return { status: res.status, body: text ? JSON.parse(text) : undefined };
+    return { status: res.status, body: text ? JSON.parse(text) : undefined, headers: res.headers };
   };
   return {
     get: <T = any>(path: string) => call<T>("GET", path),

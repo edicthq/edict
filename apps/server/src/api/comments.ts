@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { comments, emit } from "@edicthq/db";
 import { Comment, CommentConflict, CreateComment, Id, IssueRef, UpdateComment } from "@edicthq/schema";
 import type { MemberRow } from "./access.js";
@@ -26,7 +26,7 @@ export function toComment(row: CommentRow): Comment {
 // Locks the row, so two edits of one version cannot both pass.
 async function editableComment(tx: Transaction, caller: MemberRow, commentId: string): Promise<CommentRow> {
   const [row] = await tx.select().from(comments).where(eq(comments.id, commentId)).for("update");
-  if (!row) {
+  if (!row || row.deletedAt) {
     throw notFound("comment");
   }
   await visibleIssue(tx, caller, row.issueId);
@@ -81,7 +81,11 @@ export function commentRoutes(deps: ApiDeps) {
     const { orgId, issueRef } = c.req.valid("param");
     const list = await inOrg(deps, c, orgId, async (tx, caller) => {
       const { issue } = await visibleIssue(tx, caller, issueRef);
-      const rows = await tx.select().from(comments).where(eq(comments.issueId, issue.id)).orderBy(asc(comments.id));
+      const rows = await tx
+        .select()
+        .from(comments)
+        .where(and(eq(comments.issueId, issue.id), isNull(comments.deletedAt)))
+        .orderBy(asc(comments.id));
       return rows.map(toComment);
     });
     return c.json(list, 200);

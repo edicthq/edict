@@ -7,6 +7,7 @@ import { NoAssignee } from "../components/issue-fields.js";
 import { IssuePeek, type PeekMenu } from "../components/issue-peek.js";
 import { EmptyState, Loading, PageBody, PageHeader } from "../components/shell.js";
 import { useToast } from "../components/toast.js";
+import { useOfferUndo } from "../components/undo.js";
 import { ago, assignable, boardColumns, listGroups, priorityLabel, statusFill, type StatusGroup } from "../lib/issues.js";
 import {
   useIssue,
@@ -62,6 +63,7 @@ function TeamIssues({ team }: { team: Team }) {
   const teams = useTeams(orgId);
   const update = useUpdateIssue(orgId);
   const toast = useToast();
+  const offerUndo = useOfferUndo();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const view: View = params.get("view") === "board" ? "board" : "list";
@@ -247,7 +249,14 @@ function TeamIssues({ team }: { team: Team }) {
             onOpen={openIssue}
             onFocus={setFocusId}
             onMove={(issue, statusId) =>
-              update.mutate({ issue, changes: { statusId } }, { onError: (error) => toast(error.message) })
+              update.mutate(
+                { issue, changes: { statusId } },
+                {
+                  onSuccess: () =>
+                    offerUndo(`${issue.identifier} moved to ${statuses.data?.find((s) => s.id === statusId)?.name ?? "a new status"}`),
+                  onError: (error) => toast(error.message),
+                },
+              )
             }
           />
         )}
@@ -281,7 +290,7 @@ function TeamIssues({ team }: { team: Team }) {
           parent={creating?.parent}
           open={creating !== null}
           onClose={() => setCreating(null)}
-          onCreated={(identifier) => toast(`Created ${identifier}`)}
+          onCreated={(identifier) => offerUndo(`Created ${identifier}`)}
         />
       ) : null}
     </div>

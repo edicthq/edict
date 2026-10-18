@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { emit, issueLabels, issueNumbers, issues, statuses } from "@edicthq/db";
 import { CreateIssue, Id, Issue, IssueConflict, IssueRef, LinkedIssue, UpdateIssue } from "@edicthq/schema";
 import { visibleTeam } from "./access.js";
@@ -135,7 +135,11 @@ export function issueRoutes(deps: ApiDeps) {
     const { orgId, teamId } = c.req.valid("param");
     const list = await inOrg(deps, c, orgId, async (tx, caller) => {
       const team = await visibleTeam(tx, caller, teamId);
-      const rows = await tx.select().from(issues).where(eq(issues.teamId, teamId)).orderBy(desc(issues.number));
+      const rows = await tx
+        .select()
+        .from(issues)
+        .where(and(eq(issues.teamId, teamId), isNull(issues.deletedAt)))
+        .orderBy(desc(issues.number));
       return toIssues(tx, rows, () => team.key);
     });
     return c.json(list, 200);

@@ -1,5 +1,6 @@
 import { OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Context } from "hono";
+import { sql } from "drizzle-orm";
 import { inScope, type Database, type Transaction } from "@edicthq/db";
 import { ErrorResponse, Id, type ErrorCode } from "@edicthq/schema";
 import type { Mailer } from "../email.js";
@@ -46,6 +47,8 @@ export function signedIn(c: Context<ApiEnv>): SessionUser {
 }
 
 // Runs fn inside the organization's scope as the signed-in user's member.
+// When it wrote events, the Edict-Change-Id response header names the change
+// they belong to, which undo takes (ADR 0019).
 export function inOrg<T>(
   deps: ApiDeps,
   c: Context<ApiEnv>,
@@ -53,10 +56,22 @@ export function inOrg<T>(
   fn: (tx: Transaction, caller: MemberRow) => Promise<T>,
 ): Promise<T> {
   const user = signedIn(c);
-  return inScope(deps.db, { orgId, userId: user.id }, async (tx) =>
-    fn(tx, await callerMember(tx, orgId, user.id)),
-  );
+  return inScope(deps.db, { orgId, userId: user.id }, async (tx) => {
+    const result = await fn(tx, await callerMember(tx, orgId, user.id));
+    if (c.req.method !== "GET") {
+      const { rows } = await tx.execute<{ change_id: string | null }>(sql`
+        SELECT change_id FROM events
+        WHERE change_id = nullif(current_setting('edict.change_id', true), '')::uuid
+        LIMIT 1`);
+      if (rows[0]?.change_id) {
+        c.header(changeHeader, rows[0].change_id);
+      }
+    }
+    return result;
+  });
 }
+
+export const changeHeader = "Edict-Change-Id";
 
 export function json<T extends z.ZodType>(schema: T, description: string) {
   return { description, content: { "application/json": { schema } } };

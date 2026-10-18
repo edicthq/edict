@@ -189,3 +189,62 @@ test("comment on an issue and attach a file in the peek", async ({ page, baseURL
   expect(fetched.ok()).toBe(true);
   expect(await fetched.text()).toBe("hello from edict");
 });
+
+test("delete an issue, undo it from the toast, undo a status change with the keyboard, and restore from the trash", async ({
+  page,
+  baseURL,
+}) => {
+  // Its own org and user: the file's tests share the worker's instance.
+  const headers = { origin: baseURL! };
+  const signUp = await page.request.post("/api/auth/sign-up/email", {
+    headers,
+    data: { name: "Omar Haddad", email: "omar@example.com", password: "correct-horse-battery" },
+  });
+  expect(signUp.ok()).toBe(true);
+  const org = await (await page.request.post("/api/v1/organizations", { headers, data: { name: "Delta", slug: "delta" } })).json();
+  const orgId = org.organization.id as string;
+  const team = (await (
+    await page.request.post(`/api/v1/organizations/${orgId}/teams`, { headers, data: { name: "Ops", key: "OPS" } })
+  ).json()) as { id: string };
+  await page.request.post(`/api/v1/organizations/${orgId}/teams/${team.id}/issues`, { headers, data: { title: "Rotate keys" } });
+
+  await page.goto(`/delta/teams/${team.id}`);
+  const todo = page.getByRole("region", { name: "Todo" });
+  const row = todo.getByRole("button", { name: /OPS-1 Rotate keys/ });
+
+  // Delete from the peek; the toast's Undo brings it back.
+  await row.click();
+  const peek = page.getByRole("complementary", { name: /OPS-1 Rotate keys/ });
+  await peek.getByRole("button", { name: "Delete OPS-1" }).click();
+  await expect(peek).toBeHidden();
+  await expect(row).toBeHidden();
+  const toasts = page.getByRole("status");
+  await expect(toasts.getByText("Moved OPS-1 to the trash")).toBeVisible();
+  await toasts.getByRole("button", { name: /Undo/ }).click();
+  await expect(toasts.getByText("Undone")).toBeVisible();
+  await expect(row).toBeVisible();
+
+  // A status change, then ⌘Z outside any field sets it back.
+  await row.click();
+  await expect(peek).toBeVisible();
+  await page.keyboard.press("s");
+  await page.getByRole("combobox", { name: "Change status" }).fill("in prog");
+  await page.keyboard.press("Enter");
+  await expect(toasts.getByText("OPS-1 moved to In Progress")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("region", { name: "In Progress" }).getByRole("button", { name: /OPS-1/ })).toBeVisible();
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(row).toBeVisible();
+
+  // Delete again, then restore from the trash page.
+  await row.click();
+  await peek.getByRole("button", { name: "Delete OPS-1" }).click();
+  await expect(row).toBeHidden();
+  await page.getByRole("link", { name: "Trash" }).click();
+  const trashed = page.getByRole("listitem").filter({ hasText: "Rotate keys" });
+  await expect(trashed.getByText(/Omar Haddad deleted it/)).toBeVisible();
+  await trashed.getByRole("button", { name: "Restore" }).click();
+  await expect(page.getByText("The trash is empty")).toBeVisible();
+  const restored = await page.request.get(`/api/v1/organizations/${orgId}/issues/OPS-1`);
+  expect(restored.ok()).toBe(true);
+});

@@ -10,6 +10,7 @@ import { createAuth, type EdictAuth } from "./auth.js";
 import { createSmtpMailer, type Mailer } from "./email.js";
 import type { ServerConfig } from "./env.js";
 import { ensureInstanceSettings } from "./instance.js";
+import { purgeTrash, startJobs, type PurgeResult } from "./jobs.js";
 import { localDiskStorage } from "./storage.js";
 
 export interface App {
@@ -20,6 +21,8 @@ export interface App {
   // Resolves once migrations have run and the HTTP server accepts requests.
   start: () => Promise<void>;
   shutdown: () => Promise<void>;
+  // The daily trash purge, run now as if at `now`. Tests use it.
+  purgeTrash: (now?: Date) => Promise<PurgeResult>;
 }
 
 export interface AppOptions {
@@ -68,6 +71,7 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
   }
 
   let server: ServerType | undefined;
+  let jobs: Awaited<ReturnType<typeof startJobs>> | undefined;
   let poolEnded = false;
 
   const state: App = {
@@ -87,14 +91,24 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
         mailer,
       );
 
+      if (config.jobs !== false) {
+        jobs = await startJobs(config.databaseUrl, db, deps.storage);
+      }
+
       server = await listen(app, config.port);
       state.port = boundPort(server);
     },
+    purgeTrash: (now) => purgeTrash(db, deps.storage, now),
     shutdown: async () => {
       if (server) {
         const closing = server;
         server = undefined;
         await new Promise<void>((resolve) => closing.close(() => resolve()));
+      }
+      if (jobs) {
+        const stopping = jobs;
+        jobs = undefined;
+        await stopping.stop({ graceful: true });
       }
       if (!poolEnded) {
         poolEnded = true;

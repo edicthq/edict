@@ -27,6 +27,13 @@ const updatedAt = () =>
   timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`);
 // ADR 0018: goes up by one on every change.
 const version = () => integer("version").notNull().default(1);
+// The trash (ADR 0019). Set together; rows trashed by one change share its
+// id, so restoring brings them back together.
+const trashColumns = () => ({
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  deletedBy: uuid("deleted_by"),
+  deletedChangeId: uuid("deleted_change_id"),
+});
 
 // The five fixed meanings every status maps to, in workflow order. Sorting by
 // the enum sorts by that order.
@@ -92,9 +99,18 @@ export const issues = pgTable(
     fieldVersions: jsonb("field_versions").$type<IssueFieldVersions>().notNull().default({}),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
+    ...trashColumns(),
   },
   (table) => [
     unique("issues_org_id_id_unique").on(table.orgId, table.id),
+    index("issues_deleted_change_id_idx").on(table.deletedChangeId),
+    index("issues_deleted_at_idx").on(table.deletedAt).where(sql`${table.deletedAt} IS NOT NULL`),
+    check("issues_trash_together", sql`(${table.deletedAt} IS NULL) = (${table.deletedBy} IS NULL) AND (${table.deletedAt} IS NULL) = (${table.deletedChangeId} IS NULL)`),
+    foreignKey({
+      name: "issues_deleted_by_fk",
+      columns: [table.orgId, table.deletedBy],
+      foreignColumns: [members.orgId, members.id],
+    }),
     unique("issues_team_id_number_unique").on(table.teamId, table.number),
     index("issues_assignee_id_idx").on(table.assigneeId),
     index("issues_parent_id_idx").on(table.parentId),
@@ -261,9 +277,17 @@ export const comments = pgTable(
     version: version(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
+    ...trashColumns(),
   },
   (table) => [
     index("comments_issue_id_idx").on(table.issueId),
+    index("comments_deleted_at_idx").on(table.deletedAt).where(sql`${table.deletedAt} IS NOT NULL`),
+    check("comments_trash_together", sql`(${table.deletedAt} IS NULL) = (${table.deletedBy} IS NULL) AND (${table.deletedAt} IS NULL) = (${table.deletedChangeId} IS NULL)`),
+    foreignKey({
+      name: "comments_deleted_by_fk",
+      columns: [table.orgId, table.deletedBy],
+      foreignColumns: [members.orgId, members.id],
+    }),
     check("comments_body_not_empty", sql`${table.body} <> ''`),
     foreignKey({
       name: "comments_issue_fk",

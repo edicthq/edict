@@ -1,6 +1,7 @@
 import { DEFAULT_MAX_ATTACHMENT_BYTES } from "../env.js";
 import { localDiskStorage } from "../storage.js";
 import { attachmentRoutes, type AttachmentDeps } from "./attachments.js";
+import { changeRoutes } from "./changes.js";
 import { commentRoutes } from "./comments.js";
 import { router } from "./context.js";
 import { eventRoutes } from "./events.js";
@@ -12,6 +13,7 @@ import { organizationRoutes } from "./organizations.js";
 import { relationRoutes } from "./relations.js";
 import { statusRoutes } from "./statuses.js";
 import { teamRoutes } from "./teams.js";
+import { trashRoutes } from "./trash.js";
 
 export type { ApiDeps, SessionUser } from "./context.js";
 export { fileRoutes, type AttachmentDeps } from "./attachments.js";
@@ -32,6 +34,8 @@ export function createApi(deps: AttachmentDeps) {
   api.route("/", issueRoutes(deps));
   api.route("/", attachmentRoutes(deps));
   api.route("/", commentRoutes(deps));
+  api.route("/", trashRoutes(deps));
+  api.route("/", changeRoutes(deps));
   api.route("/", labelRoutes(deps));
   api.route("/", relationRoutes(deps));
   api.route("/", inviteRoutes(deps));

@@ -441,3 +441,47 @@ export function useCreateAttachment(orgId: string, issueId: string) {
       client.setQueryData(keys.attachments(orgId, issueId), (list: Attachment[] | undefined) => [...(list ?? []), attachment]),
   });
 }
+
+// ---------- trash (ADR 0019) ----------
+
+export function useTrash(orgId: string) {
+  return useQuery({
+    queryKey: ["org", orgId, "trash"] as const,
+    queryFn: () => unwrap(api.GET("/organizations/{orgId}/trash", org(orgId))),
+  });
+}
+
+// Trashing an issue takes its sub-issues with it, so every issue list and
+// lane refetches.
+export function useDeleteIssue(orgId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (issue: Issue) =>
+      unwrap(api.DELETE("/organizations/{orgId}/issues/{issueRef}", { params: { path: { orgId, issueRef: issue.id } } })),
+    onSuccess: (_, issue) => {
+      client.setQueryData<Issue[]>(keys.issues(orgId, issue.teamId), (list) => list?.filter((item) => item.id !== issue.id));
+      void client.invalidateQueries({ queryKey: ["org", orgId] });
+    },
+  });
+}
+
+export function useRestoreIssue(orgId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (issueRef: string) =>
+      unwrap(api.POST("/organizations/{orgId}/issues/{issueRef}/restore", { params: { path: { orgId, issueRef } } })),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["org", orgId] }),
+  });
+}
+
+export function useDeleteComment(orgId: string, issueId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (comment: Comment) =>
+      unwrap(api.DELETE("/organizations/{orgId}/comments/{commentId}", { params: { path: { orgId, commentId: comment.id } } })),
+    onSuccess: (_, comment) =>
+      client.setQueryData(keys.comments(orgId, issueId), (list: Comment[] | undefined) =>
+        list?.filter((item) => item.id !== comment.id),
+      ),
+  });
+}

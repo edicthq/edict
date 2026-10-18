@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { aliasedTable, and, asc, eq, or } from "drizzle-orm";
+import { aliasedTable, and, asc, eq, isNull, or } from "drizzle-orm";
 import { emit, issueRelations, issues, statuses, teams } from "@edicthq/db";
 import { CreateRelation, Id, IssueRef, Relation, type RelationType } from "@edicthq/schema";
 import { teamVisibility, type MemberRow } from "./access.js";
@@ -52,7 +52,9 @@ async function relationsOf(tx: Transaction, caller: MemberRow, issueId: string, 
     )
     .innerJoin(teams, eq(teams.id, other.teamId))
     .innerJoin(statuses, eq(statuses.id, other.statusId))
-    .where(and(relationId ? eq(issueRelations.id, relationId) : undefined, teamVisibility(tx, caller)))
+    .where(
+      and(relationId ? eq(issueRelations.id, relationId) : undefined, isNull(other.deletedAt), teamVisibility(tx, caller)),
+    )
     .orderBy(asc(issueRelations.id));
   return rows.map(({ relation, other, key, status }) => ({
     id: relation.id,

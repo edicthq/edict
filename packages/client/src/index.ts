@@ -27,6 +27,8 @@ export type RelationType = Schemas["RelationType"];
 export type Comment = Schemas["Comment"];
 export type CommentConflict = Schemas["CommentConflict"]["error"];
 export type Attachment = Schemas["Attachment"];
+export type TrashedIssue = Schemas["TrashedIssue"];
+export type UndoResult = Schemas["UndoResult"];
 export type ApiError = Schemas["Error"]["error"];
 
 export type EdictClient = ReturnType<typeof createEdictClient>;

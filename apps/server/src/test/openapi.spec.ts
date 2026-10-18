@@ -21,7 +21,9 @@ describe("OpenAPI document", () => {
       .flatMap(([path, methods]) => Object.keys(methods).map((method) => `${method.toUpperCase()} ${path}`))
       .sort();
     expect(operations).toEqual([
+      "DELETE /organizations/{orgId}/comments/{commentId}",
       "DELETE /organizations/{orgId}/invites/{inviteId}",
+      "DELETE /organizations/{orgId}/issues/{issueRef}",
       "DELETE /organizations/{orgId}/issues/{issueRef}/relations/{relationId}",
       "DELETE /organizations/{orgId}/labels/{labelId}",
       "DELETE /organizations/{orgId}/members/{memberId}",
@@ -44,6 +46,7 @@ describe("OpenAPI document", () => {
       "GET /organizations/{orgId}/teams/{teamId}/labels",
       "GET /organizations/{orgId}/teams/{teamId}/members",
       "GET /organizations/{orgId}/teams/{teamId}/statuses",
+      "GET /organizations/{orgId}/trash",
       "PATCH /instance",
       "PATCH /organizations/{orgId}/comments/{commentId}",
       "PATCH /organizations/{orgId}/issues/{issueRef}",
@@ -53,10 +56,13 @@ describe("OpenAPI document", () => {
       "PATCH /organizations/{orgId}/teams/{teamId}/statuses/{statusId}",
       "POST /invites/{token}/accept",
       "POST /organizations",
+      "POST /organizations/{orgId}/changes/{changeId}/undo",
+      "POST /organizations/{orgId}/comments/{commentId}/restore",
       "POST /organizations/{orgId}/invites",
       "POST /organizations/{orgId}/issues/{issueRef}/attachments",
       "POST /organizations/{orgId}/issues/{issueRef}/comments",
       "POST /organizations/{orgId}/issues/{issueRef}/relations",
+      "POST /organizations/{orgId}/issues/{issueRef}/restore",
       "POST /organizations/{orgId}/labels",
       "POST /organizations/{orgId}/teams",
       "POST /organizations/{orgId}/teams/{teamId}/issues",

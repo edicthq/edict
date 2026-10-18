@@ -17,12 +17,28 @@ export class ApiFailure extends Error {
   }
 }
 
+// The last change this tab made, from the Edict-Change-Id header every write
+// answers with (ADR 0019). ⌘Z and the toast's Undo button undo it.
+let lastChange: string | null = null;
+
+export function takeLastChange(): string | null {
+  const change = lastChange;
+  lastChange = null;
+  return change;
+}
+
+export function peekLastChange(): string | null {
+  return lastChange;
+}
+
 // openapi-fetch returns { data, error }. Queries and mutations want the data
 // or a thrown error with the API's code and message.
 export async function unwrap<T>(
   request: Promise<{ data?: T; error?: unknown; response: Response }>,
 ): Promise<T> {
   const { data, error, response } = await request;
+  const change = response.headers.get("edict-change-id");
+  if (change && response.ok) lastChange = change;
   if (error !== undefined || !response.ok) {
     const body = error as { error?: { code?: ApiError["code"]; message?: string } } | undefined;
     throw new ApiFailure(

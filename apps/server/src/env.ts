@@ -20,6 +20,9 @@ export interface ServerConfig {
   // The largest file an attachment accepts. DEFAULT_MAX_ATTACHMENT_BYTES
   // otherwise.
   maxAttachmentBytes: number;
+  // Background jobs such as the trash purge. On unless JOBS=off; tests run
+  // them by hand.
+  jobs?: boolean;
   // Outgoing email. Both or neither: without them invites are links to share
   // by hand.
   smtpUrl?: string;
@@ -69,6 +72,7 @@ export function readConfig(env: NodeJS.ProcessEnv): ServerConfig {
     smtpUrl,
     emailFrom,
     authRateLimit: env.AUTH_RATE_LIMIT !== "off",
+    jobs: env.JOBS !== "off",
   };
 }
 

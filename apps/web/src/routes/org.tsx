@@ -1,4 +1,4 @@
-import { ChevronDown, LogOut, Plus, Server, Settings } from "lucide-react";
+import { ChevronDown, LogOut, Plus, Server, Settings, Trash2 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import type { Membership } from "@edicthq/client";
 import { Link, NavLink, Outlet, useNavigate, useOutletContext, useParams } from "react-router";
@@ -6,6 +6,7 @@ import { Avatar, Button, Count, Kbd, LogoMark, TeamKey, cn } from "@edicthq/ui";
 import { CreateTeamDialog } from "../components/create-team-dialog.js";
 import { InviteDialog } from "../components/invite-dialog.js";
 import { CommandPalette } from "../components/palette.js";
+import { UndoProvider } from "../components/undo.js";
 import { VerifyBanner } from "../components/verify-banner.js";
 import { AuthShell, Loading } from "../components/shell.js";
 import { authClient, useSession } from "../lib/auth.js";
@@ -79,6 +80,7 @@ export function OrgLayout() {
   };
 
   return (
+    <UndoProvider orgId={context.orgId}>
     <div className="flex min-h-dvh">
       <a
         href="#main"
@@ -107,6 +109,7 @@ export function OrgLayout() {
         onClose={() => setDialog(null)}
       />
     </div>
+    </UndoProvider>
   );
 }
 
@@ -213,6 +216,10 @@ function Rail({ context, others }: { context: OrgContext; others: Membership[] }
 
       <div className="mt-auto flex flex-col gap-3">
         <div className="flex flex-col gap-0.5">
+          <NavLink to={`/${slug}/trash`} className={railLink}>
+            <Trash2 aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+            Trash
+          </NavLink>
           <NavLink to={`/${slug}/settings`} className={railLink}>
             <Settings aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
             Settings

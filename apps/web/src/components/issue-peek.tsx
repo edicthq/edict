@@ -1,9 +1,9 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { Attachment, Comment, Issue, Label, LinkedIssue, Member, RelationType, Status, Team } from "@edicthq/client";
 import { Avatar, Button, Dialog, Kbd, Menu, PriorityIcon, Select, StatusIcon, TeamKey } from "@edicthq/ui";
-import { CornerLeftUp, Paperclip, Plus, X } from "lucide-react";
+import { CornerLeftUp, Paperclip, Plus, Trash2, X } from "lucide-react";
 import { ApiFailure } from "../lib/api.js";
-import { ago } from "../lib/issues.js";
+import { ago, priorityLabel } from "../lib/issues.js";
 import {
   useAttachments,
   useComments,
@@ -11,6 +11,8 @@ import {
   useCreateComment,
   useCreateLabel,
   useCreateRelation,
+  useDeleteComment,
+  useDeleteIssue,
   useDeleteRelation,
   useIssue,
   useRelations,
@@ -22,6 +24,7 @@ import {
 import { AssigneePicker, EstimatePicker, LabelPicker, NoAssignee, PriorityPicker, StatusPicker } from "./issue-fields.js";
 import { Markdown } from "./markdown.js";
 import { useToast } from "./toast.js";
+import { useOfferUndo } from "./undo.js";
 
 export type PeekMenu = "status" | "priority" | "assignee" | null;
 
@@ -63,15 +66,33 @@ export function IssuePeek({
   onAddSubIssue: () => void;
 }) {
   const update = useUpdateIssue(orgId);
+  const remove = useDeleteIssue(orgId);
   const createLabel = useCreateLabel(orgId, issue.teamId);
   const parent = useIssue(orgId, issue.parentId);
   const toast = useToast();
+  const offerUndo = useOfferUndo();
+
+  // What the toast says for the changes the concept offers to undo there.
+  // Text edits stay quiet; ⌘Z still undoes them.
+  const said = (changes: IssueChanges): string | undefined => {
+    if (changes.statusId) return `${issue.identifier} moved to ${statuses.find((s) => s.id === changes.statusId)?.name ?? "a new status"}`;
+    if (changes.priority) return `${issue.identifier} set to ${priorityLabel[changes.priority]}`;
+    if (changes.assigneeId !== undefined) {
+      const name = members.find((m) => m.id === changes.assigneeId)?.name;
+      return name ? `${issue.identifier} assigned to ${name}` : `${issue.identifier} unassigned`;
+    }
+    return undefined;
+  };
   const [merge, setMerge] = useState<{ field: "title" | "description"; mine: string; theirs: Issue } | null>(null);
 
   const save = (changes: IssueChanges) =>
     update.mutate(
       { issue, changes },
       {
+        onSuccess: () => {
+          const message = said(changes);
+          if (message) offerUndo(message);
+        },
         onError: (error) => {
           if (!(error instanceof ApiFailure) || error.code !== "conflict") {
             toast(error.message);
@@ -122,7 +143,7 @@ export function IssuePeek({
               { issue, changes: { teamId } },
               {
                 onSuccess: (moved) => {
-                  toast(`Moved ${issue.identifier} to ${moved.identifier}. ${issue.identifier} still finds it.`);
+                  offerUndo(`Moved ${issue.identifier} to ${moved.identifier}. ${issue.identifier} still finds it.`);
                   onOpen(moved.identifier);
                 },
                 onError: (error) => toast(error.message),
@@ -135,6 +156,24 @@ export function IssuePeek({
             </Button>
           )}
         />
+        <Button
+          variant="ghost"
+          aria-label={`Delete ${issue.identifier}`}
+          title="Delete"
+          className="size-7 px-0"
+          disabled={remove.isPending}
+          onClick={() =>
+            remove.mutate(issue, {
+              onSuccess: () => {
+                offerUndo(`Moved ${issue.identifier} to the trash`);
+                onClose();
+              },
+              onError: (error) => toast(error.message),
+            })
+          }
+        >
+          <Trash2 aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+        </Button>
         <span className="ms-auto hidden items-center gap-1 text-sm text-ink-2 sm:inline-flex">
           <Kbd>J</Kbd>
           <Kbd>K</Kbd>
@@ -658,8 +697,10 @@ function Discussion({
   const comments = useComments(orgId, issue.id);
   const create = useCreateComment(orgId, issue.id);
   const update = useUpdateComment(orgId, issue.id);
+  const remove = useDeleteComment(orgId, issue.id);
   const [draft, setDraft] = useState("");
   const toast = useToast();
+  const offerUndo = useOfferUndo();
   const creator = orgMembers.find((m) => m.id === issue.creatorId);
 
   const send = () => {
@@ -698,6 +739,12 @@ function Discussion({
             onUpdate={async (body) => {
               await update.mutateAsync({ comment, body });
             }}
+            onDelete={() =>
+              remove.mutate(comment, {
+                onSuccess: () => offerUndo("Comment deleted"),
+                onError: (error) => toast(error.message),
+              })
+            }
           />
         ))}
         <Composer value={draft} onChange={setDraft} onSend={send} pending={create.isPending} />
@@ -713,11 +760,13 @@ function CommentRow({
   myId,
   orgMembers,
   onUpdate,
+  onDelete,
 }: {
   comment: Comment;
   myId: string;
   orgMembers: Member[];
   onUpdate: (body: string) => Promise<void>;
+  onDelete: () => void;
 }) {
   const author = orgMembers.find((m) => m.id === comment.creatorId);
   const mine = comment.creatorId === myId;
@@ -807,16 +856,21 @@ function CommentRow({
           </time>
           {comment.updatedAt !== comment.createdAt ? <span className="text-xs text-ink-3">(edited)</span> : null}
           {mine ? (
-            <Button
-              variant="ghost"
-              className="ms-auto h-6 px-2 text-sm opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
-              onClick={() => {
-                setDraft(comment.body);
-                setEditing(true);
-              }}
-            >
-              Edit
-            </Button>
+            <span className="ms-auto flex gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
+              <Button
+                variant="ghost"
+                className="h-6 px-2 text-sm"
+                onClick={() => {
+                  setDraft(comment.body);
+                  setEditing(true);
+                }}
+              >
+                Edit
+              </Button>
+              <Button variant="ghost" className="h-6 px-2 text-sm" onClick={onDelete}>
+                Delete
+              </Button>
+            </span>
           ) : null}
         </header>
         <Markdown text={comment.body} />

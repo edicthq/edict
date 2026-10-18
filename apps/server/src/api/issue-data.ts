@@ -2,7 +2,7 @@ import { and, asc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { issueLabels, issueNumbers, issues, labels, statuses, teamKeys, teams, type Transaction } from "@edicthq/db";
 import type { Issue, LinkedIssue } from "@edicthq/schema";
 import { activeMember, canSeeTeam, teamVisibility, type MemberRow, type TeamRow } from "./access.js";
-import { invalid, notFound } from "./errors.js";
+import { gone, invalid, notFound } from "./errors.js";
 
 export type IssueRow = typeof issues.$inferSelect;
 type StatusRow = typeof statuses.$inferSelect;
@@ -73,12 +73,13 @@ async function issueIdOf(tx: Transaction, orgId: string, ref: string): Promise<s
 }
 
 // The issue a reference names, with its team, if the caller can see its team.
-// Locks the issue row when updating.
+// Locks the issue row when updating. A trashed issue answers 410, saying how
+// to get it back (ADR 0019), unless the caller asks for trashed ones too.
 export async function visibleIssue(
   tx: Transaction,
   caller: MemberRow,
   ref: string,
-  options: { forUpdate?: boolean } = {},
+  options: { forUpdate?: boolean; trashed?: boolean } = {},
 ): Promise<{ issue: IssueRow; team: TeamRow }> {
   const issueId = await issueIdOf(tx, caller.orgId, ref);
   if (issueId) {
@@ -88,6 +89,12 @@ export async function visibleIssue(
       .innerJoin(teams, eq(teams.id, issues.teamId))
       .where(and(eq(issues.orgId, caller.orgId), eq(issues.id, issueId), teamVisibility(tx, caller)));
     const [row] = await (options.forUpdate ? query.for("update", { of: issues }) : query);
+    if (row?.issue.deletedAt && !options.trashed) {
+      const identifier = `${row.team.key}-${row.issue.number}`;
+      throw gone(
+        `${identifier} is in the trash. POST /api/v1/organizations/${caller.orgId}/issues/${identifier}/restore brings it back within 30 days of deletion.`,
+      );
+    }
     if (row) {
       return row;
     }
@@ -107,7 +114,7 @@ export async function linkedIssues(tx: Transaction, caller: MemberRow, where: SQ
     .from(issues)
     .innerJoin(teams, eq(teams.id, issues.teamId))
     .innerJoin(statuses, eq(statuses.id, issues.statusId))
-    .where(and(where, teamVisibility(tx, caller)))
+    .where(and(where, isNull(issues.deletedAt), teamVisibility(tx, caller)))
     .orderBy(asc(issues.createdAt), asc(issues.id));
   return rows.map(({ issue, key, status }) => toLinked(issue, key, status));
 }

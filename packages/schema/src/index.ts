@@ -434,6 +434,25 @@ export const CommentConflict = z
   })
   .meta({ id: "CommentConflict" });
 
+// An issue in the trash (ADR 0019). Restoring it, or undoing changeId, brings
+// back everything that change trashed.
+export const TrashedIssue = z
+  .object({
+    id: Id,
+    identifier: Identifier,
+    title: z.string(),
+    teamId: Id,
+    deletedAt: z.iso.datetime(),
+    deletedById: Id,
+    changeId: Id,
+  })
+  .meta({ id: "TrashedIssue" });
+export type TrashedIssue = z.infer<typeof TrashedIssue>;
+
+// What undoing a change did (ADR 0019): changeId is the new change, which
+// can itself be undone to redo.
+export const UndoResult = z.object({ changeId: Id, undoes: Id }).meta({ id: "UndoResult" });
+
 // A file attached to an issue (ADR 0020). The bytes live outside Postgres,
 // under the attachment's id; this row is what the data-access layer guards.
 export const Attachment = z

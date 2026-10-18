@@ -92,6 +92,20 @@
       "when": 1792243271033,
       "tag": "0012_comments_and_attachments_row_level_security",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792274548928,
+      "tag": "0013_trash",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792274554452,
+      "tag": "0014_trash_purge_grants",
+      "breakpoints": true
     }
   ]
 }

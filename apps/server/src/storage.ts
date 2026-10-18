@@ -1,12 +1,14 @@
 // Where attachment bytes live (ADR 0020). Local disk now; an S3-compatible
 // driver will slot in behind this interface when a self-hoster configures
 // storage, without the routes or the data-access layer caring.
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 export interface AttachmentStorage {
   put(key: string, bytes: Uint8Array): Promise<void>;
   get(key: string): Promise<Uint8Array | undefined>;
+  // Removing a key that holds nothing is not an error.
+  delete(key: string): Promise<void>;
 }
 
 // Only `${orgId}/${id}` keys resolve, so no key can reach outside the
@@ -33,6 +35,9 @@ export function localDiskStorage(dir: string): AttachmentStorage {
         }
         throw error;
       }
+    },
+    delete: async (key) => {
+      await rm(pathOf(key), { force: true });
     },
   };
 }
