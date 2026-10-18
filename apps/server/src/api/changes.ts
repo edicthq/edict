@@ -7,6 +7,7 @@ import { visibleTeam } from "./access.js";
 import { errors, inOrg, json, OrgParams, router, type ApiDeps } from "./context.js";
 import { ApiError, conflict, forbidden, invalid, isUniqueViolation, notFound } from "./errors.js";
 import { checkAssignee, checkDelegate, checkLabels, checkParent, checkStatus, labelSet, loadIssue, visibleIssue } from "./issue-data.js";
+import { relink, unlink } from "./links.js";
 import { restoreComment, restoreIssues, trashComment, trashIssues } from "./trash.js";
 
 type EventRow = typeof events.$inferSelect;
@@ -34,6 +35,9 @@ const inverses: Record<string, (tx: Transaction, caller: Caller, event: EventRow
     await restoreIssues(tx, caller, [issue.id], mark.data);
   },
   "issue.updated": (tx, caller, event, mark) => setIssueBack(tx, caller, event, mark),
+  "link.created": (tx, caller, event, mark) => unlink(tx, caller, event.subjectId, mark.data),
+  "link.deleted": (tx, caller, event, mark) =>
+    relink(tx, caller, event.subjectId, event.data as Parameters<typeof relink>[3], mark.data),
   "comment.created": async (tx, caller, event, mark) => {
     const row = await commentOf(tx, caller, event.subjectId);
     if (row.deletedChangeId === mark.changeId) return;

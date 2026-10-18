@@ -148,6 +148,20 @@
       "when": 1792312192640,
       "tag": "0020_progress_row_level_security",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792312840619,
+      "tag": "0021_issue_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1792312840879,
+      "tag": "0022_links_and_search",
+      "breakpoints": true
     }
   ]
 }

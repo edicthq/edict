@@ -96,7 +96,7 @@ const identifierPattern = /^([A-Z][A-Z0-9]{1,6})-([1-9][0-9]{0,8})$/;
 
 // The id of the issue a reference names: its UUID, or any identifier it has
 // had, through the key and number history (ADR 0017).
-async function issueIdOf(tx: Transaction, orgId: string, ref: string): Promise<string | undefined> {
+export async function issueIdOf(tx: Transaction, orgId: string, ref: string): Promise<string | undefined> {
   if (uuidPattern.test(ref)) {
     return ref;
   }

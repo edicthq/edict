@@ -36,6 +36,7 @@ export type CreatedApiKey = Schemas["CreatedApiKey"];
 export type ProgressUpdate = Schemas["ProgressUpdate"];
 export type ProgressState = Schemas["ProgressState"];
 export type WebLink = Schemas["WebLink"];
+export type Link = Schemas["Link"];
 export type ApiError = Schemas["Error"]["error"];
 
 export type EdictClient = ReturnType<typeof createEdictClient>;

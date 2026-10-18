@@ -381,3 +381,30 @@ export const progressUpdates = pgTable(
     }),
   ],
 );
+
+// A URL attached to an issue, such as a pull request. One per URL per issue.
+export const issueLinks = pgTable(
+  "issue_links",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull(),
+    issueId: uuid("issue_id").notNull(),
+    url: text("url").notNull(),
+    title: text("title"),
+    creatorId: uuid("creator_id").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    unique("issue_links_issue_id_url_unique").on(table.issueId, table.url),
+    foreignKey({
+      name: "issue_links_issue_fk",
+      columns: [table.orgId, table.issueId],
+      foreignColumns: [issues.orgId, issues.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "issue_links_creator_fk",
+      columns: [table.orgId, table.creatorId],
+      foreignColumns: [members.orgId, members.id],
+    }),
+  ],
+);

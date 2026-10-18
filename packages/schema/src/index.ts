@@ -371,6 +371,19 @@ export const PostProgress = z
   })
   .meta({ id: "PostProgress" });
 
+// A URL attached to an issue, such as a pull request.
+export const Link = z
+  .object({
+    id: Id,
+    issueId: Id,
+    url: z.string(),
+    title: z.string().nullable(),
+    creatorId: Id,
+    createdAt: z.iso.datetime(),
+  })
+  .meta({ id: "Link" });
+export type Link = z.infer<typeof Link>;
+
 export const Issue = z
   .object({
     id: Id,
