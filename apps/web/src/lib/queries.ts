@@ -717,3 +717,17 @@ export function useChooseConnectionOrganization() {
     mutationFn: (orgId: string) => unwrap(api.POST("/oauth/organization", { body: { orgId } })),
   });
 }
+
+// An agent's open queue: issues delegated to it, most pressing first.
+export function useAgentQueue(orgId: string, agentId: string) {
+  return useQuery({
+    queryKey: ["org", orgId, "agents", agentId, "queue"] as const,
+    queryFn: () =>
+      unwrap(
+        api.GET("/organizations/{orgId}/issues", {
+          params: { path: { orgId }, query: { delegateId: agentId, include: "open", limit: 5 } },
+        }),
+      ),
+    refetchInterval: 15_000,
+  });
+}

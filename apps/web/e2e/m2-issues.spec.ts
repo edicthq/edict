@@ -65,7 +65,13 @@ test("label an issue, add a sub-issue and a relation, and move it to another tea
   const relations = peek.locator('section[aria-labelledby="peek-relations"]');
   await peek.getByRole("button", { name: "Add relation" }).click();
   await peek.getByRole("textbox", { name: "Issue" }).fill("OPS-1");
-  await peek.getByRole("button", { name: "Add", exact: true }).click();
+  // Wait on the request itself, so a failure says whether it was sent and
+  // what the server answered.
+  const [created] = await Promise.all([
+    page.waitForResponse((res) => res.url().endsWith("/relations") && res.request().method() === "POST"),
+    peek.getByRole("button", { name: "Add", exact: true }).click(),
+  ]);
+  expect(created.status(), await created.text()).toBe(201);
   await expect(relations.getByText("Blocks")).toBeVisible();
   await expect(relations.getByRole("button", { name: /OPS-1 Restart the relay/ })).toBeVisible();
 

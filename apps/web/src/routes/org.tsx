@@ -11,8 +11,9 @@ import { VerifyBanner } from "../components/verify-banner.js";
 import { AuthShell, Loading } from "../components/shell.js";
 import { authClient, useSession } from "../lib/auth.js";
 import { mod } from "../lib/labels.js";
-import { connectionLine } from "../lib/agents.js";
-import { useAgents, useMembers, useMemberships, useTeams } from "../lib/queries.js";
+import type { Agent, Member } from "@edicthq/client";
+import { agentState, connectionLine } from "../lib/agents.js";
+import { useAgentQueue, useAgents, useMembers, useMemberships, useTeams } from "../lib/queries.js";
 
 export interface OrgContext {
   membership: Membership;
@@ -192,22 +193,7 @@ function Rail({ context, others }: { context: OrgContext; others: Membership[] }
         }
       >
         {agents.length ? (
-          agents.map((agent) => (
-            <NavLink
-              key={agent.id}
-              to={`/${slug}/agents#${agent.id}`}
-              className="flex items-start gap-2 rounded-sm px-2 py-1.5 text-ui hover:bg-hover"
-            >
-              <Avatar name={agent.name} kind="agent" />
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2">
-                  <span className="truncate font-medium">{agent.name}</span>
-                  {agent.pausedAt ? <ProgressBadge state="paused" className="ms-auto" /> : null}
-                </span>
-                <span className="block text-sm text-ink-2 text-pretty">{connectionLine(agent, members.data ?? [])}</span>
-              </span>
-            </NavLink>
-          ))
+          agents.map((agent) => <AgentCard key={agent.id} agent={agent} members={members.data ?? []} slug={slug} orgId={orgId} />)
         ) : (
           <p className="px-2 text-sm text-ink-2 text-pretty">
             Agents join when someone{" "}
@@ -265,6 +251,58 @@ function Rail({ context, others }: { context: OrgContext; others: Membership[] }
         </div>
       </div>
     </nav>
+  );
+}
+
+// An agent in the rail, as the C2 concept shows it: how it connects, its
+// state, and the open issues in its queue.
+function AgentCard({ agent, members, slug, orgId }: { agent: Agent; members: Member[]; slug: string; orgId: string }) {
+  const queue = useAgentQueue(orgId, agent.id).data ?? [];
+  const states = queue.map((issue) => agentState(issue, agent));
+  const working = states.includes("working");
+  return (
+    <div
+      className={cn(
+        "flex flex-col gap-1 rounded-sm px-2 py-1.5",
+        working && "bg-surface shadow-[inset_0_0_0_1px_var(--agent-edge)]",
+      )}
+    >
+      <NavLink to={`/${slug}/agents#${agent.id}`} className="flex items-start gap-2 text-ui">
+        <Avatar name={agent.name} kind="agent" />
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2">
+            <span className="truncate font-medium">{agent.name}</span>
+            {agent.pausedAt ? (
+              <ProgressBadge state="paused" className="ms-auto" />
+            ) : working ? (
+              <ProgressBadge state="working" className="ms-auto" />
+            ) : null}
+          </span>
+          <span className="block text-sm text-ink-2 text-pretty">{connectionLine(agent, members)}</span>
+        </span>
+      </NavLink>
+      {queue.length ? (
+        <ul className="flex flex-col">
+          {queue.slice(0, 3).map((issue, index) => (
+            <li key={issue.id}>
+              <Link
+                to={`/${slug}/issue/${issue.identifier}`}
+                className="flex min-w-0 items-baseline gap-1.5 rounded-xs py-0.5 text-sm hover:text-ink"
+              >
+                <span className="shrink-0 font-medium text-ink-2 tabular-nums">{issue.identifier}</span>
+                {states[index] === "needs_input" ? (
+                  <span className="shrink-0 font-medium text-warn">Needs input</span>
+                ) : states[index] === "blocked" ? (
+                  <span className="shrink-0 font-medium text-danger">Blocked</span>
+                ) : (
+                  <span className="truncate text-ink">{issue.title}</span>
+                )}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 
