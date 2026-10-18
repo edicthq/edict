@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router";
-import type { Agent, Issue, Label, Member, Status, Team } from "@edicthq/client";
-import { Avatar, Button, Kbd, LabelPill, PriorityIcon, ProgressBadge, StatusIcon, TeamKey, cn } from "@edicthq/ui";
+import type { Agent, Issue, Label, Member, Priority, Status, Team } from "@edicthq/client";
+import { Avatar, Button, Kbd, LabelPill, Menu, PriorityIcon, ProgressBadge, StatusIcon, TeamKey, cn } from "@edicthq/ui";
+import type { MenuItem } from "@edicthq/ui";
+import { ArrowDown, ArrowUp, ListFilter, Search, X } from "lucide-react";
 import { CreateIssueDialog } from "../components/create-issue-dialog.js";
 import { NoAssignee } from "../components/issue-fields.js";
 import { IssuePeek, type PeekMenu } from "../components/issue-peek.js";
@@ -9,7 +11,7 @@ import { EmptyState, Loading, PageBody, PageHeader } from "../components/shell.j
 import { useToast } from "../components/toast.js";
 import { useOfferUndo } from "../components/undo.js";
 import { agentState, plainLine, waitingLine } from "../lib/agents.js";
-import { ago, assignable, boardColumns, listGroups, priorityLabel, statusFill, type StatusGroup } from "../lib/issues.js";
+import { ago, assignable, boardColumns, categoryLabel, priorityLabel, statusFill, type StatusGroup } from "../lib/issues.js";
 import {
   useAgents,
   useIssue,
@@ -21,6 +23,24 @@ import {
   useUpdateIssue,
 } from "../lib/queries.js";
 import { useTeamIssues } from "../lib/collections.js";
+import {
+  defaultDirs,
+  filterKeys,
+  groupIssues,
+  groupLabel,
+  groupOptions,
+  hasFilters,
+  matches,
+  parseView,
+  priorityOrder,
+  serializeView,
+  sortLabel,
+  sortOptions,
+  toggleFilter,
+  type FilterKey,
+  type IssueGroup,
+  type IssueView,
+} from "../lib/views.js";
 import { useOrg } from "./org.js";
 
 type View = "list" | "board";
@@ -71,21 +91,31 @@ function TeamIssues({ team }: { team: Team }) {
   const [params, setParams] = useSearchParams();
   const view: View = params.get("view") === "board" ? "board" : "list";
   const peekRef = params.get("issue");
+  const issueView = useMemo(() => parseView(params), [params]);
   // The create dialog, and the issue it makes a sub-issue of.
   const [creating, setCreating] = useState<{ parent?: Issue } | null>(null);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [menu, setMenu] = useState<PeekMenu>(null);
 
-  const groups = useMemo<StatusGroup[]>(() => {
-    if (!statuses.data || !issues.data) return [];
-    return view === "list" ? listGroups(statuses.data, issues.data) : boardColumns(statuses.data, issues.data);
-  }, [statuses.data, issues.data, view]);
-  // Keyboard order: down the list, or down each board column in turn.
-  const order = useMemo(() => groups.flatMap((g) => g.issues), [groups]);
+  const filtered = useMemo(
+    () => (issues.data ?? []).filter((issue) => matches(issue, issueView)),
+    [issues.data, issueView],
+  );
   const members = useMemo(
     () => assignable(team, orgMembers.data ?? [], teamMembers.data ?? []),
     [team, orgMembers.data, teamMembers.data],
   );
+  const groups = useMemo<IssueGroup[]>(() => {
+    if (!statuses.data) return [];
+    return groupIssues(filtered, issueView, statuses.data, members);
+  }, [statuses.data, filtered, issueView, members]);
+  // The board keeps its status columns whatever the list groups by.
+  const boardGroups = useMemo<StatusGroup[]>(() => {
+    if (!statuses.data) return [];
+    return boardColumns(statuses.data, filtered);
+  }, [statuses.data, filtered]);
+  // Keyboard order: down the list, or down each board column in turn.
+  const order = useMemo(() => (view === "board" ? boardGroups : groups).flatMap((g) => g.issues), [groups, boardGroups, view]);
 
   const byRef = (ref: string) => {
     const upper = ref.toUpperCase();
@@ -106,6 +136,32 @@ function TeamIssues({ team }: { team: Team }) {
       },
       { replace },
     );
+
+  const viewKeys = ["q", "status", "priority", "assignee", "label", "group", "sort", "dir"] as const;
+
+  // Writes a change to the view, dropping every key it stops carrying. Other
+  // params — the open issue, the layout — survive untouched. A new sort gets
+  // its own default direction, not the previous sort's.
+  const patchView = (partial: Partial<IssueView>, replace = false) => {
+    setParams(
+      (current) => {
+        const next = { ...parseView(current), ...partial };
+        if (partial.sortBy !== undefined && partial.dir === undefined) next.dir = defaultDirs[partial.sortBy];
+        const search = new URLSearchParams(current);
+        for (const key of viewKeys) search.delete(key);
+        for (const [key, value] of Object.entries(serializeView(next))) {
+          search.set(key, value);
+        }
+        return search;
+      },
+      { replace },
+    );
+  };
+  const toggleFilterKey = (key: FilterKey) => patchView(toggleFilter(issueView, key));
+  const clearFilters = () => patchView({ q: "", statuses: [], priorities: [], assignees: [], labels: [] });
+  // `/` puts the caret in the search field. The search input's ref is needed
+  // for that and nothing else.
+  const searchRef = useRef<HTMLInputElement>(null);
   const openIssue = (issue: Issue | undefined) => {
     if (!issue) return;
     setFocusId(issue.id);
@@ -161,6 +217,9 @@ function TeamIssues({ team }: { team: Team }) {
     } else if (key === "c") {
       event.preventDefault();
       setCreating({});
+    } else if (key === "/") {
+      event.preventDefault();
+      searchRef.current?.focus();
     } else if (key === "v") {
       event.preventDefault();
       setParam("view", view === "list" ? "board" : null);
@@ -177,6 +236,54 @@ function TeamIssues({ team }: { team: Team }) {
 
   const loading = statuses.isPending || issues.isLoading;
   const statusList = statuses.data ?? [];
+  const labelList = labels.data ?? [];
+
+  // One flat menu of everything a team page can filter by, each entry
+  // renamed by its dimension in the keywords, so typing finds it.
+  const filterItems = useMemo<MenuItem<FilterKey>[]>(() => {
+    if (!statuses.data) return [];
+    return [
+      ...statuses.data.map((status) => ({
+        value: `status:${status.id}` as FilterKey,
+        label: status.name,
+        keywords: `status ${categoryLabel[status.category]}`,
+        icon: <StatusIcon category={status.category} fill={statusFill(statuses.data as Status[], status)} />,
+      })),
+      ...priorityOrder.map((priority) => ({
+        value: `priority:${priority}` as FilterKey,
+        label: priorityLabel[priority],
+        keywords: "priority",
+      })),
+      ...members.map((member) => ({
+        value: `assignee:${member.id}` as FilterKey,
+        label: member.name,
+        keywords: "assignee person",
+        icon: <Avatar name={member.name} size={18} />,
+      })),
+      { value: "assignee:none", label: "Unassigned", keywords: "assignee person" },
+      ...labelList.map((label) => ({
+        value: `label:${label.id}` as FilterKey,
+        label: label.name,
+        keywords: "label",
+        icon: <LabelPill name={label.name} hue={label.hue} />,
+      })),
+    ];
+  }, [statuses.data, members, labelList]);
+
+  const filterName = (key: FilterKey): string => {
+    const at = key.indexOf(":");
+    const value = key.slice(at + 1);
+    switch (key.slice(0, at)) {
+      case "status":
+        return statusList.find((s) => s.id === value)?.name ?? value;
+      case "priority":
+        return priorityLabel[value as Priority];
+      case "assignee":
+        return value === "none" ? "Unassigned" : (members.find((m) => m.id === value)?.name ?? value);
+      default:
+        return labelList.find((l) => l.id === value)?.name ?? value;
+    }
+  };
 
   return (
     <div className="relative flex h-full min-h-0 flex-col">
@@ -194,7 +301,7 @@ function TeamIssues({ team }: { team: Team }) {
           </>
         }
       />
-      <div className="flex items-center gap-3 px-6 pb-2">
+      <div className="flex flex-wrap items-center gap-3 px-6 pb-2">
         <div role="group" aria-label="View" className="inline-flex gap-0.5 rounded-md bg-hover p-[3px]">
           {(["list", "board"] as const).map((v) => (
             <button
@@ -208,12 +315,123 @@ function TeamIssues({ team }: { team: Team }) {
             </button>
           ))}
         </div>
+
+        <div className="relative">
+          <Search aria-hidden="true" className="pointer-events-none absolute start-2 top-1/2 size-3.5 -translate-y-1/2 text-ink-3" />
+          <input
+            ref={searchRef}
+            value={issueView.q}
+            onChange={(event) => patchView({ q: event.target.value }, true)}
+            onKeyDown={(event) => {
+              if (event.key !== "Escape") return;
+              event.stopPropagation();
+              if (issueView.q) patchView({ q: "" }, true);
+              else event.currentTarget.blur();
+            }}
+            placeholder="Search"
+            aria-label="Search issues"
+            className="h-7 w-44 rounded-md bg-surface ps-7 pe-2 text-ui text-ink placeholder:text-ink-3 shadow-[inset_0_0_0_1px_var(--line)] focus-visible:shadow-[inset_0_0_0_1.5px_var(--line-strong)] focus-visible:outline-none"
+          />
+        </div>
+
+        <Menu
+          label="Filter"
+          items={filterItems}
+          values={filterKeys(issueView)}
+          multiple
+          onSelect={toggleFilterKey}
+          trigger={(props) => (
+            <button
+              ref={props.ref}
+              type="button"
+              onClick={props.onClick}
+              aria-haspopup={props["aria-haspopup"]}
+              aria-expanded={props["aria-expanded"]}
+              className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-ui font-medium text-ink-2 hover:bg-hover hover:text-ink"
+            >
+              <ListFilter aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+              Filter
+              {filterKeys(issueView).length > 0 ? (
+                <span className="rounded-full bg-hover px-1.5 text-sm tabular-nums">{filterKeys(issueView).length}</span>
+              ) : null}
+            </button>
+          )}
+        />
+
+        <Menu
+          label="Grouping"
+          items={groupOptions.map((g) => ({ value: g, label: groupLabel[g] }))}
+          value={issueView.groupBy}
+          onSelect={(g) => patchView({ groupBy: g })}
+          trigger={(props) => (
+            <button
+              ref={props.ref}
+              type="button"
+              onClick={props.onClick}
+              aria-haspopup={props["aria-haspopup"]}
+              aria-expanded={props["aria-expanded"]}
+              className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-ui font-medium text-ink-2 hover:bg-hover hover:text-ink"
+            >
+              Group <span className="text-ink">{groupLabel[issueView.groupBy]}</span>
+            </button>
+          )}
+        />
+
+        {view === "list" ? (
+          <>
+            <Menu
+              label="Sorting"
+              items={sortOptions.map((s) => ({ value: s, label: sortLabel[s] }))}
+              value={issueView.sortBy}
+              onSelect={(s) => patchView({ sortBy: s })}
+              trigger={(props) => (
+                <button
+                  ref={props.ref}
+                  type="button"
+                  onClick={props.onClick}
+                  aria-haspopup={props["aria-haspopup"]}
+                  aria-expanded={props["aria-expanded"]}
+                  className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-ui font-medium text-ink-2 hover:bg-hover hover:text-ink"
+                >
+                  Sort <span className="text-ink">{sortLabel[issueView.sortBy]}</span>
+                </button>
+              )}
+            />
+            <button
+              type="button"
+              aria-label={issueView.dir === "asc" ? "Sort ascending" : "Sort descending"}
+              title={issueView.dir === "asc" ? "Ascending" : "Descending"}
+              onClick={() => patchView({ dir: issueView.dir === "asc" ? "desc" : "asc" })}
+              className="inline-flex size-7 items-center justify-center rounded-md text-ink-2 hover:bg-hover hover:text-ink"
+            >
+              {issueView.dir === "asc" ? (
+                <ArrowUp aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+              ) : (
+                <ArrowDown aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+              )}
+            </button>
+          </>
+        ) : null}
+
         {issues.data ? (
-          <span className="text-sm text-ink-2 tabular-nums">
-            {issues.data.length} {issues.data.length === 1 ? "issue" : "issues"}
+          <span className="ms-auto text-sm text-ink-2 tabular-nums">
+            {hasFilters(issueView)
+              ? `${filtered.length} of ${issues.data.length} ${issues.data.length === 1 ? "issue" : "issues"}`
+              : `${issues.data.length} ${issues.data.length === 1 ? "issue" : "issues"}`}
           </span>
         ) : null}
       </div>
+
+      {filterKeys(issueView).length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1.5 px-6 pb-2">
+          {filterKeys(issueView).map((key) => (
+            <FilterPill key={key} name={filterName(key)} onRemove={() => toggleFilterKey(key)} />
+          ))}
+          <Button variant="ghost" className="h-6 px-2 text-ui text-ink-2" onClick={clearFilters}>
+            Clear
+          </Button>
+        </div>
+      ) : null}
 
       <div className="min-h-0 flex-1 overflow-auto" id="issues">
         {loading ? (
@@ -228,6 +446,18 @@ function TeamIssues({ team }: { team: Team }) {
                   New issue <Kbd>C</Kbd>
                 </Button>
               }
+            />
+          </PageBody>
+        ) : filtered.length === 0 ? (
+          <PageBody>
+            <EmptyState
+              title="No issues match"
+              body={issues.data?.length ? "The team's issues all fall outside these filters." : "Nothing has matched yet."}
+              action={issues.data?.length ? (
+                <Button variant="ghost" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              ) : null}
             />
           </PageBody>
         ) : view === "list" ? (
@@ -245,7 +475,7 @@ function TeamIssues({ team }: { team: Team }) {
           />
         ) : (
           <IssueBoard
-            groups={groups}
+            groups={boardGroups}
             statuses={statusList}
             labels={labels.data ?? []}
             orgMembers={orgMembers.data ?? []}
@@ -304,13 +534,53 @@ function TeamIssues({ team }: { team: Team }) {
   );
 }
 
-function GroupHeading({ group, statuses }: { group: StatusGroup; statuses: Status[] }) {
+// A group names what its rows share: a status, a priority or an assignee.
+function groupKey(group: IssueGroup): string {
+  if (group.status) return group.status.id;
+  if (group.priority) return `priority:${group.priority}`;
+  return group.assignee ? `assignee:${group.assignee.id}` : "unassigned";
+}
+
+function groupName(group: IssueGroup): string {
+  if (group.status) return group.status.name;
+  if (group.priority) return priorityLabel[group.priority];
+  return group.assignee ? group.assignee.name : "Unassigned";
+}
+
+function GroupHeading({ group, statuses }: { group: IssueGroup; statuses: Status[] }) {
   return (
     <h2 className="flex h-[34px] items-center gap-2 bg-bg px-3 text-sm font-semibold text-ink">
-      <StatusIcon category={group.status.category} fill={statusFill(statuses, group.status)} />
-      <span>{group.status.name}</span>
+      {group.status ? (
+        <StatusIcon category={group.status.category} fill={statusFill(statuses, group.status)} />
+      ) : group.priority ? (
+        <PriorityIcon priority={group.priority} />
+      ) : group.assignee ? (
+        <span className="shrink-0">
+          <Avatar name={group.assignee.name} size={18} />
+        </span>
+      ) : (
+        <NoAssignee size={18} />
+      )}
+      <span>{groupName(group)}</span>
       <span className="font-normal text-ink-2 tabular-nums">{group.issues.length}</span>
     </h2>
+  );
+}
+
+// A removed-in-one-click chip for one active filter value.
+function FilterPill({ name, onRemove }: { name: string; onRemove: () => void }) {
+  return (
+    <span className="inline-flex h-6 items-center gap-1 rounded-md bg-hover ps-2 pe-1 text-ui text-ink">
+      {name}
+      <button
+        type="button"
+        aria-label={`Remove filter ${name}`}
+        onClick={onRemove}
+        className="grid size-4 place-items-center rounded-xs text-ink-2 hover:text-ink"
+      >
+        <X aria-hidden="true" className="size-3" strokeWidth={1.75} />
+      </button>
+    </span>
   );
 }
 
@@ -380,7 +650,7 @@ function IssueList({
   onOpen,
   onFocus,
 }: {
-  groups: StatusGroup[];
+  groups: IssueGroup[];
   statuses: Status[];
   labels: Label[];
   // The whole team's issues, to name a row's parent.
@@ -396,7 +666,7 @@ function IssueList({
   return (
     <div className="px-3 pb-28">
       {groups.map((group) => (
-        <section key={group.status.id} aria-label={group.status.name} className="mb-3">
+        <section key={groupKey(group)} aria-label={groupName(group)} className="mb-3">
           <div className="sticky top-0 z-[1]">
             <GroupHeading group={group} statuses={statuses} />
           </div>
