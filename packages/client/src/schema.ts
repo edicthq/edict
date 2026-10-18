@@ -984,6 +984,447 @@ export interface paths {
         };
         trace?: never;
     };
+    "/organizations/{orgId}/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List projects in the organization */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Organization projects */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Project"][];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create a project */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateProject"];
+                };
+            };
+            responses: {
+                /** @description The created project */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Project"];
+                    };
+                };
+                /** @description The request does not match the schema */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Conflicts with the current state */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{orgId}/projects/{projectRef}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a project by ID or slug */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                    /** @description The project's id or slug */
+                    projectRef: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The project */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Project"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No longer valid */
+                410: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Move a project to trash */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                    /** @description The project's id or slug */
+                    projectRef: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Done */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The caller's role does not allow this */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No longer valid */
+                410: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Update a project */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                    /** @description The project's id or slug */
+                    projectRef: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateProject"];
+                };
+            };
+            responses: {
+                /** @description The updated project */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Project"];
+                    };
+                };
+                /** @description The request does not match the schema */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Optimistic concurrency conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProjectConflict"];
+                    };
+                };
+                /** @description No longer valid */
+                410: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/organizations/{orgId}/projects/{projectRef}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore a project from trash */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                    /** @description The project's id or slug */
+                    projectRef: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The restored project */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Project"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{orgId}/projects/{projectRef}/issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List issues belonging to a project across teams */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                    /** @description The project's id or slug */
+                    projectRef: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Issues belonging to the project */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Issue"][];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No longer valid */
+                410: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{orgId}/teams/{teamId}/issues": {
         parameters: {
             query?: never;
@@ -1875,6 +2316,7 @@ export interface paths {
                     priority?: components["schemas"]["Priority"];
                     assigneeId?: string;
                     delegateId?: string;
+                    projectId?: string;
                     labelId?: string;
                     /** @description open leaves out issues in a Done or Canceled status, unless statusId or statusCategory asks for one */
                     include?: "open" | "all";
@@ -2510,6 +2952,62 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["TrashedIssue"][];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{orgId}/trash/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trashed projects in the organization, most recently deleted first */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Trashed projects */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TrashedProject"][];
                     };
                 };
                 /** @description Not signed in */
@@ -5425,6 +5923,89 @@ export interface components {
             /** @enum {boolean} */
             default?: true;
         };
+        Project: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            slug: components["schemas"]["ProjectSlug"];
+            description: string;
+            status: components["schemas"]["ProjectStatus"];
+            /** Format: uuid */
+            leadId: string | null;
+            /** Format: date-time */
+            startDate: string | null;
+            /** Format: date-time */
+            targetDate: string | null;
+            progress: components["schemas"]["ProjectProgress"];
+            version: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        ProjectSlug: string;
+        /** @enum {string} */
+        ProjectStatus: "planned" | "in_progress" | "paused" | "completed" | "canceled";
+        ProjectProgress: {
+            total: number;
+            completed: number;
+            percentage: number;
+            byCategory: {
+                backlog: number;
+                todo: number;
+                in_progress: number;
+                done: number;
+                canceled: number;
+            };
+            estimate: {
+                total: number;
+                completed: number;
+            };
+        };
+        CreateProject: {
+            name: string;
+            slug?: components["schemas"]["ProjectSlug"];
+            /** @default  */
+            description: string;
+            status?: components["schemas"]["ProjectStatus"];
+            /**
+             * Format: uuid
+             * @default null
+             */
+            leadId: string | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            startDate: string | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            targetDate: string | null;
+        };
+        ProjectConflict: {
+            error: {
+                /** @enum {string} */
+                code: "conflict";
+                message: string;
+                fields: string[];
+                current: components["schemas"]["Project"];
+            };
+        };
+        UpdateProject: {
+            version: number;
+            name?: string;
+            slug?: components["schemas"]["ProjectSlug"];
+            description?: string;
+            status?: components["schemas"]["ProjectStatus"];
+            /** Format: uuid */
+            leadId?: string | null;
+            /** Format: date-time */
+            startDate?: string | null;
+            /** Format: date-time */
+            targetDate?: string | null;
+        };
         Issue: {
             /** Format: uuid */
             id: string;
@@ -5432,6 +6013,8 @@ export interface components {
             number: number;
             /** Format: uuid */
             teamId: string;
+            /** Format: uuid */
+            projectId: string | null;
             title: string;
             description: string;
             /** Format: uuid */
@@ -5498,6 +6081,8 @@ export interface components {
              * @default null
              */
             delegateId: string | null;
+            /** Format: uuid */
+            projectId?: string | null;
             /** @default [] */
             labelIds: string[];
             /**
@@ -5544,6 +6129,8 @@ export interface components {
             assigneeId?: string | null;
             /** Format: uuid */
             delegateId?: string | null;
+            /** Format: uuid */
+            projectId?: string | null;
             labelIds?: string[];
             /** Format: uuid */
             parentId?: string | null;
@@ -5562,6 +6149,8 @@ export interface components {
             assigneeId?: string | null;
             /** Format: uuid */
             delegateId?: string | null;
+            /** Format: uuid */
+            projectId?: string | null;
             labelIds?: string[];
             /** Format: uuid */
             teamId?: string;
@@ -5642,6 +6231,18 @@ export interface components {
             title: string;
             /** Format: uuid */
             teamId: string;
+            /** Format: date-time */
+            deletedAt: string;
+            /** Format: uuid */
+            deletedById: string;
+            /** Format: uuid */
+            changeId: string;
+        };
+        TrashedProject: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            slug: components["schemas"]["ProjectSlug"];
             /** Format: date-time */
             deletedAt: string;
             /** Format: uuid */

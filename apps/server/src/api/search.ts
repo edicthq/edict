@@ -18,6 +18,7 @@ const SearchQuery = z.object({
   priority: Priority.optional(),
   assigneeId: Id.optional(),
   delegateId: Id.optional(),
+  projectId: Id.optional(),
   labelId: Id.optional(),
   include: z.enum(["open", "all"]).default("open").meta({
     description: "open leaves out issues in a Done or Canceled status, unless statusId or statusCategory asks for one",
@@ -77,6 +78,7 @@ export function searchRoutes(deps: ApiDeps) {
             query.priority ? eq(issues.priority, query.priority) : undefined,
             query.assigneeId ? eq(issues.assigneeId, query.assigneeId) : undefined,
             query.delegateId ? eq(issues.delegateId, query.delegateId) : undefined,
+            query.projectId ? eq(issues.projectId, query.projectId) : undefined,
             query.labelId
               ? inArray(issues.id, tx.select({ id: issueLabels.issueId }).from(issueLabels).where(eq(issueLabels.labelId, query.labelId)))
               : undefined,

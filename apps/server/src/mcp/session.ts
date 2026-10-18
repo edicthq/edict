@@ -1,7 +1,7 @@
 // What one MCP request works with: the caller's API client and the values it
 // resolves names against. The MCP server calls the API only through
 // packages/client (AGENTS.md), in process, with the caller's own token.
-import type { Agent, EdictClient, Issue, Label, Member, Status, StatusCategory, Team } from "@edicthq/client";
+import type { Agent, EdictClient, Issue, Label, Member, Project, Status, StatusCategory, Team } from "@edicthq/client";
 
 // A tool's failure, worded for the agent: what went wrong and what to do.
 export class ToolError extends Error {}
@@ -91,6 +91,23 @@ export class Session {
 
   agents(): Promise<Agent[]> {
     return this.once("agents", () => ok(this.api.GET("/organizations/{orgId}/agents", { params: { path: this.path } })));
+  }
+
+  projects(): Promise<Project[]> {
+    return this.once("projects", () => ok(this.api.GET("/organizations/{orgId}/projects", { params: { path: this.path } })));
+  }
+
+  async project(value: string): Promise<Project> {
+    const projects = await this.projects();
+    const found = projects.find((p) => p.id === value || norm(p.slug) === norm(value) || norm(p.name) === norm(value));
+    if (!found) {
+      try {
+        return await ok(this.api.GET("/organizations/{orgId}/projects/{projectRef}", { params: { path: { ...this.path, projectRef: value } } }));
+      } catch {
+        throw new ToolError(`No project "${value}". Projects: ${projects.map((p) => `${p.slug} (${p.name})`).join(", ") || "none"}.`);
+      }
+    }
+    return found;
   }
 
   issue(ref: string): Promise<Issue> {

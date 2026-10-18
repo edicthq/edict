@@ -235,6 +235,109 @@ export type WebhookDelivery = z.infer<typeof WebhookDelivery>;
 // through OAuth (ADR 0021).
 export const ConnectionOrganization = z.object({ orgId: Id }).meta({ id: "ConnectionOrganization" });
 
+// ADR 0002, GLOSSARY.md
+export const ProjectStatus = z
+  .enum(["planned", "in_progress", "paused", "completed", "canceled"])
+  .meta({ id: "ProjectStatus" });
+export type ProjectStatus = z.infer<typeof ProjectStatus>;
+
+export const ProjectSlug = z
+  .string()
+  .regex(/^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?$/, "1-48 lowercase letters, digits and dashes")
+  .meta({ id: "ProjectSlug" });
+
+export const ProjectRef = z.string().min(1).max(64).meta({
+  description: "The project's id or slug",
+});
+
+export const ProjectProgress = z
+  .object({
+    total: z.number().int(),
+    completed: z.number().int(),
+    percentage: z.number().int().min(0).max(100),
+    byCategory: z.object({
+      backlog: z.number().int(),
+      todo: z.number().int(),
+      in_progress: z.number().int(),
+      done: z.number().int(),
+      canceled: z.number().int(),
+    }),
+    estimate: z.object({
+      total: z.number().int(),
+      completed: z.number().int(),
+    }),
+  })
+  .meta({ id: "ProjectProgress" });
+export type ProjectProgress = z.infer<typeof ProjectProgress>;
+
+export const Project = z
+  .object({
+    id: Id,
+    name: z.string(),
+    slug: ProjectSlug,
+    description: z.string(),
+    status: ProjectStatus,
+    leadId: Id.nullable(),
+    startDate: z.iso.datetime().nullable(),
+    targetDate: z.iso.datetime().nullable(),
+    progress: ProjectProgress,
+    version: Version,
+    createdAt: z.iso.datetime(),
+    updatedAt: z.iso.datetime(),
+  })
+  .meta({ id: "Project" });
+export type Project = z.infer<typeof Project>;
+
+export const CreateProject = z
+  .object({
+    name: z.string().trim().min(1).max(80),
+    slug: ProjectSlug.optional(),
+    description: z.string().max(20_000).default(""),
+    status: ProjectStatus.default("planned"),
+    leadId: Id.nullable().default(null),
+    startDate: z.iso.datetime().nullable().default(null),
+    targetDate: z.iso.datetime().nullable().default(null),
+  })
+  .meta({ id: "CreateProject" });
+export type CreateProject = z.infer<typeof CreateProject>;
+
+export const UpdateProject = z
+  .object({
+    version: Version,
+    name: z.string().trim().min(1).max(80).optional(),
+    slug: ProjectSlug.optional(),
+    description: z.string().max(20_000).optional(),
+    status: ProjectStatus.optional(),
+    leadId: Id.nullable().optional(),
+    startDate: z.iso.datetime().nullable().optional(),
+    targetDate: z.iso.datetime().nullable().optional(),
+  })
+  .meta({ id: "UpdateProject" });
+export type UpdateProject = z.infer<typeof UpdateProject>;
+
+export const ProjectConflict = z
+  .object({
+    error: z.object({
+      code: z.literal("conflict"),
+      message: z.string(),
+      fields: z.array(z.string()),
+      current: Project,
+    }),
+  })
+  .meta({ id: "ProjectConflict" });
+
+export const TrashedProject = z
+  .object({
+    id: Id,
+    name: z.string(),
+    slug: ProjectSlug,
+    deletedAt: z.iso.datetime(),
+    deletedById: Id,
+    changeId: Id,
+  })
+  .meta({ id: "TrashedProject" });
+export type TrashedProject = z.infer<typeof TrashedProject>;
+
 export const TeamKey = z
   .string()
   .regex(/^[A-Z][A-Z0-9]{1,6}$/, "2-7 uppercase letters and digits, starting with a letter");
@@ -463,6 +566,7 @@ export const Issue = z
     identifier: Identifier,
     number: z.number().int(),
     teamId: Id,
+    projectId: Id.nullable(),
     title: z.string(),
     // Markdown.
     description: z.string(),
@@ -497,6 +601,7 @@ export const CreateIssue = z
     estimate: Estimate.nullable().default(null),
     assigneeId: Id.nullable().default(null),
     delegateId: Id.nullable().default(null),
+    projectId: Id.nullable().optional(),
     labelIds: LabelIds.default([]),
     parentId: Id.nullable().default(null),
   })
@@ -514,6 +619,7 @@ export const UpdateIssue = z
     assigneeId: Id.nullable().optional(),
     // An agent who can see the issue's team.
     delegateId: Id.nullable().optional(),
+    projectId: Id.nullable().optional(),
     // Replaces the whole set.
     labelIds: LabelIds.optional(),
     parentId: Id.nullable().optional(),
@@ -541,6 +647,7 @@ export const BulkUpdateIssues = z
     priority: Priority.optional(),
     assigneeId: Id.nullable().optional(),
     delegateId: Id.nullable().optional(),
+    projectId: Id.nullable().optional(),
     labelIds: LabelIds.optional(),
     teamId: Id.optional(),
   })

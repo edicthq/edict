@@ -16,6 +16,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { members, teams } from "./tenancy.js";
+import { projects } from "./projects.js";
 
 // Like tenancy.ts: every table carries org_id under row-level security, and
 // references to other org-owned rows use composite keys that include it.
@@ -92,6 +93,8 @@ export const issues = pgTable(
     assigneeId: uuid("assignee_id"),
     // The agent doing the work while the assignee answers for it (ADR 0008).
     delegateId: uuid("delegate_id"),
+    // Groups issues across teams into a goal (GLOSSARY.md, ADR 0002).
+    projectId: uuid("project_id"),
     // Makes this a sub-issue. The parent can be in any team.
     parentId: uuid("parent_id"),
     creatorId: uuid("creator_id").notNull(),
@@ -116,6 +119,7 @@ export const issues = pgTable(
     unique("issues_team_id_number_unique").on(table.teamId, table.number),
     index("issues_assignee_id_idx").on(table.assigneeId),
     index("issues_delegate_id_idx").on(table.delegateId),
+    index("issues_project_id_idx").on(table.projectId),
     index("issues_parent_id_idx").on(table.parentId),
     check("issues_not_own_parent", sql`${table.parentId} <> ${table.id}`),
     check("issues_estimate_not_negative", sql`${table.estimate} >= 0`),
@@ -140,6 +144,11 @@ export const issues = pgTable(
       columns: [table.orgId, table.delegateId],
       foreignColumns: [members.orgId, members.id],
     }),
+    foreignKey({
+      name: "issues_project_fk",
+      columns: [table.orgId, table.projectId],
+      foreignColumns: [projects.orgId, projects.id],
+    }).onDelete("set null"),
     foreignKey({
       name: "issues_parent_fk",
       columns: [table.orgId, table.parentId],

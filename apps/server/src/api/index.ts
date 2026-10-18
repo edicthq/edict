@@ -14,6 +14,7 @@ import { labelRoutes } from "./labels.js";
 import { linkRoutes } from "./links.js";
 import { organizationRoutes } from "./organizations.js";
 import { progressRoutes } from "./progress.js";
+import { projectRoutes } from "./projects.js";
 import { relationRoutes } from "./relations.js";
 import { savedViewRoutes } from "./saved-views.js";
 import { searchRoutes } from "./search.js";
@@ -36,6 +37,7 @@ export function createApi(deps: AttachmentDeps & WebhookDeps) {
   api.route("/", organizationRoutes(deps));
   api.route("/", teamRoutes(deps));
   api.route("/", statusRoutes(deps));
+  api.route("/", projectRoutes(deps));
   api.route("/", issueRoutes(deps));
   api.route("/", progressRoutes(deps));
   api.route("/", linkRoutes(deps));

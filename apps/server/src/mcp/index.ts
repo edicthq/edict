@@ -8,7 +8,7 @@ import { z } from "zod";
 import { createEdictClient } from "@edicthq/client";
 import type { OAuthDiscovery } from "../oauth.js";
 import { Session } from "./session.js";
-import { registerTools, renderIssue } from "./tools.js";
+import { registerTools, renderIssue, renderProject } from "./tools.js";
 
 const instructions = `Edict is the issue tracker your team uses. You are an agent member of the organization: issues delegated to you are your queue, and the person assigned still answers for each.
 To do your Edict work: call my_work, then for each issue get_issue, post_progress with state working, do the work, link pull requests, comment with what people should know, update_issue to move its status, and post_progress done.
@@ -80,6 +80,15 @@ function createServer(session: Session, organizationName: string): McpServer {
     { title: "Issue", description: "An issue by identifier, as get_issue shows it", mimeType: "text/markdown" },
     async (uri, { identifier }) => ({
       contents: [{ uri: uri.href, mimeType: "text/markdown", text: await renderIssue(session, String(identifier)) }],
+    }),
+  );
+
+  server.registerResource(
+    "project",
+    new ResourceTemplate("edict://project/{slug}", { list: undefined }),
+    { title: "Project", description: "A project by slug, as get_project shows it", mimeType: "text/markdown" },
+    async (uri, { slug }) => ({
+      contents: [{ uri: uri.href, mimeType: "text/markdown", text: await renderProject(session, String(slug)) }],
     }),
   );
 

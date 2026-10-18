@@ -13,6 +13,7 @@ import {
   checkDelegate,
   checkLabels,
   checkParent,
+  checkProject,
   checkStatus,
   labelSet,
   linkedIssues,
@@ -162,6 +163,7 @@ export async function applyIssueUpdate(
   if (next.assigneeId && (changes.teamId || changes.assigneeId)) await checkAssignee(tx, target, next.assigneeId);
   if (next.delegateId && (changes.teamId || changes.delegateId)) await checkDelegate(tx, target, next.delegateId);
   if (changes.labelIds || changes.teamId) await checkLabels(tx, target, next.labelIds);
+  if (changes.projectId && next.projectId) await checkProject(tx, orgId, next.projectId);
   if (changes.parentId && next.parentId) await checkParent(tx, caller, next.parentId, row.id);
 
   // Changes the move made without being asked, recorded like the rest.
@@ -193,6 +195,7 @@ export async function applyIssueUpdate(
       estimate: next.estimate,
       assigneeId: next.assigneeId,
       delegateId: next.delegateId,
+      projectId: next.projectId,
       parentId: next.parentId,
       teamId: target.id,
       number,
@@ -251,6 +254,7 @@ export function issueRoutes(deps: ApiDeps) {
       }
       if (input.assigneeId) await checkAssignee(tx, team, input.assigneeId);
       if (input.delegateId) await checkDelegate(tx, team, input.delegateId);
+      if (input.projectId) await checkProject(tx, orgId, input.projectId);
       if (input.parentId) await checkParent(tx, caller, input.parentId);
       await checkLabels(tx, team, labelIds);
 

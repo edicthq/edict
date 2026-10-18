@@ -1,14 +1,15 @@
 import { createRoute } from "@hono/zod-openapi";
 import { asc, eq, sql } from "drizzle-orm";
-import { comments, emit, events, issueLabels, issueRelations, issues, type Transaction } from "@edicthq/db";
+import { comments, emit, events, issueLabels, issueRelations, issues, projects, type Transaction } from "@edicthq/db";
 import { Id, UndoResult } from "@edicthq/schema";
 import type { Caller } from "./callers.js";
 import { visibleTeam } from "./access.js";
 import { errors, inOrg, json, OrgParams, router, type ApiDeps } from "./context.js";
 import { ApiError, conflict, forbidden, invalid, isUniqueViolation, notFound } from "./errors.js";
-import { checkAssignee, checkDelegate, checkLabels, checkParent, checkStatus, labelSet, loadIssue, visibleIssue } from "./issue-data.js";
+import { checkAssignee, checkDelegate, checkLabels, checkParent, checkProject, checkStatus, labelSet, loadIssue, visibleIssue } from "./issue-data.js";
 import { relink, unlink } from "./links.js";
 import { restoreComment, restoreIssues, trashComment, trashIssues } from "./trash.js";
+import { visibleProject } from "./projects.js";
 
 type EventRow = typeof events.$inferSelect;
 type FieldChange = { from: unknown; to: unknown };
@@ -74,6 +75,51 @@ const inverses: Record<string, (tx: Transaction, caller: Caller, event: EventRow
       subjectId: row.id,
       data: { issueId: row.issueId, version: updated!.version, changes: { body: { from: row.body, to: body } }, ...mark.data },
     });
+  },
+  "project.created": async (tx, caller, event, mark) => {
+    const project = await visibleProject(tx, caller, event.subjectId, { forUpdate: true, trashed: true });
+    if (!project.deletedAt) {
+      await tx
+        .update(projects)
+        .set({ deletedAt: sql`now()`, deletedBy: caller.id, deletedChangeId: mark.changeId })
+        .where(eq(projects.id, project.id));
+      await emit(tx, caller.orgId, {
+        type: "project.deleted",
+        actorId: caller.id,
+        subjectId: project.id,
+        data: { name: project.name, slug: project.slug, ...mark.data },
+      });
+    }
+  },
+  "project.deleted": async (tx, caller, event, mark) => {
+    const project = await visibleProject(tx, caller, event.subjectId, { forUpdate: true, trashed: true });
+    if (project.deletedChangeId === event.changeId) {
+      await tx
+        .update(projects)
+        .set({ deletedAt: null, deletedBy: null, deletedChangeId: null })
+        .where(eq(projects.id, project.id));
+      await emit(tx, caller.orgId, {
+        type: "project.restored",
+        actorId: caller.id,
+        subjectId: project.id,
+        data: { name: project.name, slug: project.slug, ...mark.data },
+      });
+    }
+  },
+  "project.restored": async (tx, caller, event, mark) => {
+    const project = await visibleProject(tx, caller, event.subjectId, { forUpdate: true, trashed: true });
+    if (!project.deletedAt) {
+      await tx
+        .update(projects)
+        .set({ deletedAt: sql`now()`, deletedBy: caller.id, deletedChangeId: mark.changeId })
+        .where(eq(projects.id, project.id));
+      await emit(tx, caller.orgId, {
+        type: "project.deleted",
+        actorId: caller.id,
+        subjectId: project.id,
+        data: { name: project.name, slug: project.slug, ...mark.data },
+      });
+    }
   },
   "relation.created": async (tx, caller, event, mark) => {
     const [row] = await tx.delete(issueRelations).where(eq(issueRelations.id, event.subjectId)).returning();
@@ -163,6 +209,7 @@ async function setIssueBack(tx: Transaction, caller: Caller, event: EventRow, ma
   if (next.delegateId && (fields.includes("delegateId") || fields.includes("teamId"))) {
     await checkDelegate(tx, target, next.delegateId);
   }
+  if (fields.includes("projectId") && next.projectId) await checkProject(tx, caller.orgId, next.projectId);
   if (fields.includes("parentId") && next.parentId) await checkParent(tx, caller, next.parentId, row.id);
 
   const changes: Record<string, FieldChange> = Object.fromEntries(
@@ -184,6 +231,7 @@ async function setIssueBack(tx: Transaction, caller: Caller, event: EventRow, ma
       estimate: next.estimate,
       assigneeId: next.assigneeId,
       delegateId: next.delegateId,
+      projectId: next.projectId,
       parentId: next.parentId,
       teamId: target.id,
       number,

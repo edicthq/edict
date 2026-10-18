@@ -5,6 +5,7 @@ import {
   issues,
   labels,
   progressUpdates,
+  projects,
   statuses,
   teamKeys,
   teams,
@@ -24,6 +25,7 @@ export function toIssue(row: IssueRow, teamKey: string, labelIds: string[], late
     identifier: `${teamKey}-${row.number}`,
     number: row.number,
     teamId: row.teamId,
+    projectId: row.projectId,
     title: row.title,
     description: row.description,
     statusId: row.statusId,
@@ -216,6 +218,17 @@ export async function checkLabels(tx: Transaction, team: TeamRow, labelIds: stri
     throw invalid(
       `labelIds must be organization labels or labels of team ${team.key}. GET the team's labels for the valid ones.`,
     );
+  }
+}
+
+// A project in the organization that is not in the trash.
+export async function checkProject(tx: Transaction, orgId: string, projectId: string): Promise<void> {
+  const [project] = await tx
+    .select({ id: projects.id })
+    .from(projects)
+    .where(and(eq(projects.orgId, orgId), eq(projects.id, projectId), isNull(projects.deletedAt)));
+  if (!project) {
+    throw invalid("projectId is not a project in this organization.");
   }
 }
 

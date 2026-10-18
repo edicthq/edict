@@ -1,7 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
-import { comments, emit, issues, teams, type Transaction } from "@edicthq/db";
-import { BulkDeleteIssues, Comment, Id, Issue, IssueRef, TrashedIssue } from "@edicthq/schema";
+import { comments, emit, issues, projects, teams, type Transaction } from "@edicthq/db";
+import { BulkDeleteIssues, Comment, Id, Issue, IssueRef, TrashedIssue, TrashedProject } from "@edicthq/schema";
 import type { Caller } from "./callers.js";
 import { atLeast, requireAgentPower, teamVisibility } from "./access.js";
 import { toComment } from "./comments.js";
@@ -163,6 +163,15 @@ const listTrash = createRoute({
   responses: { 200: json(z.array(TrashedIssue), "Trashed issues"), ...errors("unauthorized", "not_found") },
 });
 
+const listTrashedProjects = createRoute({
+  method: "get",
+  path: "/organizations/{orgId}/trash/projects",
+  tags: ["Trash"],
+  summary: "Trashed projects in the organization, most recently deleted first",
+  request: { params: OrgParams },
+  responses: { 200: json(z.array(TrashedProject), "Trashed projects"), ...errors("unauthorized", "not_found") },
+});
+
 const deleteComment = createRoute({
   method: "delete",
   path: "/organizations/{orgId}/comments/{commentId}",
@@ -248,6 +257,26 @@ export function trashRoutes(deps: ApiDeps) {
         deletedAt: issue.deletedAt!.toISOString(),
         deletedById: issue.deletedBy!,
         changeId: issue.deletedChangeId!,
+      }));
+    });
+    return c.json(list, 200);
+  });
+
+  app.openapi(listTrashedProjects, async (c) => {
+    const { orgId } = c.req.valid("param");
+    const list = await inOrg(deps, c, orgId, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(projects)
+        .where(and(eq(projects.orgId, orgId), isNotNull(projects.deletedAt)))
+        .orderBy(desc(projects.deletedAt));
+      return rows.map((project) => ({
+        id: project.id,
+        name: project.name,
+        slug: project.slug,
+        deletedAt: project.deletedAt!.toISOString(),
+        deletedById: project.deletedBy!,
+        changeId: project.deletedChangeId!,
       }));
     });
     return c.json(list, 200);

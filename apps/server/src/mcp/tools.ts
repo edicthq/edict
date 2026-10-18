@@ -99,6 +99,35 @@ export async function renderIssue(session: Session, ref: string): Promise<string
   return out.join("\n");
 }
 
+// A project as get_project and the edict://project resource show it.
+export async function renderProject(session: Session, ref: string): Promise<string> {
+  const project = await session.project(ref);
+  const issues = await ok(
+    session.api.GET("/organizations/{orgId}/projects/{projectRef}/issues", {
+      params: { path: { ...session.path, projectRef: project.id } },
+    }),
+  );
+  const lead = await session.memberName(project.leadId);
+  const out = [
+    `# ${project.name} (${project.slug})`,
+    "",
+    `Status: ${project.status}`,
+    `Lead: ${lead ?? "none"}`,
+    `Progress: ${project.progress.percentage}% (${project.progress.completed}/${project.progress.total} issues completed)`,
+    `Target Date: ${project.targetDate ?? "none"}`,
+    `Version: ${project.version}`,
+    "",
+    "## Description",
+    "",
+    project.description || "_No description._",
+    "",
+    "## Issues",
+    "",
+    await list(session, issues, "_No issues in this project._"),
+  ];
+  return out.join("\n");
+}
+
 export function registerTools(server: McpServer, session: Session): void {
   server.registerTool(
     "my_work",
@@ -131,6 +160,7 @@ export function registerTools(server: McpServer, session: Session): void {
         delegate: z.string().optional().describe("@handle or name of an agent, or me"),
         label: z.string().optional(),
         priority: priorityArg.optional(),
+        project: z.string().optional().describe("Project slug, name or ID"),
         include_closed: z.boolean().default(false),
         limit: z.number().int().min(1).max(100).default(25),
       },
@@ -156,6 +186,7 @@ export function registerTools(server: McpServer, session: Session): void {
         if (!team) throw new ToolError("Give a team to search by label.");
         query.labelId = (await session.labelIds(team.id, [args.label]))[0]!;
       }
+      if (args.project) query.projectId = (await session.project(args.project)).id;
       const issues = await ok(
         session.api.GET("/organizations/{orgId}/issues", { params: { path: session.path, query: query as never } }),
       );
@@ -188,12 +219,14 @@ export function registerTools(server: McpServer, session: Session): void {
         assignee: z.string().optional().describe("The person who answers for it: @handle or name"),
         delegate: z.string().optional().describe("The agent who does it: @handle, name, or me"),
         labels: z.array(z.string()).optional(),
+        project: z.string().optional().describe("Project slug, name or ID"),
         parent: z.string().optional().describe("Identifier of the parent issue, to make a sub-issue"),
       },
     },
     tool(async (args) => {
       const team = await session.team(args.team);
       const parent = args.parent ? await session.issue(args.parent) : undefined;
+      const project = args.project ? await session.project(args.project) : undefined;
       const created = await ok(
         session.api.POST("/organizations/{orgId}/teams/{teamId}/issues", {
           params: { path: { ...session.path, teamId: team.id } },
@@ -206,6 +239,7 @@ export function registerTools(server: McpServer, session: Session): void {
             assigneeId: args.assignee ? (await session.member(args.assignee, "human", "assignee")).id : null,
             delegateId: args.delegate ? (await session.member(args.delegate, "agent", "delegate")).id : null,
             labelIds: args.labels ? await session.labelIds(team.id, args.labels) : [],
+            projectId: project?.id ?? null,
             parentId: parent?.id ?? null,
           },
         }),
@@ -234,6 +268,7 @@ export function registerTools(server: McpServer, session: Session): void {
         add_labels: z.array(z.string()).optional(),
         remove_labels: z.array(z.string()).optional(),
         team: z.string().optional().describe("Move to this team; the issue gets a new identifier"),
+        project: z.string().nullable().optional().describe("Project slug, name or ID; null to clear"),
         parent: z.string().nullable().optional().describe("Parent identifier; null to clear"),
       },
     },
@@ -262,6 +297,7 @@ export function registerTools(server: McpServer, session: Session): void {
         body.labelIds = ids;
       }
       if (args.team) body.teamId = target.id;
+      if (args.project !== undefined) body.projectId = args.project === null ? null : (await session.project(args.project)).id;
       if (args.parent !== undefined) body.parentId = args.parent === null ? null : (await session.issue(args.parent)).id;
       const updated = await ok(
         session.api.PATCH("/organizations/{orgId}/issues/{issueRef}", {
@@ -399,5 +435,15 @@ export function registerTools(server: McpServer, session: Session): void {
         "Templates arrive in a later version of Edict.",
       ].join("\n");
     }),
+  );
+
+  server.registerTool(
+    "get_project",
+    {
+      title: "Get project",
+      description: "Read a project by slug or ID with its progress and issues.",
+      inputSchema: { project: z.string().describe("Project slug or ID") },
+    },
+    tool(async ({ project }) => renderProject(session, project)),
   );
 }

@@ -197,6 +197,20 @@
       "when": 1792329140010,
       "tag": "0028_saved_views_row_level_security",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1792350126125,
+      "tag": "0029_old_mikhail_rasputin",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1792350130000,
+      "tag": "0030_projects_row_level_security",
+      "breakpoints": true
     }
   ]
 }

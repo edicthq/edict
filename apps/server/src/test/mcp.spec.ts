@@ -66,6 +66,7 @@ describe("/mcp", () => {
       "comment",
       "create_issue",
       "get_issue",
+      "get_project",
       "get_team_context",
       "link",
       "list_teams",
@@ -76,7 +77,7 @@ describe("/mcp", () => {
       "update_issue",
     ]);
     const templates = (await client.listResourceTemplates()).resourceTemplates.map((r) => r.uriTemplate);
-    expect(templates).toEqual(["edict://issue/{identifier}"]);
+    expect(templates).toEqual(["edict://issue/{identifier}", "edict://project/{slug}"]);
     const prompts = (await client.listPrompts()).prompts.map((p) => p.name).sort();
     expect(prompts).toEqual(["plan_issues", "work_my_queue"]);
   });
