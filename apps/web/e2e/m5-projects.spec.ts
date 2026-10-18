@@ -7,14 +7,14 @@ test("Milestone 5: Projects cross-team tracking, progress metrics, and My Issues
   const headers = { origin: baseURL! };
   const signUp = await page.request.post("/api/auth/sign-up/email", {
     headers,
-    data: { name: "Amirali BG", email: "amirali@example.com", password: "correct-horse-battery" },
+    data: { name: "Nadia Cole", email: "nadia@example.com", password: "correct-horse-battery" },
   });
   expect(signUp.ok(), await signUp.text()).toBe(true);
 
   const org = await (
     await page.request.post("/api/v1/organizations", {
       headers,
-      data: { name: "Acme", slug: "acme" },
+      data: { name: "Projectco", slug: "projectco" },
     })
   ).json();
   const orgId = org.organization.id as string;
@@ -34,7 +34,7 @@ test("Milestone 5: Projects cross-team tracking, progress metrics, and My Issues
   ).json()) as { id: string };
 
   // 1. Visit projects page
-  await page.goto("/acme/projects");
+  await page.goto("/projectco/projects");
   await expect(page.getByRole("heading", { name: "Projects" })).toBeVisible();
   await expect(page.getByText("No projects yet")).toBeVisible();
 
@@ -45,7 +45,7 @@ test("Milestone 5: Projects cross-team tracking, progress metrics, and My Issues
   await page.getByRole("dialog", { name: "Create project" }).getByRole("button", { name: "Create project" }).click();
 
   // 3. Verify redirected to detail page
-  await expect(page).toHaveURL(/\/acme\/projects\/core-redesign/);
+  await expect(page).toHaveURL(/\/projectco\/projects\/core-redesign/);
   await expect(page.getByRole("heading", { name: "Core Redesign" })).toBeVisible();
   await expect(page.getByText("0% completed")).toBeVisible();
   await expect(page.getByText("No issues in this project yet")).toBeVisible();
@@ -93,6 +93,6 @@ test("Milestone 5: Projects cross-team tracking, progress metrics, and My Issues
 
   // 7. Visit My Issues page
   await nav.getByRole("link", { name: "My issues" }).click();
-  await expect(page).toHaveURL(/\/acme\/my-issues/);
+  await expect(page).toHaveURL(/\/projectco\/my-issues/);
   await expect(page.getByRole("heading", { name: "My issues" })).toBeVisible();
 });

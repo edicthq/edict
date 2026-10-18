@@ -14,7 +14,7 @@ test("Milestone 5: the inbox gathers assignments and mentions, and clearing it",
   const org = await (
     await page.request.post("/api/v1/organizations", {
       headers,
-      data: { name: "Acme", slug: "acme" },
+      data: { name: "Acme Inbox", slug: "acme-inbox" },
     })
   ).json();
   const orgId = org.organization.id as string;
@@ -52,7 +52,7 @@ test("Milestone 5: the inbox gathers assignments and mentions, and clearing it",
   const charlieMemberId = accepted.member.id;
 
   // The rail shows Inbox with no badge for somebody with an empty inbox.
-  await page.goto("/acme");
+  await page.goto("/acme-inbox");
   const nav = page.getByRole("navigation", { name: "Organization" });
   await expect(nav.getByRole("link", { name: "Inbox" })).toBeVisible();
 
@@ -73,12 +73,12 @@ test("Milestone 5: the inbox gathers assignments and mentions, and clearing it",
     data: { email: "charlie@example.com", password: "correct-horse-battery" },
   });
   expect(charlieSignIn.ok(), await charlieSignIn.text()).toBe(true);
-  await page.goto("/acme");
+  await page.goto("/acme-inbox");
   await expect(nav.getByRole("link", { name: /Inbox/ }).filter({ hasText: "2" })).toBeVisible();
 
   // Opening the inbox shows both assignments in Bob's words.
   await nav.getByRole("link", { name: /Inbox/ }).click();
-  await expect(page).toHaveURL(/\/acme\/inbox/);
+  await expect(page).toHaveURL(/\/acme-inbox\/inbox/);
   await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
   await expect(page.getByText(/assigned/).first()).toBeVisible();
   await expect(page.getByText("Bob").first()).toBeVisible();

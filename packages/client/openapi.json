@@ -10009,6 +10009,69 @@
         }
       }
     },
+    "/organizations/{orgId}/export": {
+      "get": {
+        "tags": [
+          "Organization"
+        ],
+        "summary": "A zip of the whole organization",
+        "description": "Owners and admins only. The zip holds one JSON document describing the organization — members, teams, statuses, labels, projects, templates, saved views, issues with their comments, relations, links, progress updates and attachment metadata — plus every attachment's bytes. Secrets are not included, so nothing in the zip can act on any other instance.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The export zip: edict-export.json and attachments/<attachment id>/<name>",
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller's role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/instance": {
       "get": {
         "tags": [

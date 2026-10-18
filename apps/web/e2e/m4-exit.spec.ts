@@ -45,7 +45,7 @@ test("Milestone 4: board, keyboard navigation, bulk actions with undo, command p
   }
 
   await page.goto(`/vector/teams/${team.id}`);
-  await expect(page.getByText("4 issues")).toBeVisible();
+  await expect(page.getByText("4 issues", { exact: true })).toBeVisible();
 
   // 1. Keyboard shortcuts & peek panel:
   // Press J to move to an issue, then Enter to open peek
@@ -102,13 +102,13 @@ test("Milestone 4: board, keyboard navigation, bulk actions with undo, command p
 
   // Click Trash on the bulk toolbar
   await toolbar.getByRole("button", { name: /Trash/ }).click();
-  await expect(page.getByText("2 issues")).toBeVisible();
+  await expect(page.getByText("2 issues", { exact: true })).toBeVisible();
   const deleteToast = page.getByText(/Moved 2 issues to the trash/);
   await expect(deleteToast).toBeVisible();
 
   // Undo the bulk delete via toast Undo button
   await page.getByRole("button", { name: "Undo" }).click();
-  await expect(page.getByText("4 issues")).toBeVisible();
+  await expect(page.getByText("4 issues", { exact: true })).toBeVisible();
 
   // 5. Command Palette (⌘K) and search across issues:
   await page.keyboard.press("ControlOrMeta+k");

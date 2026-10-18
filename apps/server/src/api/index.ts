@@ -7,6 +7,7 @@ import { connectionRoutes } from "./connections.js";
 import { commentRoutes } from "./comments.js";
 import { identify, router } from "./context.js";
 import { eventRoutes } from "./events.js";
+import { exportRoutes } from "./export.js";
 import { instanceRoutes } from "./instance.js";
 import { inviteRoutes } from "./invites.js";
 import { issueRoutes } from "./issues.js";
@@ -58,6 +59,7 @@ export function createApi(deps: AttachmentDeps & WebhookDeps) {
   api.route("/", inboxRoutes(deps));
   api.route("/", savedViewRoutes(deps));
   api.route("/", templateRoutes(deps));
+  api.route("/", exportRoutes(deps));
   api.route("/", instanceRoutes(deps));
 
   api.doc31("/openapi.json", documentConfig);

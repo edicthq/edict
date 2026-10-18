@@ -1,7 +1,9 @@
 import { cn } from "@edicthq/ui";
 import { GroupHeader, PageBody, PageHeader } from "../components/shell.js";
+import { useToast } from "../components/toast.js";
 import { useState } from "react";
 import { accentNames, accents, getOrgDefaultAccent, setAppearance, setOrgDefaultAccent, themes, useAppearance, type Accent, type Theme } from "../lib/appearance.js";
+import { ApiFailure, api } from "../lib/api.js";
 import { useOrg } from "./org.js";
 
 const themeOptions: Record<Theme, { label: string; hint: string }> = {
@@ -111,7 +113,66 @@ export function SettingsPage() {
             </div>
           </section>
         ) : null}
+        {canManage ? <OrganizationExportSection orgId={orgId} /> : null}
       </PageBody>
     </>
+  );
+}
+
+// Owners and admins can download the organization as a zip: one JSON document
+// plus every attachment. The web cannot open the zip itself, so it hands the
+// browser the response's own file name.
+function OrganizationExportSection({ orgId }: { orgId: string }) {
+  const [busy, setBusy] = useState(false);
+  const toast = useToast();
+
+  const download = async () => {
+    setBusy(true);
+    try {
+      // parseAs: the zip is not JSON, and openapi-fetch's default parse
+      // assumes it is.
+      const { data: blob, response } = await api.GET("/organizations/{orgId}/export", {
+        params: { path: { orgId } },
+        parseAs: "blob",
+      });
+      if (!response.ok || blob === undefined) throw new ApiFailure(response.status, "unknown", `The server answered ${response.status}.`);
+      const name =
+        response.headers.get("content-disposition")?.match(/filename="(.+)"/)?.[1] ?? "edict-export.zip";
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = name;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      toast("Export downloaded");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "The export failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section aria-labelledby="export-heading" className="flex flex-col gap-2">
+      <GroupHeader>
+        <span id="export-heading">Export</span>
+      </GroupHeader>
+      <p className="max-w-[60ch] px-3 text-ui text-ink-2 text-pretty">
+        Download the whole organization as a zip: a JSON document of your teams, issues, comments and
+        settings, plus every attachment. Secrets are not included.
+      </p>
+      <div className="px-3">
+        <button
+          type="button"
+          onClick={download}
+          disabled={busy}
+          className={cn(
+            "h-8 rounded-[7px] bg-surface px-3 text-ui font-medium shadow-[0_0_0_1px_var(--line)] transition hover:bg-hover disabled:opacity-50",
+          )}
+        >
+          {busy ? "Preparing…" : "Download export"}
+        </button>
+      </div>
+    </section>
   );
 }

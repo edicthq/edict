@@ -41,6 +41,7 @@ describe("OpenAPI document", () => {
       "GET /organizations/{orgId}/agents/{agentId}",
       "GET /organizations/{orgId}/agents/{agentId}/api-keys",
       "GET /organizations/{orgId}/events",
+      "GET /organizations/{orgId}/export",
       "GET /organizations/{orgId}/inbox",
       "GET /organizations/{orgId}/inbox/unread-count",
       "GET /organizations/{orgId}/invites",
