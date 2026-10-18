@@ -5,7 +5,7 @@ import { useNavigate } from "react-router";
 import { Dialog, Kbd, TeamKey, cn } from "@edicthq/ui";
 import { PriorityIcon } from "@edicthq/ui";
 import { accentNames, accents, cycleAccent, cycleTheme, setAppearance, themes } from "../lib/appearance.js";
-import { useSearchIssues, useTeams } from "../lib/queries.js";
+import { useProjects, useSearchIssues, useTeams } from "../lib/queries.js";
 import type { OrgContext } from "../routes/org.js";
 
 interface Command {
@@ -40,6 +40,7 @@ export function CommandPalette({
 function PaletteBody({ context, others, onClose }: { context: OrgContext; others: Membership[]; onClose: () => void }) {
   const navigate = useNavigate();
   const teams = useTeams(context.orgId);
+  const projects = useProjects(context.orgId);
   const [query, setQuery] = useState("");
   const searchResults = useSearchIssues(context.orgId, { q: query.trim() }, query.trim().length > 0);
   const [active, setActive] = useState(0);
@@ -57,6 +58,15 @@ function PaletteBody({ context, others, onClose }: { context: OrgContext; others
         lead: <TeamKey>{team.key}</TeamKey>,
         run: go(`/${context.slug}/teams/${team.id}`),
       })),
+      ...(projects.data ?? []).map((project) => ({
+        id: `project-${project.id}`,
+        group: "Projects",
+        label: project.name,
+        hint: project.slug,
+        run: go(`/${context.slug}/projects/${project.slug}`),
+      })),
+      { id: "projects", group: "Go to", label: "Projects", run: go(`/${context.slug}/projects`) },
+      { id: "my-issues", group: "Go to", label: "My issues", run: go(`/${context.slug}/my-issues`) },
       { id: "teams", group: "Go to", label: "All teams", run: go(`/${context.slug}`) },
       { id: "members", group: "Go to", label: "Members", run: go(`/${context.slug}/members`) },
       { id: "settings", group: "Go to", label: "Settings", run: go(`/${context.slug}/settings`) },

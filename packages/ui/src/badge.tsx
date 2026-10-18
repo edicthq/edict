@@ -66,3 +66,58 @@ export function ProgressBadge({ state, className }: { state: AgentState; classNa
     </span>
   );
 }
+
+export function ProgressBar({
+  percentage,
+  className,
+}: {
+  percentage: number;
+  className?: string;
+}) {
+  const clamped = Math.max(0, Math.min(100, Math.round(percentage)));
+  return (
+    <div
+      role="progressbar"
+      aria-valuenow={clamped}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      className={cn("h-1.5 w-full overflow-hidden rounded-full bg-line", className)}
+    >
+      <div
+        className="h-full rounded-full bg-ink transition-[width] duration-300 ease-out"
+        style={{ width: `${clamped}%` }}
+      />
+    </div>
+  );
+}
+
+export function ProjectStatusBadge({
+  status,
+  className,
+}: {
+  status: "planned" | "in_progress" | "paused" | "completed" | "canceled";
+  className?: string;
+}) {
+  const labels: Record<string, string> = {
+    planned: "Planned",
+    in_progress: "In Progress",
+    paused: "Paused",
+    completed: "Completed",
+    canceled: "Canceled",
+  };
+  return (
+    <span
+      className={cn(
+        "inline-flex h-5 items-center gap-1.5 whitespace-nowrap rounded-full px-2 text-meta font-medium",
+        status === "in_progress" && "bg-surface text-ink shadow-[inset_0_0_0_1px_var(--line-strong)]",
+        status === "planned" && "bg-hover text-ink-2",
+        status === "paused" && "bg-warn-wash text-warn",
+        status === "completed" && "bg-hover font-semibold text-ink",
+        status === "canceled" && "bg-hover text-ink-3 line-through",
+        className,
+      )}
+    >
+      {labels[status] ?? status}
+    </span>
+  );
+}

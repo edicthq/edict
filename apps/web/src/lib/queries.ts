@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Agent, AgentPower, Attachment, Comment, Issue, Label, paths, RelationType, Role, SavedView, SavedViewQuery, SignUpMode, Webhook, WebLink } from "@edicthq/client";
+import type { Agent, AgentPower, Attachment, Comment, Issue, Label, paths, Project, ProjectProgress, ProjectStatus, RelationType, Role, SavedView, SavedViewQuery, SignUpMode, Webhook, WebLink } from "@edicthq/client";
 import { ApiFailure, api, unwrap } from "./api.js";
 
 export const keys = {
@@ -25,6 +25,10 @@ export const keys = {
   webhooks: (orgId: string) => ["org", orgId, "webhooks"] as const,
   deliveries: (orgId: string, webhookId: string) => ["org", orgId, "webhooks", webhookId, "deliveries"] as const,
   savedViews: (orgId: string, teamId: string) => ["org", orgId, "teams", teamId, "saved-views"] as const,
+  projects: (orgId: string) => ["org", orgId, "projects"] as const,
+  project: (orgId: string, projectRef: string) => ["org", orgId, "projects", projectRef] as const,
+  projectIssues: (orgId: string, projectRef: string) => ["org", orgId, "projects", projectRef, "issues"] as const,
+  myWork: (orgId: string, include?: "open" | "all") => ["org", orgId, "my-work", include ?? "open"] as const,
 };
 
 const org = (orgId: string) => ({ params: { path: { orgId } } });
@@ -826,5 +830,82 @@ export function useDeleteSavedView(orgId: string, teamId: string) {
         }),
       ),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.savedViews(orgId, teamId) }),
+  });
+}
+
+// ---------- projects (Milestone 5) ----------
+
+export function useProjects(orgId: string) {
+  return useQuery({
+    queryKey: keys.projects(orgId),
+    queryFn: () => unwrap(api.GET("/organizations/{orgId}/projects", org(orgId))),
+  });
+}
+
+export function useProject(orgId: string, projectRef: string | null | undefined) {
+  return useQuery({
+    queryKey: keys.project(orgId, projectRef ?? ""),
+    queryFn: () => unwrap(api.GET("/organizations/{orgId}/projects/{projectRef}", { params: { path: { orgId, projectRef: projectRef! } } })),
+    enabled: Boolean(projectRef),
+  });
+}
+
+export function useProjectIssues(orgId: string, projectRef: string | null | undefined) {
+  return useQuery({
+    queryKey: keys.projectIssues(orgId, projectRef ?? ""),
+    queryFn: () => unwrap(api.GET("/organizations/{orgId}/projects/{projectRef}/issues", { params: { path: { orgId, projectRef: projectRef! } } })),
+    enabled: Boolean(projectRef),
+  });
+}
+
+type CreateProjectBody = NonNullable<paths["/organizations/{orgId}/projects"]["post"]["requestBody"]>["content"]["application/json"];
+
+export function useCreateProject(orgId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Partial<CreateProjectBody> & { name: string }) =>
+      unwrap(
+        api.POST("/organizations/{orgId}/projects", {
+          ...org(orgId),
+          body: {
+            description: "",
+            leadId: null,
+            startDate: null,
+            targetDate: null,
+            ...body,
+          },
+        }),
+      ),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.projects(orgId) }),
+  });
+}
+
+export function useUpdateProject(orgId: string, projectRef: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { version: number; name?: string; description?: string; status?: ProjectStatus; leadId?: string | null; startDate?: string | null; targetDate?: string | null }) =>
+      unwrap(api.PATCH("/organizations/{orgId}/projects/{projectRef}", { params: { path: { orgId, projectRef } }, body })),
+    onSuccess: (updated) => {
+      client.setQueryData(keys.project(orgId, projectRef), updated);
+      client.setQueryData(keys.project(orgId, updated.id), updated);
+      client.setQueryData(keys.project(orgId, updated.slug), updated);
+      void client.invalidateQueries({ queryKey: keys.projects(orgId) });
+    },
+  });
+}
+
+export function useDeleteProject(orgId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (projectRef: string) =>
+      unwrap(api.DELETE("/organizations/{orgId}/projects/{projectRef}", { params: { path: { orgId, projectRef } } })),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.projects(orgId) }),
+  });
+}
+
+export function useMyWork(orgId: string, include: "open" | "all" = "open") {
+  return useQuery({
+    queryKey: keys.myWork(orgId, include),
+    queryFn: () => unwrap(api.GET("/organizations/{orgId}/my-work", { params: { path: { orgId }, query: { include } } })),
   });
 }

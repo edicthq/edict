@@ -2,8 +2,8 @@ import { useState } from "react";
 import type { Label, Member, Priority, Status, Team } from "@edicthq/client";
 import { Button, Dialog, Kbd, TeamKey } from "@edicthq/ui";
 import { mod } from "../lib/labels.js";
-import { useCreateIssue, useCreateLabel } from "../lib/queries.js";
-import { AssigneePicker, EstimatePicker, LabelPicker, PriorityPicker, StatusPicker } from "./issue-fields.js";
+import { useCreateIssue, useCreateLabel, useProjects } from "../lib/queries.js";
+import { AssigneePicker, EstimatePicker, LabelPicker, PriorityPicker, ProjectPicker, StatusPicker } from "./issue-fields.js";
 import { FormError } from "./shell.js";
 
 export function CreateIssueDialog({
@@ -13,6 +13,7 @@ export function CreateIssueDialog({
   members,
   labels,
   parent,
+  defaultProjectId,
   open,
   onClose,
   onCreated,
@@ -24,6 +25,7 @@ export function CreateIssueDialog({
   labels: Label[];
   // Creates a sub-issue of this issue.
   parent?: { id: string; identifier: string };
+  defaultProjectId?: string | null;
   open: boolean;
   onClose: () => void;
   onCreated: (identifier: string) => void;
@@ -37,6 +39,7 @@ export function CreateIssueDialog({
         members={members}
         labels={labels}
         parent={parent}
+        defaultProjectId={defaultProjectId}
         onDone={onClose}
         onCreated={onCreated}
       />
@@ -51,6 +54,7 @@ function CreateIssueForm({
   members,
   labels,
   parent,
+  defaultProjectId,
   onDone,
   onCreated,
 }: {
@@ -60,6 +64,7 @@ function CreateIssueForm({
   members: Member[];
   labels: Label[];
   parent?: { id: string; identifier: string };
+  defaultProjectId?: string | null;
   onDone: () => void;
   onCreated: (identifier: string) => void;
 }) {
@@ -72,6 +77,8 @@ function CreateIssueForm({
   const [priority, setPriority] = useState<Priority>("none");
   const [assigneeId, setAssigneeId] = useState<string | null>(null);
   const [estimate, setEstimate] = useState<number | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(defaultProjectId ?? null);
+  const projects = useProjects(orgId);
   const [failure, setFailure] = useState<string | null>(null);
 
   const submit = async () => {
@@ -81,7 +88,7 @@ function CreateIssueForm({
     }
     setFailure(null);
     try {
-      const issue = await create.mutateAsync({ title, description, statusId, priority, assigneeId, delegateId: null, estimate, labelIds, parentId: parent?.id ?? null });
+      const issue = await create.mutateAsync({ title, description, statusId, priority, assigneeId, delegateId: null, estimate, labelIds, parentId: parent?.id ?? null, projectId: projectId ?? null });
       onDone();
       onCreated(issue.identifier);
     } catch (error) {
@@ -140,6 +147,7 @@ function CreateIssueForm({
         <PriorityPicker value={priority} onChange={setPriority} />
         <AssigneePicker members={members} value={assigneeId} onChange={setAssigneeId} />
         <EstimatePicker value={estimate} onChange={setEstimate} />
+        <ProjectPicker projects={projects.data ?? []} value={projectId} onChange={setProjectId} />
         <LabelPicker
           labels={labels}
           value={labelIds}

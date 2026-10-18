@@ -1,5 +1,5 @@
 export { Avatar } from "./avatar.js";
-export { Badge, Count, ProgressBadge, TeamKey, type AgentState } from "./badge.js";
+export { Badge, Count, ProgressBar, ProgressBadge, ProjectStatusBadge, TeamKey, type AgentState } from "./badge.js";
 export { Button, Kbd, type ButtonProps } from "./button.js";
 export { cn } from "./cn.js";
 export { Dialog } from "./dialog.js";

@@ -1,4 +1,4 @@
-import { ChevronDown, LogOut, Plus, Server, Settings, Trash2 } from "lucide-react";
+import { CheckSquare, ChevronDown, FolderKanban, LogOut, Plus, Server, Settings, Trash2 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import type { Membership } from "@edicthq/client";
 import { Link, NavLink, Outlet, useNavigate, useOutletContext, useParams } from "react-router";
@@ -173,6 +173,17 @@ function Rail({ context, others }: { context: OrgContext; others: Membership[] }
         <span>Search or command</span>
         <Kbd>{`${mod}K`}</Kbd>
       </button>
+
+      <div className="flex flex-col gap-0.5">
+        <NavLink to={`/${slug}/my-issues`} className={railLink}>
+          <CheckSquare aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+          My issues
+        </NavLink>
+        <NavLink to={`/${slug}/projects`} className={railLink}>
+          <FolderKanban aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+          Projects
+        </NavLink>
+      </div>
 
       <RailSection
         title="Teams"
@@ -369,6 +380,12 @@ function MobileBar({ context }: { context: OrgContext }) {
       <div className="flex gap-1 overflow-x-auto">
         <NavLink to={`/${slug}`} end className={link}>
           Teams
+        </NavLink>
+        <NavLink to={`/${slug}/my-issues`} className={link}>
+          My issues
+        </NavLink>
+        <NavLink to={`/${slug}/projects`} className={link}>
+          Projects
         </NavLink>
         <NavLink to={`/${slug}/members`} className={link}>
           Members

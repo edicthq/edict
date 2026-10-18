@@ -292,11 +292,11 @@ export const CreateProject = z
   .object({
     name: z.string().trim().min(1).max(80),
     slug: ProjectSlug.optional(),
-    description: z.string().max(20_000).default(""),
-    status: ProjectStatus.default("planned"),
-    leadId: Id.nullable().default(null),
-    startDate: z.iso.datetime().nullable().default(null),
-    targetDate: z.iso.datetime().nullable().default(null),
+    description: z.string().max(20_000).optional().default(""),
+    status: ProjectStatus.optional().default("planned"),
+    leadId: Id.nullable().optional().default(null),
+    startDate: z.iso.datetime().nullable().optional().default(null),
+    targetDate: z.iso.datetime().nullable().optional().default(null),
   })
   .meta({ id: "CreateProject" });
 export type CreateProject = z.infer<typeof CreateProject>;

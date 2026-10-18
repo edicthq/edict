@@ -1,6 +1,6 @@
 import type { Agent, Label, Member, Priority, Status } from "@edicthq/client";
 import { Avatar, LabelDot, LabelPill, Menu, PriorityIcon, StatusIcon, cn } from "@edicthq/ui";
-import { CircleDashed, Hash, Tag } from "lucide-react";
+import { CircleDashed, FolderKanban, Hash, Tag } from "lucide-react";
 import { connectionLine } from "../lib/agents.js";
 import { categoryLabel, estimates, priorities, priorityLabel, statusFill } from "../lib/issues.js";
 
@@ -231,6 +231,53 @@ export function LabelPicker({
             Labels
           </button>
         )
+      }
+    />
+  );
+}
+
+export function ProjectPicker({
+  projects,
+  value,
+  onChange,
+  trigger,
+  ...open
+}: {
+  projects: { id: string; name: string; slug: string }[];
+  value: string | null;
+  onChange: (projectId: string | null) => void;
+} & Open) {
+  const current = projects.find((p) => p.id === value);
+  const items = [
+    { value: nobody, label: "No project", keywords: "clear remove none" },
+    ...projects.map((p) => ({
+      value: p.id,
+      label: p.name,
+      keywords: p.slug,
+      icon: <FolderKanban aria-hidden="true" className="size-3.5 text-ink-2" />,
+    })),
+  ];
+
+  return (
+    <Menu
+      label="Set project"
+      value={value ?? nobody}
+      onSelect={(selected) => onChange(selected === nobody ? null : selected)}
+      {...open}
+      items={items}
+      trigger={
+        trigger ??
+        ((props) => (
+          <button
+            type="button"
+            {...props}
+            className={cn(chipClass, !current && "text-ink-2")}
+            aria-label={`Project: ${current?.name ?? "none"}. Set project`}
+          >
+            <FolderKanban aria-hidden="true" className="size-3.5 text-ink-2" />
+            {current ? current.name : "Project"}
+          </button>
+        ))
       }
     />
   );

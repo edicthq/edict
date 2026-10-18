@@ -17,6 +17,7 @@ import {
   useAddLink,
   useIssue,
   useLinks,
+  useProjects,
   useRelations,
   useRemoveLink,
   useSubIssues,
@@ -25,7 +26,7 @@ import {
   type IssueChanges,
 } from "../lib/queries.js";
 import { AgentLane } from "./agent-lane.js";
-import { AssigneePicker, DelegatePicker, EstimatePicker, LabelPicker, NoAssignee, PriorityPicker, StatusPicker } from "./issue-fields.js";
+import { AssigneePicker, DelegatePicker, EstimatePicker, LabelPicker, NoAssignee, PriorityPicker, ProjectPicker, StatusPicker } from "./issue-fields.js";
 import { Markdown } from "./markdown.js";
 import { useToast } from "./toast.js";
 import { useOfferUndo } from "./undo.js";
@@ -76,6 +77,7 @@ export function IssuePeek({
 }) {
   const update = useUpdateIssue(orgId);
   const remove = useDeleteIssue(orgId);
+  const projects = useProjects(orgId);
   const createLabel = useCreateLabel(orgId, issue.teamId);
   const parent = useIssue(orgId, issue.parentId);
   const toast = useToast();
@@ -232,6 +234,7 @@ export function IssuePeek({
             onOpenChange={(open) => onMenu(open ? "delegate" : null)}
           />
           <EstimatePicker value={issue.estimate} onChange={(estimate) => save({ estimate })} />
+          <ProjectPicker projects={projects.data ?? []} value={issue.projectId} onChange={(projectId) => save({ projectId })} />
           <LabelPicker
             labels={labels}
             value={issue.labelIds}
