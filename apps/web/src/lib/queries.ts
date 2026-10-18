@@ -25,6 +25,7 @@ export const keys = {
   webhooks: (orgId: string) => ["org", orgId, "webhooks"] as const,
   deliveries: (orgId: string, webhookId: string) => ["org", orgId, "webhooks", webhookId, "deliveries"] as const,
   savedViews: (orgId: string, teamId: string) => ["org", orgId, "teams", teamId, "saved-views"] as const,
+  templates: (orgId: string, teamId: string) => ["org", orgId, "teams", teamId, "templates"] as const,
   projects: (orgId: string) => ["org", orgId, "projects"] as const,
   project: (orgId: string, projectRef: string) => ["org", orgId, "projects", projectRef] as const,
   projectIssues: (orgId: string, projectRef: string) => ["org", orgId, "projects", projectRef, "issues"] as const,
@@ -832,6 +833,18 @@ export function useDeleteSavedView(orgId: string, teamId: string) {
         }),
       ),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.savedViews(orgId, teamId) }),
+  });
+}
+
+// ---------- templates ----------
+
+export function useTemplates(orgId: string, teamId: string) {
+  return useQuery({
+    queryKey: keys.templates(orgId, teamId),
+    queryFn: () =>
+      unwrap(
+        api.GET("/organizations/{orgId}/teams/{teamId}/templates", { params: { path: { orgId, teamId } } }),
+      ),
   });
 }
 

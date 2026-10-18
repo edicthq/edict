@@ -909,3 +909,39 @@ export const UpdateInboxItem = z
   })
   .meta({ id: "UpdateInboxItem" });
 export type UpdateInboxItem = z.infer<typeof UpdateInboxItem>;
+
+export const Template = z
+  .object({
+    id: Id,
+    teamId: Id,
+    name: z.string(),
+    title: z.string(),
+    description: z.string(),
+    labelIds: z.array(Id),
+    version: Version,
+    createdAt: z.iso.datetime(),
+    updatedAt: z.iso.datetime(),
+  })
+  .meta({ id: "Template" });
+export type Template = z.infer<typeof Template>;
+
+export const CreateTemplate = z
+  .object({
+    name: z.string().trim().min(1).max(80),
+    title: z.string().trim().max(255).default(""),
+    description: z.string().max(100_000).default(""),
+    labelIds: z.array(Id).max(50).default([]),
+  })
+  .meta({ id: "CreateTemplate" });
+export type CreateTemplate = z.infer<typeof CreateTemplate>;
+
+export const UpdateTemplate = z
+  .object({
+    version: Version,
+    name: z.string().trim().min(1).max(80).optional(),
+    title: z.string().trim().max(255).optional(),
+    description: z.string().max(100_000).optional(),
+    labelIds: z.array(Id).max(50).optional(),
+  })
+  .meta({ id: "UpdateTemplate" });
+export type UpdateTemplate = z.infer<typeof UpdateTemplate>;

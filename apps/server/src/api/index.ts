@@ -20,6 +20,7 @@ import { savedViewRoutes } from "./saved-views.js";
 import { searchRoutes } from "./search.js";
 import { statusRoutes } from "./statuses.js";
 import { teamRoutes } from "./teams.js";
+import { templateRoutes } from "./templates.js";
 import { trashRoutes } from "./trash.js";
 import { webhookRoutes, type WebhookDeps } from "./webhooks.js";
 import { inboxRoutes } from "./inbox.js";
@@ -56,6 +57,7 @@ export function createApi(deps: AttachmentDeps & WebhookDeps) {
   api.route("/", webhookRoutes(deps));
   api.route("/", inboxRoutes(deps));
   api.route("/", savedViewRoutes(deps));
+  api.route("/", templateRoutes(deps));
   api.route("/", instanceRoutes(deps));
 
   api.doc31("/openapi.json", documentConfig);

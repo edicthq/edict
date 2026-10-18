@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Label, Member, Priority, Status, Team } from "@edicthq/client";
 import { Button, Dialog, Kbd, TeamKey } from "@edicthq/ui";
 import { mod } from "../lib/labels.js";
-import { useCreateIssue, useCreateLabel, useProjects } from "../lib/queries.js";
+import { useCreateIssue, useCreateLabel, useProjects, useTemplates } from "../lib/queries.js";
 import { AssigneePicker, EstimatePicker, LabelPicker, PriorityPicker, ProjectPicker, StatusPicker } from "./issue-fields.js";
 import { FormError } from "./shell.js";
 
@@ -70,6 +70,7 @@ function CreateIssueForm({
 }) {
   const create = useCreateIssue(orgId, team.id);
   const createLabel = useCreateLabel(orgId, team.id);
+  const templates = useTemplates(orgId, team.id);
   const [labelIds, setLabelIds] = useState<string[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -80,6 +81,13 @@ function CreateIssueForm({
   const [projectId, setProjectId] = useState<string | null>(defaultProjectId ?? null);
   const projects = useProjects(orgId);
   const [failure, setFailure] = useState<string | null>(null);
+
+  // A template fills the title, description and labels the team agreed on.
+  function applyTemplate(pick: { title: string; description: string; labelIds: string[] }) {
+    setTitle(pick.title);
+    setDescription(pick.description);
+    setLabelIds(pick.labelIds);
+  }
 
   const submit = async () => {
     if (!title.trim()) {
@@ -118,6 +126,22 @@ function CreateIssueForm({
         </h2>
       </div>
       <div className="flex flex-col gap-2 px-5 pt-3">
+        {templates.data?.length ? (
+          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Templates">
+            <span className="text-sm text-ink-2">Start from</span>
+            {templates.data.map((pick) => (
+              <button
+                key={pick.id}
+                type="button"
+                title={pick.title || pick.description || undefined}
+                onClick={() => applyTemplate(pick)}
+                className="rounded-full bg-hover px-2 py-0.5 text-sm font-medium text-ink transition-[background-color,color] duration-[140ms] ease-standard hover:bg-line"
+              >
+                {pick.name}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <label className="sr-only" htmlFor="new-issue-title">
           Title
         </label>

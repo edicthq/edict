@@ -7,3 +7,4 @@ export * from "./instance.js";
 export * from "./webhooks.js";
 export * from "./saved-views.js";
 export * from "./inbox.js";
+export * from "./templates.js";

@@ -208,10 +208,11 @@ export function registerTools(server: McpServer, session: Session): void {
     "create_issue",
     {
       title: "Create an issue",
-      description: "Create an issue in a team. Values are names: status, labels and people resolve to the team's.",
+      description: "Create an issue in a team. Values are names: status, labels and people resolve to the team's. A team template name prefills the title, description and labels; anything you pass explicitly wins.",
       inputSchema: {
         team: z.string().describe("Team key or name"),
-        title: z.string(),
+        template: z.string().optional().describe("A template's name; get_team_context lists them"),
+        title: z.string().optional(),
         description: z.string().optional().describe("Markdown"),
         status: z.string().optional().describe("Defaults to the team's default status"),
         priority: priorityArg.optional(),
@@ -225,20 +226,37 @@ export function registerTools(server: McpServer, session: Session): void {
     },
     tool(async (args) => {
       const team = await session.team(args.team);
+      let template: { title: string; description: string; labelIds: string[] } | undefined;
+      if (args.template) {
+        const all = await ok(
+          session.api.GET("/organizations/{orgId}/teams/{teamId}/templates", { params: { path: { ...session.path, teamId: team.id } } }),
+        );
+        const found = all.find((item) => item.name.toLowerCase() === args.template!.toLowerCase());
+        if (!found) {
+          throw new ToolError(`No template named ${args.template} on ${team.key}. Valid templates: ${all.map((item) => item.name).join(", ") || "none"}.`);
+        }
+        template = found;
+      }
+      const title = args.title ?? template?.title ?? "";
+      if (!title.trim()) {
+        throw new ToolError(`Give a title, or a template with one.`);
+      }
+      const labels = args.labels;
+      const templateLabels = !labels && template ? template.labelIds : undefined;
       const parent = args.parent ? await session.issue(args.parent) : undefined;
       const project = args.project ? await session.project(args.project) : undefined;
       const created = await ok(
         session.api.POST("/organizations/{orgId}/teams/{teamId}/issues", {
           params: { path: { ...session.path, teamId: team.id } },
           body: {
-            title: args.title,
-            description: args.description ?? "",
+            title,
+            description: args.description ?? template?.description ?? "",
             statusId: args.status ? (await session.status(team.id, args.status)).id : undefined,
             priority: args.priority ?? "none",
             estimate: args.estimate ?? null,
             assigneeId: args.assignee ? (await session.member(args.assignee, "human", "assignee")).id : null,
             delegateId: args.delegate ? (await session.member(args.delegate, "agent", "delegate")).id : null,
-            labelIds: args.labels ? await session.labelIds(team.id, args.labels) : [],
+            labelIds: labels ? await session.labelIds(team.id, labels) : (templateLabels ?? []),
             projectId: project?.id ?? null,
             parentId: parent?.id ?? null,
           },
@@ -409,11 +427,12 @@ export function registerTools(server: McpServer, session: Session): void {
     },
     tool(async ({ team: value }) => {
       const team = await session.team(value);
-      const [statuses, labels, members, agents] = await Promise.all([
+      const [statuses, labels, members, agents, templates] = await Promise.all([
         session.statuses(team.id),
         session.labels(team.id),
         ok(session.api.GET("/organizations/{orgId}/teams/{teamId}/members", { params: { path: { ...session.path, teamId: team.id } } })),
         session.agents(),
+        ok(session.api.GET("/organizations/{orgId}/teams/{teamId}/templates", { params: { path: { ...session.path, teamId: team.id } } })),
       ]);
       const agentLine = (id: string) => {
         const agent = agents.find((a) => a.id === id);
@@ -432,7 +451,10 @@ export function registerTools(server: McpServer, session: Session): void {
         "## Members",
         ...members.map((m) => `- ${handleOf(m)} ${m.name} · ${m.kind === "agent" ? "agent" : m.role}${agentLine(m.id)}`),
         "",
-        "Templates arrive in a later version of Edict.",
+        "## Templates",
+        ...(templates.length
+          ? templates.map((t) => `- ${t.name}: prefills the title "${t.title}"${t.description ? " and the description" : ""}`)
+          : ["- none"]),
       ].join("\n");
     }),
   );

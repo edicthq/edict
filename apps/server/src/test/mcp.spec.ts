@@ -162,6 +162,47 @@ describe("/mcp", () => {
     expect(badTeam.text).toContain("ENG");
   });
 
+  it("creates an issue from a team template, prefilling what the caller left out", async () => {
+    const { t, owner, org, orgId, eng } = await seed();
+    const { accessToken } = await connect(t.baseUrl, owner, orgId);
+    const { call } = await mcpClient(t.baseUrl, accessToken);
+    const labelId = (await owner.get(`${org}/teams/${eng.id}/labels`)).body[0].id;
+
+    await owner.post(`${org}/teams/${eng.id}/templates`, {
+      name: "Bug report",
+      title: "Fix: ",
+      description: "## Steps to reproduce\n",
+      labelIds: [labelId],
+    });
+
+    const context = await call("get_team_context", { team: "ENG" });
+    expect(context.text, context.text).toContain("## Templates");
+    expect(context.text).toContain("Bug report: prefills the title \"Fix:\"");
+
+    const created = await call("create_issue", { team: "eng", template: "bug report" });
+    expect(created.error, created.text).toBe(false);
+    expect(created.text).toContain("ENG-2");
+    const made = (await owner.get(`${org}/issues/ENG-2`)).body as { title: string; description: string; labelIds: string[] };
+    expect(made.title).toBe("Fix:");
+    expect(made.description).toBe("## Steps to reproduce\n");
+    expect(made.labelIds).toEqual([labelId]);
+
+    // The caller's own values win over the template's.
+    const overridden = await call("create_issue", { team: "eng", template: "Bug report", title: "Custom title" });
+    expect(overridden.error, overridden.text).toBe(false);
+    expect((await owner.get(`${org}/issues/ENG-3`)).body.title).toBe("Custom title");
+
+    const unknown = await call("create_issue", { team: "eng", template: "Design brief" });
+    expect(unknown.error).toBe(true);
+    expect(unknown.text).toContain("No template named Design brief");
+    expect(unknown.text).toContain("Bug report");
+
+    // Without a template and without a title, the tool asks for one.
+    const noTitle = await call("create_issue", { team: "eng" });
+    expect(noTitle.error).toBe(true);
+    expect(noTitle.text).toContain("Give a title");
+  });
+
   it("tells an agent to re-read when its version is stale", async () => {
     const { t, owner, org, orgId, issue } = await seed();
     const { call } = await mcpClient(t.baseUrl, (await connect(t.baseUrl, owner, orgId)).accessToken);
