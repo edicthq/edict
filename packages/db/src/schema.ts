@@ -4,3 +4,4 @@ export * from "./events.js";
 export * from "./issues.js";
 export * from "./instance.js";
 export * from "./webhooks.js";
+export * from "./saved-views.js";

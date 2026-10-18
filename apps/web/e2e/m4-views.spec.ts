@@ -174,3 +174,59 @@ test("group by assignee and sort by last updated, all in the address", async ({ 
   await expect(page).toHaveURL(/dir=asc/);
   await expect(rows.first()).toContainText("STU-3");
 });
+
+test("a saved view comes back after reloading and is deleted for good", async ({ page, baseURL }) => {
+  const headers = { origin: baseURL! };
+  const signUp = await page.request.post("/api/auth/sign-up/email", {
+    headers,
+    data: { name: "Tam Ellis", email: "tam@example.com", password: "correct-horse-battery" },
+  });
+  expect(signUp.ok(), await signUp.text()).toBe(true);
+  const org = await (await page.request.post("/api/v1/organizations", { headers, data: { name: "Studland", slug: "studland-views" } })).json();
+  const orgId = org.organization.id as string;
+  const team = await (
+    await page.request.post(`/api/v1/organizations/${orgId}/teams`, { headers, data: { name: "Support", key: "SUP" } })
+  ).json() as { id: string };
+  for (const title of ["Charts for the tide", "Ropes and knots", "Sea charts overdue"]) {
+    const res = await page.request.post(`/api/v1/organizations/${orgId}/teams/${team.id}/issues`, {
+      headers,
+      data: { title },
+    });
+    expect(res.ok(), await res.text()).toBe(true);
+  }
+
+  await page.goto(`/studland-views/teams/${team.id}`);
+
+  // A filtered arrangement of the page...
+  await page.getByLabel("Search issues").fill("charts");
+
+  // ...gets a name through the Views menu: typing a name the list doesn't
+  // know offers to create it.
+  await page.getByRole("button", { name: "Views" }).click();
+  await page.getByRole("combobox").fill("Tide charts");
+  await page.getByRole("option", { name: "Create “Tide charts”" }).click();
+  await expect(page).toHaveURL(/q=charts/);
+
+  // The view is the URL again after a reload: applying it filters the list.
+  await page.reload();
+  await page.getByLabel("Search issues").fill("");
+  await expect(page.getByText("3 issues")).toBeVisible();
+  await page.getByRole("button", { name: "Views" }).click();
+  await page.getByRole("combobox").click();
+  await page.getByRole("option", { name: "Tide charts" }).click();
+  await expect(page).toHaveURL(/q=charts/);
+  await expect(page.getByText("2 of 3 issues")).toBeVisible();
+
+  // Deleting the active view is immediate: no trash, the name is gone.
+  await page.getByRole("button", { name: "Delete view Tide charts" }).click();
+  await expect(page.getByText("Deleted the view Tide charts.")).toBeVisible();
+  await page.getByRole("button", { name: "Views" }).click();
+  await page.getByRole("combobox").fill("Tide charts");
+  // The name is free again: it offers to create it once more.
+  await expect(page.getByRole("option", { name: "Create “Tide charts”" })).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  // The URL stays filtered, but nothing is stored for this name again.
+  await page.reload();
+  await expect(page).toHaveURL(/q=charts/);
+});

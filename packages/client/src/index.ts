@@ -40,6 +40,8 @@ export type Link = Schemas["Link"];
 export type Webhook = Schemas["Webhook"];
 export type CreatedWebhook = Schemas["CreatedWebhook"];
 export type WebhookDelivery = Schemas["WebhookDelivery"];
+export type SavedView = Schemas["SavedView"];
+export type SavedViewQuery = Schemas["SavedViewQuery"];
 export type ApiError = Schemas["Error"]["error"];
 
 export type EdictClient = ReturnType<typeof createEdictClient>;

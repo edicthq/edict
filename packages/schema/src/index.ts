@@ -677,3 +677,50 @@ export const Attachment = z
   })
   .meta({ id: "Attachment" });
 export type Attachment = z.infer<typeof Attachment>;
+
+// ADR 0023. A saved view holds exactly the team page's URL view. The server
+// stores and validates this query but never interprets it: the client code
+// that applies the URL applies a view too.
+export const SavedViewQuery = z
+  .object({
+    q: z.string().max(120).optional(),
+    // Team-defined status names.
+    statuses: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
+    priorities: z.array(Priority).max(Priority.options.length).optional(),
+    assignees: z.array(Id).max(20).optional(),
+    labels: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
+    groupBy: z.enum(["status", "priority", "assignee"]).optional(),
+    sortBy: z.enum(["priority", "updated", "created", "title"]).optional(),
+    dir: z.enum(["asc", "desc"]).optional(),
+  })
+  .meta({ id: "SavedViewQuery" });
+export type SavedViewQuery = z.infer<typeof SavedViewQuery>;
+
+export const SavedView = z
+  .object({
+    id: Id,
+    teamId: Id,
+    memberId: Id,
+    name: z.string(),
+    query: SavedViewQuery,
+    version: Version,
+    createdAt: z.iso.datetime(),
+    updatedAt: z.iso.datetime(),
+  })
+  .meta({ id: "SavedView" });
+export type SavedView = z.infer<typeof SavedView>;
+
+export const CreateSavedView = z
+  .object({
+    name: z.string().trim().min(1).max(80),
+    query: SavedViewQuery,
+  })
+  .meta({ id: "CreateSavedView" });
+
+export const UpdateSavedView = z
+  .object({
+    version: Version,
+    name: z.string().trim().min(1).max(80).optional(),
+    query: SavedViewQuery.optional(),
+  })
+  .meta({ id: "UpdateSavedView" });

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Agent, AgentPower, Attachment, Comment, Issue, Label, paths, RelationType, Role, SignUpMode, Webhook, WebLink } from "@edicthq/client";
+import type { Agent, AgentPower, Attachment, Comment, Issue, Label, paths, RelationType, Role, SavedView, SavedViewQuery, SignUpMode, Webhook, WebLink } from "@edicthq/client";
 import { ApiFailure, api, unwrap } from "./api.js";
 
 export const keys = {
@@ -24,6 +24,7 @@ export const keys = {
   apiKeys: (orgId: string, agentId: string) => ["org", orgId, "agents", agentId, "api-keys"] as const,
   webhooks: (orgId: string) => ["org", orgId, "webhooks"] as const,
   deliveries: (orgId: string, webhookId: string) => ["org", orgId, "webhooks", webhookId, "deliveries"] as const,
+  savedViews: (orgId: string, teamId: string) => ["org", orgId, "teams", teamId, "saved-views"] as const,
 };
 
 const org = (orgId: string) => ({ params: { path: { orgId } } });
@@ -719,5 +720,56 @@ export function useAgentQueue(orgId: string, agentId: string) {
         }),
       ),
     refetchInterval: 15_000,
+  });
+}
+
+// ---------- saved views (ADR 0023) ----------
+
+export function useSavedViews(orgId: string, teamId: string, enabled = true) {
+  return useQuery({
+    queryKey: keys.savedViews(orgId, teamId),
+    queryFn: () =>
+      unwrap(
+        api.GET("/organizations/{orgId}/teams/{teamId}/saved-views", { params: { path: { orgId, teamId } } }),
+      ),
+    enabled,
+  });
+}
+
+export function useCreateSavedView(orgId: string, teamId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { name: string; query: SavedViewQuery }) =>
+      unwrap(
+        api.POST("/organizations/{orgId}/teams/{teamId}/saved-views", { params: { path: { orgId, teamId } }, body }),
+      ),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.savedViews(orgId, teamId) }),
+  });
+}
+
+export function useUpdateSavedView(orgId: string, teamId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ view, changes }: { view: SavedView; changes: { name?: string; query?: SavedViewQuery } }) =>
+      unwrap(
+        api.PATCH("/organizations/{orgId}/teams/{teamId}/saved-views/{savedViewId}", {
+          params: { path: { orgId, teamId, savedViewId: view.id } },
+          body: { version: view.version, ...changes },
+        }),
+      ),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.savedViews(orgId, teamId) }),
+  });
+}
+
+export function useDeleteSavedView(orgId: string, teamId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (savedViewId: string) =>
+      unwrap(
+        api.DELETE("/organizations/{orgId}/teams/{teamId}/saved-views/{savedViewId}", {
+          params: { path: { orgId, teamId, savedViewId } },
+        }),
+      ),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.savedViews(orgId, teamId) }),
   });
 }

@@ -183,6 +183,20 @@
       "when": 1792313956210,
       "tag": "0025_webhooks_row_level_security",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1792328798375,
+      "tag": "0027_nervous_chamber",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1792329140010,
+      "tag": "0028_saved_views_row_level_security",
+      "breakpoints": true
     }
   ]
 }

@@ -15,6 +15,7 @@ import { linkRoutes } from "./links.js";
 import { organizationRoutes } from "./organizations.js";
 import { progressRoutes } from "./progress.js";
 import { relationRoutes } from "./relations.js";
+import { savedViewRoutes } from "./saved-views.js";
 import { searchRoutes } from "./search.js";
 import { statusRoutes } from "./statuses.js";
 import { teamRoutes } from "./teams.js";
@@ -50,6 +51,7 @@ export function createApi(deps: AttachmentDeps & WebhookDeps) {
   api.route("/", inviteRoutes(deps));
   api.route("/", eventRoutes(deps));
   api.route("/", webhookRoutes(deps));
+  api.route("/", savedViewRoutes(deps));
   api.route("/", instanceRoutes(deps));
 
   api.doc31("/openapi.json", documentConfig);

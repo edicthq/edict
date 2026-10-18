@@ -201,3 +201,45 @@ export function groupIssues(issues: Issue[], view: IssueView, statuses: Status[]
     .map((status) => ({ status, issues: sorted.filter((i) => i.statusId === status.id) }))
     .filter((group) => group.issues.length > 0);
 }
+
+// A saved view's query (ADR 0023) as the full view it means, defaults where
+// the query says nothing. The type is the API's SavedViewQuery, which this
+// module does not import: callers pass the plain object.
+export function inView(query: {
+  q?: string;
+  statuses?: string[];
+  priorities?: string[];
+  assignees?: string[];
+  labels?: string[];
+  groupBy?: string;
+  sortBy?: string;
+  dir?: string;
+}): IssueView {
+  return {
+    q: query.q ?? "",
+    statuses: query.statuses ?? [],
+    priorities: (query.priorities ?? []) as Priority[],
+    assignees: query.assignees ?? [],
+    labels: query.labels ?? [],
+    groupBy: (groupOptions.includes(query.groupBy as GroupBy) ? query.groupBy : "status") as GroupBy,
+    sortBy: (sortOptions.includes(query.sortBy as SortBy) ? query.sortBy : "priority") as SortBy,
+    dir: query.dir === "asc" || query.dir === "desc" ? query.dir : defaultDirs[query.sortBy as SortBy] ?? "asc",
+  };
+}
+
+// Two views match as configurations: member lists compare as sets, so a view
+// saved from clicking things stays active when the URL lists them in the
+// click order and a saved one in its stored order.
+export function sameView(a: IssueView, b: IssueView): boolean {
+  const set = (xs: string[]) => [...xs].sort().join(",");
+  return (
+    a.q === b.q &&
+    set(a.statuses) === set(b.statuses) &&
+    set(a.priorities) === set(b.priorities) &&
+    set(a.assignees) === set(b.assignees) &&
+    set(a.labels) === set(b.labels) &&
+    a.groupBy === b.groupBy &&
+    a.sortBy === b.sortBy &&
+    a.dir === b.dir
+  );
+}

@@ -5,8 +5,10 @@ import {
   filterKeys,
   groupIssues,
   hasFilters,
+  inView,
   matches,
   parseView,
+  sameView,
   serializeView,
   sortIssues,
   toggleFilter,
@@ -207,5 +209,22 @@ describe("groupIssues", () => {
     const newestFirst = { sortBy: "updated" as SortBy, dir: "desc" as const };
     const byNewest = groupIssues([low, high], { ...emptyView, ...newestFirst }, todo, []);
     expect(byNewest[0]?.issues.map((i) => i.number)).toEqual([2, 1]);
+  });
+});
+
+describe("inView", () => {
+  it("fills what a saved query leaves out", () => {
+    expect(inView({ q: "kelp" })).toEqual({ ...emptyView, q: "kelp" });
+    expect(inView({ sortBy: "updated" })).toEqual({ ...emptyView, sortBy: "updated", dir: "desc" });
+    expect(inView({ groupBy: "weird" as string })).toEqual(emptyView);
+  });
+});
+
+describe("sameView", () => {
+  it("compares member lists as sets, and the rest exactly", () => {
+    expect(sameView(emptyView, emptyView)).toBe(true);
+    expect(sameView({ ...emptyView, statuses: ["Todo", "Done"] }, { ...emptyView, statuses: ["Done", "Todo"] })).toBe(true);
+    expect(sameView({ ...emptyView, q: "a" }, { ...emptyView, q: "b" })).toBe(false);
+    expect(sameView({ ...emptyView, dir: "desc" }, { ...emptyView, dir: "asc" })).toBe(false);
   });
 });

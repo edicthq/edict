@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router";
-import type { Agent, Issue, Label, Member, Priority, Status, Team } from "@edicthq/client";
+import type { Agent, Issue, Label, Member, Priority, SavedViewQuery, Status, Team } from "@edicthq/client";
 import { Avatar, Button, Kbd, LabelPill, Menu, PriorityIcon, ProgressBadge, StatusIcon, TeamKey, cn } from "@edicthq/ui";
 import type { MenuItem } from "@edicthq/ui";
-import { ArrowDown, ArrowUp, ListFilter, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Bookmark, ListFilter, Search, X } from "lucide-react";
 import { CreateIssueDialog } from "../components/create-issue-dialog.js";
 import { NoAssignee } from "../components/issue-fields.js";
 import { IssuePeek, type PeekMenu } from "../components/issue-peek.js";
@@ -14,8 +14,11 @@ import { agentState, plainLine, waitingLine } from "../lib/agents.js";
 import { ago, assignable, boardColumns, categoryLabel, priorityLabel, statusFill, type StatusGroup } from "../lib/issues.js";
 import {
   useAgents,
+  useCreateSavedView,
+  useDeleteSavedView,
   useIssue,
   useMembers,
+  useSavedViews,
   useStatuses,
   useTeamLabels,
   useTeamMembers,
@@ -30,9 +33,11 @@ import {
   groupLabel,
   groupOptions,
   hasFilters,
+  inView,
   matches,
   parseView,
   priorityOrder,
+  sameView,
   serializeView,
   sortLabel,
   sortOptions,
@@ -159,6 +164,40 @@ function TeamIssues({ team }: { team: Team }) {
   };
   const toggleFilterKey = (key: FilterKey) => patchView(toggleFilter(issueView, key));
   const clearFilters = () => patchView({ q: "", statuses: [], priorities: [], assignees: [], labels: [] });
+
+  // Saved views (ADR 0023): the server stores the view, the URL stays the
+  // single way to render it. Saving stores only the non-default parts, so a
+  // recreated URL matches the URL it was made from.
+  const views = useSavedViews(orgId, team.id);
+  const saveView = useCreateSavedView(orgId, team.id);
+  const removeView = useDeleteSavedView(orgId, team.id);
+  const saved = useMemo(() => views.data ?? [], [views.data]);
+  const currentQuery: SavedViewQuery = useMemo(
+    () => ({
+      q: issueView.q || undefined,
+      statuses: issueView.statuses.length ? issueView.statuses : undefined,
+      priorities: issueView.priorities.length ? issueView.priorities : undefined,
+      assignees: issueView.assignees.length ? issueView.assignees : undefined,
+      labels: issueView.labels.length ? issueView.labels : undefined,
+      groupBy: issueView.groupBy === "status" ? undefined : issueView.groupBy,
+      sortBy: issueView.sortBy === "priority" ? undefined : issueView.sortBy,
+      dir: issueView.dir === defaultDirs[issueView.sortBy] ? undefined : issueView.dir,
+    }),
+    [issueView],
+  );
+  const applySaved = (query: SavedViewQuery) =>
+    setParams(
+      (current) => {
+        const search = new URLSearchParams(current);
+        for (const key of viewKeys) search.delete(key);
+        for (const [key, value] of Object.entries(serializeView(inView(query)))) {
+          search.set(key, value);
+        }
+        return search;
+      },
+      { replace: true },
+    );
+
   // `/` puts the caret in the search field. The search input's ref is needed
   // for that and nothing else.
   const searchRef = useRef<HTMLInputElement>(null);
@@ -357,6 +396,54 @@ function TeamIssues({ team }: { team: Team }) {
             </button>
           )}
         />
+
+        {/* The team's views this member saved (ADR 0023). Typing a name not
+        in the list offers to save the current view under it. */}
+        <Menu
+          label="Views"
+          items={saved.map((v) => ({ value: v.id, label: v.name, keywords: v.name }))}
+          value={saved.find((v) => sameView(inView(v.query), issueView))?.id ?? ""}
+          onSelect={(id) => {
+            const savedView = saved.find((v) => v.id === id);
+            if (savedView) applySaved(savedView.query);
+          }}
+          onCreate={(name) => saveView.mutate({ name, query: currentQuery }, { onError: (error) => toast(error.message) })}
+          trigger={(props) => (
+            <button
+              ref={props.ref}
+              type="button"
+              onClick={props.onClick}
+              aria-haspopup={props["aria-haspopup"]}
+              aria-expanded={props["aria-expanded"]}
+              className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-ui font-medium text-ink-2 hover:bg-hover hover:text-ink"
+            >
+              <Bookmark aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+              Views
+            </button>
+          )}
+        />
+
+        {/* Deleting a view is immediate: it has no trash (ADR 0023). */}
+        {(() => {
+          const active = saved.find((v) => sameView(inView(v.query), issueView));
+          if (!active) return null;
+          return (
+            <button
+              type="button"
+              aria-label={`Delete view ${active.name}`}
+              title={`Delete “${active.name}”`}
+              onClick={() =>
+                removeView.mutate(active.id, {
+                  onSuccess: () => toast(`Deleted the view ${active.name}.`),
+                  onError: (error) => toast(error.message),
+                })
+              }
+              className="inline-flex size-7 items-center justify-center rounded-md text-ink-2 hover:bg-hover hover:text-ink"
+            >
+              <X aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+            </button>
+          );
+        })()}
 
         <Menu
           label="Grouping"
