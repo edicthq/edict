@@ -2,7 +2,8 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { aliasedTable, and, asc, eq, isNull, or } from "drizzle-orm";
 import { emit, issueRelations, issues, statuses, teams } from "@edicthq/db";
 import { CreateRelation, Id, IssueRef, Relation, type RelationType } from "@edicthq/schema";
-import { teamVisibility, type MemberRow } from "./access.js";
+import type { Caller } from "./callers.js";
+import { requireAgentPower, teamVisibility } from "./access.js";
 import { body, errors, inOrg, json, noContent, OrgParams, router, type ApiDeps } from "./context.js";
 import { conflict, invalid, isUniqueViolation, notFound } from "./errors.js";
 import { toLinked, visibleIssue } from "./issue-data.js";
@@ -39,7 +40,7 @@ function stored(type: RelationType, issueId: string, otherId: string) {
 const other = aliasedTable(issues, "other");
 
 // An issue's relations, each with the other issue, when the caller can see it.
-async function relationsOf(tx: Transaction, caller: MemberRow, issueId: string, relationId?: string): Promise<Relation[]> {
+async function relationsOf(tx: Transaction, caller: Caller, issueId: string, relationId?: string): Promise<Relation[]> {
   const rows = await tx
     .select({ relation: issueRelations, other, key: teams.key, status: statuses })
     .from(issueRelations)
@@ -161,6 +162,7 @@ export function relationRoutes(deps: ApiDeps) {
   app.openapi(deleteRelation, async (c) => {
     const { orgId, issueRef, relationId } = c.req.valid("param");
     await inOrg(deps, c, orgId, async (tx, caller) => {
+      requireAgentPower(caller, "delete", "remove relations");
       const { issue } = await visibleIssue(tx, caller, issueRef);
       const [shown] = await relationsOf(tx, caller, issue.id, relationId);
       if (!shown) throw notFound("relation");

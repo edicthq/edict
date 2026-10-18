@@ -218,8 +218,9 @@ export function teamRoutes(deps: ApiDeps) {
     const member = await inOrg(deps, c, orgId, async (tx, caller) => {
       // A private team is invisible to Members outside it, so they get 404.
       await visibleTeam(tx, caller, teamId);
-      if (!atLeast(caller.role, "admin") && memberId !== caller.id) {
-        throw forbidden("Only Admins and Owners can add other members to a team.");
+      // An agent joining a team would widen its own access.
+      if (memberId !== caller.id || caller.kind === "agent") {
+        requireRole(caller, "admin", "add members to a team", "members");
       }
       await activeMember(tx, orgId, memberId);
       const added = await tx
@@ -246,7 +247,7 @@ export function teamRoutes(deps: ApiDeps) {
     await inOrg(deps, c, orgId, async (tx, caller) => {
       await visibleTeam(tx, caller, teamId);
       if (memberId !== caller.id) {
-        requireRole(caller, "admin", "remove other members from a team");
+        requireRole(caller, "admin", "remove other members from a team", "members");
       }
       const removed = await tx
         .delete(teamMembers)

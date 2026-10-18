@@ -2,7 +2,8 @@ import { createRoute } from "@hono/zod-openapi";
 import { asc, eq, sql } from "drizzle-orm";
 import { comments, emit, events, issueLabels, issueRelations, issues, type Transaction } from "@edicthq/db";
 import { Id, UndoResult } from "@edicthq/schema";
-import { visibleTeam, type MemberRow } from "./access.js";
+import type { Caller } from "./callers.js";
+import { visibleTeam } from "./access.js";
 import { errors, inOrg, json, OrgParams, router, type ApiDeps } from "./context.js";
 import { ApiError, conflict, forbidden, invalid, isUniqueViolation, notFound } from "./errors.js";
 import { checkAssignee, checkLabels, checkParent, checkStatus, labelSet, loadIssue, visibleIssue } from "./issue-data.js";
@@ -15,7 +16,7 @@ type FieldChange = { from: unknown; to: unknown };
 // change whose events say which change they undo (ADR 0019). Undoing an undo
 // redoes. Anything the change touched that changed since makes the whole undo
 // fail with 409, and the transaction rolls back what it had applied.
-const inverses: Record<string, (tx: Transaction, caller: MemberRow, event: EventRow, mark: Mark) => Promise<void>> = {
+const inverses: Record<string, (tx: Transaction, caller: Caller, event: EventRow, mark: Mark) => Promise<void>> = {
   "issue.created": async (tx, caller, event, mark) => {
     const issue = await liveIssue(tx, caller, event.subjectId, mark);
     if (issue) await trashIssues(tx, caller, [issue.id], mark.data);
@@ -109,14 +110,14 @@ interface Mark {
 
 // An issue that must not be in the trash, unless this same undo put it there
 // (a sub-issue goes with its parent).
-async function liveIssue(tx: Transaction, caller: MemberRow, issueId: string, mark: Mark) {
+async function liveIssue(tx: Transaction, caller: Caller, issueId: string, mark: Mark) {
   const { issue, team } = await visibleIssue(tx, caller, issueId, { forUpdate: true, trashed: true });
   if (issue.deletedChangeId === mark.changeId) return undefined;
   if (issue.deletedAt) throw conflict(`${team.key}-${issue.number} is already in the trash.`);
   return issue;
 }
 
-async function commentOf(tx: Transaction, caller: MemberRow, commentId: string) {
+async function commentOf(tx: Transaction, caller: Caller, commentId: string) {
   const [row] = await tx.select().from(comments).where(eq(comments.id, commentId)).for("update");
   if (!row) throw conflict("The comment is gone.");
   await visibleIssue(tx, caller, row.issueId);
@@ -127,7 +128,7 @@ async function commentOf(tx: Transaction, caller: MemberRow, commentId: string) 
 // later change touched it: its per-field version is still the event's
 // (ADR 0018). A move goes back to the old team and the old number, which
 // still names this issue (ADR 0017).
-async function setIssueBack(tx: Transaction, caller: MemberRow, event: EventRow, mark: Mark) {
+async function setIssueBack(tx: Transaction, caller: Caller, event: EventRow, mark: Mark) {
   const data = event.data as { version: number; changes: Record<string, FieldChange> };
   const { issue: row, team } = await visibleIssue(tx, caller, event.subjectId, { forUpdate: true });
   const current = await loadIssue(tx, row, team);

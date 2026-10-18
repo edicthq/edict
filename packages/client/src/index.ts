@@ -29,6 +29,10 @@ export type CommentConflict = Schemas["CommentConflict"]["error"];
 export type Attachment = Schemas["Attachment"];
 export type TrashedIssue = Schemas["TrashedIssue"];
 export type UndoResult = Schemas["UndoResult"];
+export type Agent = Schemas["Agent"];
+export type AgentPower = Schemas["AgentPower"];
+export type ApiKey = Schemas["ApiKey"];
+export type CreatedApiKey = Schemas["CreatedApiKey"];
 export type ApiError = Schemas["Error"]["error"];
 
 export type EdictClient = ReturnType<typeof createEdictClient>;

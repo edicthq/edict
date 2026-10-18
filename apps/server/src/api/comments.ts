@@ -2,7 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { comments, emit } from "@edicthq/db";
 import { Comment, CommentConflict, CreateComment, Id, IssueRef, UpdateComment } from "@edicthq/schema";
-import type { MemberRow } from "./access.js";
+import type { Caller } from "./callers.js";
 import { body, errors, inOrg, json, OrgParams, router, type ApiDeps } from "./context.js";
 import { changesOf, conflict, forbidden, notFound } from "./errors.js";
 import { visibleIssue } from "./issue-data.js";
@@ -24,7 +24,7 @@ export function toComment(row: CommentRow): Comment {
 
 // A comment the caller edits: on an issue they can still see, and theirs.
 // Locks the row, so two edits of one version cannot both pass.
-async function editableComment(tx: Transaction, caller: MemberRow, commentId: string): Promise<CommentRow> {
+async function editableComment(tx: Transaction, caller: Caller, commentId: string): Promise<CommentRow> {
   const [row] = await tx.select().from(comments).where(eq(comments.id, commentId)).for("update");
   if (!row || row.deletedAt) {
     throw notFound("comment");

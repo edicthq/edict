@@ -18,6 +18,9 @@ export interface Scope {
   // Lets one attachment be read by its id before its organization is known,
   // so the /files path can find it and check the caller can see its issue.
   attachmentId?: string;
+  // Lets the API key with this SHA-256 hash be read before its organization
+  // is known (ADR 0021).
+  apiKeyHash?: string;
 }
 
 // The data-access layer's entry point for tenant data (ADR 0006). Runs fn in
@@ -33,6 +36,8 @@ export function inScope<T>(db: Database, scope: Scope, fn: (tx: Transaction) => 
       set_config('edict.invite_token_hash', ${scope.inviteTokenHash ?? ""}, true),
       set_config('edict.invite_email', ${scope.inviteEmail ?? ""}, true),
       set_config('edict.attachment_id', ${scope.attachmentId ?? ""}, true),
+      set_config('edict.api_key_hash', ${scope.apiKeyHash ?? ""}, true),
+      set_config('edict.on_behalf_of', '', true),
       set_config('edict.change_id', uuidv7()::text, true)`);
     return fn(tx);
   });
@@ -42,6 +47,12 @@ export function inScope<T>(db: Database, scope: Scope, fn: (tx: Transaction) => 
 // creating it, or after finding an invite by its token.
 export async function enterOrg(tx: Transaction, orgId: string): Promise<void> {
   await tx.execute(sql`SELECT set_config('edict.org_id', ${orgId}, true)`);
+}
+
+// Records, for every event the rest of the scope writes, the human whose OAuth
+// approval lets the acting agent act (ADR 0021).
+export async function onBehalfOf(tx: Transaction, memberId: string): Promise<void> {
+  await tx.execute(sql`SELECT set_config('edict.on_behalf_of', ${memberId}, true)`);
 }
 
 export interface NewEvent {
@@ -59,7 +70,8 @@ export async function emit(tx: Transaction, orgId: string, event: NewEvent): Pro
     orgId,
     type: event.type,
     actorId: event.actorId,
-    onBehalfOfId: event.onBehalfOfId ?? null,
+    // Left out, it comes from the scope (onBehalfOf).
+    onBehalfOfId: event.onBehalfOfId ?? undefined,
     subjectId: event.subjectId,
     data: event.data ?? {},
   });

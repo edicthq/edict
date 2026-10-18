@@ -1,7 +1,8 @@
 import { and, asc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { issueLabels, issueNumbers, issues, labels, statuses, teamKeys, teams, type Transaction } from "@edicthq/db";
 import type { Issue, LinkedIssue } from "@edicthq/schema";
-import { activeMember, canSeeTeam, teamVisibility, type MemberRow, type TeamRow } from "./access.js";
+import type { Caller } from "./callers.js";
+import { activeMember, canSeeTeam, teamVisibility, type TeamRow } from "./access.js";
 import { gone, invalid, notFound } from "./errors.js";
 
 export type IssueRow = typeof issues.$inferSelect;
@@ -77,7 +78,7 @@ async function issueIdOf(tx: Transaction, orgId: string, ref: string): Promise<s
 // to get it back (ADR 0019), unless the caller asks for trashed ones too.
 export async function visibleIssue(
   tx: Transaction,
-  caller: MemberRow,
+  caller: Caller,
   ref: string,
   options: { forUpdate?: boolean; trashed?: boolean } = {},
 ): Promise<{ issue: IssueRow; team: TeamRow }> {
@@ -108,7 +109,7 @@ export async function loadIssue(tx: Transaction, issue: IssueRow, team: TeamRow)
 }
 
 // Issues as other issues show them, in teams the caller can see.
-export async function linkedIssues(tx: Transaction, caller: MemberRow, where: SQL): Promise<LinkedIssue[]> {
+export async function linkedIssues(tx: Transaction, caller: Caller, where: SQL): Promise<LinkedIssue[]> {
   const rows = await tx
     .select({ issue: issues, key: teams.key, status: statuses })
     .from(issues)
@@ -167,7 +168,7 @@ export async function checkLabels(tx: Transaction, team: TeamRow, labelIds: stri
 
 // A parent the caller can see, which is not the issue itself or one of its
 // sub-issues, however deep.
-export async function checkParent(tx: Transaction, caller: MemberRow, parentId: string, issueId?: string): Promise<void> {
+export async function checkParent(tx: Transaction, caller: Caller, parentId: string, issueId?: string): Promise<void> {
   const parent = await visibleIssue(tx, caller, parentId).catch(() => undefined);
   if (!parent) {
     throw invalid("parentId is not an issue you can see.");

@@ -4,16 +4,10 @@ import { sql } from "drizzle-orm";
 import { inScope, type Database, type Transaction } from "@edicthq/db";
 import { ErrorResponse, Id, type ErrorCode } from "@edicthq/schema";
 import type { Mailer } from "../email.js";
-import { callerMember, type MemberRow } from "./access.js";
-import { errorResponse, onApiError, unauthorized } from "./errors.js";
+import { callerIn, credentialOf, scopeFor, type Caller, type Credential, type SessionUser } from "./callers.js";
+import { errorResponse, forbidden, onApiError, unauthorized } from "./errors.js";
 
-export interface SessionUser {
-  id: string;
-  email: string;
-  name: string;
-  emailVerified: boolean;
-  instanceAdmin: boolean;
-}
+export type { Caller, Credential, SessionUser } from "./callers.js";
 
 export interface ApiDeps {
   db: Database;
@@ -24,7 +18,18 @@ export interface ApiDeps {
   publicUrl?: string;
 }
 
-export type ApiEnv = { Variables: { user: SessionUser | null } };
+export type ApiEnv = { Variables: { user: SessionUser | null; credential: Credential | null } };
+
+// Reads who is calling: an API key, else the session (ADR 0021).
+export function identify(deps: Pick<ApiDeps, "getUser">) {
+  return async (c: Context<ApiEnv>, next: () => Promise<void>) => {
+    const user = await deps.getUser(c.req.raw.headers);
+    const credential = credentialOf(c.req.raw.headers, user);
+    c.set("credential", credential);
+    c.set("user", credential?.kind === "session" ? credential.user : null);
+    await next();
+  };
+}
 
 export function router() {
   const app = new OpenAPIHono<ApiEnv>({
@@ -38,26 +43,38 @@ export function router() {
   return app;
 }
 
+// The signed-in person, for what only people do: agents get 403.
 export function signedIn(c: Context<ApiEnv>): SessionUser {
   const user = c.get("user");
   if (!user) {
+    if (c.get("credential")) {
+      throw forbidden("Agents cannot do this. It needs a person signed in to Edict.");
+    }
     throw unauthorized();
   }
   return user;
 }
 
-// Runs fn inside the organization's scope as the signed-in user's member.
+export function credential(c: Context<ApiEnv>): Credential {
+  const found = c.get("credential");
+  if (!found) {
+    throw unauthorized();
+  }
+  return found;
+}
+
+// Runs fn inside the organization's scope as the caller.
 // When it wrote events, the Edict-Change-Id response header names the change
 // they belong to, which undo takes (ADR 0019).
 export function inOrg<T>(
   deps: ApiDeps,
   c: Context<ApiEnv>,
   orgId: string,
-  fn: (tx: Transaction, caller: MemberRow) => Promise<T>,
+  fn: (tx: Transaction, caller: Caller) => Promise<T>,
 ): Promise<T> {
-  const user = signedIn(c);
-  return inScope(deps.db, { orgId, userId: user.id }, async (tx) => {
-    const result = await fn(tx, await callerMember(tx, orgId, user.id));
+  const found = credential(c);
+  return inScope(deps.db, { ...scopeFor(found), orgId }, async (tx) => {
+    const result = await fn(tx, await callerIn(tx, orgId, found));
     if (c.req.method !== "GET") {
       const { rows } = await tx.execute<{ change_id: string | null }>(sql`
         SELECT change_id FROM events

@@ -21,6 +21,7 @@ describe("OpenAPI document", () => {
       .flatMap(([path, methods]) => Object.keys(methods).map((method) => `${method.toUpperCase()} ${path}`))
       .sort();
     expect(operations).toEqual([
+      "DELETE /organizations/{orgId}/agents/{agentId}/api-keys/{keyId}",
       "DELETE /organizations/{orgId}/comments/{commentId}",
       "DELETE /organizations/{orgId}/invites/{inviteId}",
       "DELETE /organizations/{orgId}/issues/{issueRef}",
@@ -31,6 +32,9 @@ describe("OpenAPI document", () => {
       "GET /instance",
       "GET /invites/{token}",
       "GET /organizations",
+      "GET /organizations/{orgId}/agents",
+      "GET /organizations/{orgId}/agents/{agentId}",
+      "GET /organizations/{orgId}/agents/{agentId}/api-keys",
       "GET /organizations/{orgId}/events",
       "GET /organizations/{orgId}/invites",
       "GET /organizations/{orgId}/issues/{issueRef}",
@@ -48,6 +52,7 @@ describe("OpenAPI document", () => {
       "GET /organizations/{orgId}/teams/{teamId}/statuses",
       "GET /organizations/{orgId}/trash",
       "PATCH /instance",
+      "PATCH /organizations/{orgId}/agents/{agentId}",
       "PATCH /organizations/{orgId}/comments/{commentId}",
       "PATCH /organizations/{orgId}/issues/{issueRef}",
       "PATCH /organizations/{orgId}/labels/{labelId}",
@@ -56,6 +61,10 @@ describe("OpenAPI document", () => {
       "PATCH /organizations/{orgId}/teams/{teamId}/statuses/{statusId}",
       "POST /invites/{token}/accept",
       "POST /organizations",
+      "POST /organizations/{orgId}/agents",
+      "POST /organizations/{orgId}/agents/{agentId}/api-keys",
+      "POST /organizations/{orgId}/agents/{agentId}/pause",
+      "POST /organizations/{orgId}/agents/{agentId}/resume",
       "POST /organizations/{orgId}/changes/{changeId}/undo",
       "POST /organizations/{orgId}/comments/{commentId}/restore",
       "POST /organizations/{orgId}/invites",

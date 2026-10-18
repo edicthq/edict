@@ -2,7 +2,8 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { comments, emit, issues, teams, type Transaction } from "@edicthq/db";
 import { Comment, Id, Issue, IssueRef, TrashedIssue } from "@edicthq/schema";
-import { atLeast, teamVisibility, type MemberRow } from "./access.js";
+import type { Caller } from "./callers.js";
+import { atLeast, requireAgentPower, teamVisibility } from "./access.js";
 import { toComment } from "./comments.js";
 import { errors, inOrg, json, noContent, OrgParams, router, type ApiDeps } from "./context.js";
 import { conflict, forbidden, notFound } from "./errors.js";
@@ -20,7 +21,7 @@ const currentChange = sql`nullif(current_setting('edict.change_id', true), '')::
 // `extra` joins each event's data; undo marks its events with it.
 type Extra = Record<string, unknown>;
 
-export async function trashIssues(tx: Transaction, caller: MemberRow, rootIds: string[], extra: Extra = {}): Promise<void> {
+export async function trashIssues(tx: Transaction, caller: Caller, rootIds: string[], extra: Extra = {}): Promise<void> {
   if (rootIds.length === 0) return;
   const { rows } = await tx.execute<{ id: string }>(sql`
     WITH RECURSIVE tree(id) AS (
@@ -39,7 +40,7 @@ export async function trashIssues(tx: Transaction, caller: MemberRow, rootIds: s
 }
 
 // Takes issues out of the trash. One issue.restored event per issue.
-export async function restoreIssues(tx: Transaction, caller: MemberRow, ids: string[], extra: Extra = {}): Promise<void> {
+export async function restoreIssues(tx: Transaction, caller: Caller, ids: string[], extra: Extra = {}): Promise<void> {
   if (ids.length === 0) return;
   const before = await tx.select().from(issues).where(and(inArray(issues.id, ids), isNotNull(issues.deletedAt)));
   if (before.length === 0) return;
@@ -52,7 +53,7 @@ export async function restoreIssues(tx: Transaction, caller: MemberRow, ids: str
 
 async function emitEach(
   tx: Transaction,
-  caller: MemberRow,
+  caller: Caller,
   type: "issue.deleted" | "issue.restored",
   rows: (typeof issues.$inferSelect)[],
   extra: Extra,
@@ -78,7 +79,7 @@ async function emitEach(
   }
 }
 
-export async function trashComment(tx: Transaction, caller: MemberRow, row: CommentRow, extra: Extra = {}): Promise<void> {
+export async function trashComment(tx: Transaction, caller: Caller, row: CommentRow, extra: Extra = {}): Promise<void> {
   await tx
     .update(comments)
     .set({ deletedAt: sql`now()`, deletedBy: caller.id, deletedChangeId: currentChange })
@@ -86,7 +87,7 @@ export async function trashComment(tx: Transaction, caller: MemberRow, row: Comm
   await emit(tx, caller.orgId, { type: "comment.deleted", actorId: caller.id, subjectId: row.id, data: { issueId: row.issueId, ...extra } });
 }
 
-export async function restoreComment(tx: Transaction, caller: MemberRow, row: CommentRow, extra: Extra = {}): Promise<CommentRow> {
+export async function restoreComment(tx: Transaction, caller: Caller, row: CommentRow, extra: Extra = {}): Promise<CommentRow> {
   const [restored] = await tx
     .update(comments)
     .set({ deletedAt: null, deletedBy: null, deletedChangeId: null })
@@ -103,7 +104,7 @@ export async function restoreComment(tx: Transaction, caller: MemberRow, row: Co
 
 // A comment the caller may trash or restore: theirs, or any if they are an
 // Admin or Owner, on an issue they can see.
-async function managedComment(tx: Transaction, caller: MemberRow, commentId: string): Promise<CommentRow> {
+async function managedComment(tx: Transaction, caller: Caller, commentId: string): Promise<CommentRow> {
   const [row] = await tx.select().from(comments).where(eq(comments.id, commentId)).for("update");
   if (!row) {
     throw notFound("comment");
@@ -179,6 +180,7 @@ export function trashRoutes(deps: ApiDeps) {
   app.openapi(deleteIssue, async (c) => {
     const { orgId, issueRef } = c.req.valid("param");
     await inOrg(deps, c, orgId, async (tx, caller) => {
+      requireAgentPower(caller, "delete", "delete issues");
       const { issue } = await visibleIssue(tx, caller, issueRef, { forUpdate: true });
       await trashIssues(tx, caller, [issue.id]);
     });
@@ -228,6 +230,7 @@ export function trashRoutes(deps: ApiDeps) {
   app.openapi(deleteComment, async (c) => {
     const { orgId, commentId } = c.req.valid("param");
     await inOrg(deps, c, orgId, async (tx, caller) => {
+      requireAgentPower(caller, "delete", "delete comments");
       const row = await managedComment(tx, caller, commentId);
       if (row.deletedAt) {
         throw conflict("The comment is already in the trash.");

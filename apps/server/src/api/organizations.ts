@@ -27,9 +27,12 @@ import {
   requireRole,
   toMember,
 } from "./access.js";
+import { pauseConnectedAgents } from "./agents.js";
+import { callerIn, credentialOrg, scopeFor } from "./callers.js";
 import {
   OrgParams,
   body,
+  credential,
   errors,
   inOrg,
   json,
@@ -103,7 +106,7 @@ const removeMember = createRoute({
   tags: ["Members"],
   summary: "Remove a member, or leave the organization",
   description:
-    "Admins and Owners remove members, and anyone can remove themselves. Only Owners remove an Owner, and the last Owner cannot leave. The member's history stays.",
+    "Admins and Owners remove members, and anyone can remove themselves. Only Owners remove an Owner, and the last Owner cannot leave. The member's history stays, and agents they connected are paused.",
   request: { params: MemberParams },
   responses: {
     ...noContent,
@@ -149,7 +152,18 @@ export function organizationRoutes(deps: ApiDeps) {
   });
 
   app.openapi(listOrganizations, async (c) => {
-    const user = signedIn(c);
+    const found = credential(c);
+    if (found.kind !== "session") {
+      // An agent belongs to one organization.
+      const membership = await inScope(deps.db, scopeFor(found), async (tx) => {
+        const orgId = (await credentialOrg(tx, found))!;
+        const caller = await callerIn(tx, orgId, found);
+        const [organization] = await tx.select().from(organizations).where(eq(organizations.id, orgId));
+        return { organization: toOrganization(organization!), member: await loadMember(tx, orgId, caller.id) };
+      });
+      return c.json([membership], 200);
+    }
+    const user = found.user;
     const rows = await inScope(deps.db, { userId: user.id }, (tx) =>
       tx
         .select({ organization: organizations, ...memberColumns })
@@ -179,7 +193,7 @@ export function organizationRoutes(deps: ApiDeps) {
     const { orgId, memberId } = c.req.valid("param");
     const { role } = c.req.valid("json");
     const member = await inOrg(deps, c, orgId, async (tx, caller) => {
-      requireRole(caller, "admin", "change roles");
+      requireRole(caller, "admin", "change roles", "members");
       const target = await activeMember(tx, orgId, memberId);
       if ((target.role === "owner" || role === "owner") && caller.role !== "owner") {
         throw forbidden("Only Owners can grant or take away the Owner role.");
@@ -210,7 +224,7 @@ export function organizationRoutes(deps: ApiDeps) {
     await inOrg(deps, c, orgId, async (tx, caller) => {
       const target = await activeMember(tx, orgId, memberId);
       if (target.id !== caller.id) {
-        requireRole(caller, "admin", "remove members");
+        requireRole(caller, "admin", "remove members", "members");
         if (target.role === "owner" && caller.role !== "owner") {
           throw forbidden("Only Owners can remove an Owner.");
         }
@@ -221,6 +235,7 @@ export function organizationRoutes(deps: ApiDeps) {
       await tx.update(members).set({ removedAt: new Date() }).where(eq(members.id, target.id));
       await tx.delete(teamMembers).where(eq(teamMembers.memberId, target.id));
       await emit(tx, orgId, { type: "member.removed", actorId: caller.id, subjectId: target.id });
+      await pauseConnectedAgents(tx, caller.id, target);
     });
     return c.body(null, 204);
   });

@@ -4,8 +4,8 @@ import { bodyLimit } from "hono/body-limit";
 import { asc, eq } from "drizzle-orm";
 import { attachments, emit, enterOrg, inScope } from "@edicthq/db";
 import { Attachment, Id, IssueRef } from "@edicthq/schema";
-import { callerMember } from "./access.js";
-import { body, errors, inOrg, json, OrgParams, router, signedIn, type ApiEnv, type ApiDeps } from "./context.js";
+import { callerIn, scopeFor } from "./callers.js";
+import { body, credential, errors, identify, inOrg, json, OrgParams, router, type ApiEnv, type ApiDeps } from "./context.js";
 import { invalid, notFound, onApiError, tooLarge } from "./errors.js";
 import { visibleIssue } from "./issue-data.js";
 import type { AttachmentStorage } from "../storage.js";
@@ -113,7 +113,7 @@ export function attachmentRoutes(deps: AttachmentDeps) {
 
   app.openapi(createAttachment, async (c) => {
     const { orgId, issueRef } = c.req.valid("param");
-    signedIn(c);
+    credential(c);
     const form = await c.req.parseBody();
     const file = form["file"];
     if (!(file instanceof File) || file.size === 0) {
@@ -160,25 +160,22 @@ export function fileRoutes(deps: AttachmentDeps): OpenAPIHono<ApiEnv> {
   const app = router();
   app.onError(onApiError);
 
-  app.use(async (c, next) => {
-    c.set("user", await deps.getUser(c.req.raw.headers));
-    await next();
-  });
+  app.use(identify(deps));
 
   app.get("/files/:attachmentId/:fileName", async (c) => {
-    const user = signedIn(c);
+    const found = credential(c);
     const { attachmentId } = c.req.param();
     if (!Id.safeParse(attachmentId).success) {
       throw notFound("file");
     }
-    const file = await inScope(deps.db, { userId: user.id, attachmentId }, async (tx) => {
+    const file = await inScope(deps.db, { ...scopeFor(found), attachmentId }, async (tx) => {
       const [row] = await tx.select().from(attachments).where(eq(attachments.id, attachmentId));
       if (!row) {
         throw notFound("file");
       }
       // Back in the org's scope: membership and issue visibility decide.
       await enterOrg(tx, row.orgId);
-      const caller = await callerMember(tx, row.orgId, user.id);
+      const caller = await callerIn(tx, row.orgId, found);
       await visibleIssue(tx, caller, row.issueId);
       const bytes = await deps.storage.get(storageKey(row));
       if (!bytes) {

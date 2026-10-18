@@ -129,7 +129,7 @@ export function inviteRoutes(deps: ApiDeps) {
     const token = randomBytes(32).toString("base64url");
 
     const { invite, inviterName, organizationName } = await inOrg(deps, c, orgId, async (tx, caller) => {
-      requireRole(caller, "admin", "invite people");
+      requireRole(caller, "admin", "invite people", "members");
       if (input.role === "owner") {
         requireRole(caller, "owner", "invite Owners");
       }
@@ -206,7 +206,7 @@ export function inviteRoutes(deps: ApiDeps) {
   app.openapi(listInvites, async (c) => {
     const { orgId } = c.req.valid("param");
     const rows = await inOrg(deps, c, orgId, (tx, caller) => {
-      requireRole(caller, "admin", "see invites");
+      requireRole(caller, "admin", "see invites", "members");
       return tx
         .select()
         .from(invites)
@@ -226,7 +226,7 @@ export function inviteRoutes(deps: ApiDeps) {
   app.openapi(revokeInvite, async (c) => {
     const { orgId, inviteId } = c.req.valid("param");
     await inOrg(deps, c, orgId, async (tx, caller) => {
-      requireRole(caller, "admin", "revoke invites");
+      requireRole(caller, "admin", "revoke invites", "members");
       const revoked = await tx
         .update(invites)
         .set({ revokedAt: new Date() })

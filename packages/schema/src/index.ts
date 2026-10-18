@@ -82,6 +82,83 @@ export const Membership = z
   .meta({ id: "Membership" });
 export type Membership = z.infer<typeof Membership>;
 
+// What agents cannot do until an admin grants it (ADR 0021).
+export const AgentPower = z
+  .enum(["delete", "settings", "members", "agents"])
+  .meta({ id: "AgentPower", description: "delete: move things to the trash. settings: change teams, workflows, labels and the organization. members: invite and manage members. agents: create and manage agents." });
+export type AgentPower = z.infer<typeof AgentPower>;
+
+const AgentRole = z.enum(["member", "guest"]);
+
+export const Agent = z
+  .object({
+    id: Id,
+    name: z.string(),
+    description: z.string(),
+    // Member or Guest. A connected agent's team access is its human's.
+    role: AgentRole,
+    grants: z.array(AgentPower),
+    // A connected agent's human (ADR 0015). Null for agents an admin created.
+    connectedBy: Id.nullable(),
+    // The MCP client a connected agent connected as, e.g. "Claude Code".
+    clientName: z.string().nullable(),
+    pausedAt: z.iso.datetime().nullable(),
+    version: Version,
+    createdAt: z.iso.datetime(),
+  })
+  .meta({ id: "Agent" });
+export type Agent = z.infer<typeof Agent>;
+
+export const CreateAgent = z
+  .object({
+    name: z.string().trim().min(1).max(80),
+    description: z.string().max(2000).default(""),
+    role: AgentRole.default("member"),
+    teamIds: z.array(Id).max(50).default([]),
+    grants: z.array(AgentPower).default([]),
+  })
+  .meta({ id: "CreateAgent" });
+
+export const UpdateAgent = z
+  .object({
+    version: Version,
+    name: z.string().trim().min(1).max(80).optional(),
+    description: z.string().max(2000).optional(),
+    role: AgentRole.optional(),
+    grants: z.array(AgentPower).optional(),
+  })
+  .meta({ id: "UpdateAgent" });
+
+export const ApiKey = z
+  .object({
+    id: Id,
+    agentId: Id,
+    name: z.string(),
+    // The secret's first characters.
+    prefix: z.string(),
+    // The teams the key narrows the agent to. Null: all of the agent's teams.
+    teamIds: z.array(Id).nullable(),
+    createdAt: z.iso.datetime(),
+    lastUsedAt: z.iso.datetime().nullable(),
+  })
+  .meta({ id: "ApiKey" });
+export type ApiKey = z.infer<typeof ApiKey>;
+
+export const CreateApiKey = z
+  .object({
+    name: z.string().trim().min(1).max(80),
+    teamIds: z.array(Id).max(50).nullable().default(null),
+  })
+  .meta({ id: "CreateApiKey" });
+
+export const CreatedApiKey = z
+  .object({
+    apiKey: ApiKey,
+    // Shown only in this response. Send it as `Authorization: Bearer <secret>`.
+    secret: z.string(),
+  })
+  .meta({ id: "CreatedApiKey" });
+
 export const TeamKey = z
   .string()
   .regex(/^[A-Z][A-Z0-9]{1,6}$/, "2-7 uppercase letters and digits, starting with a letter");

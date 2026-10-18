@@ -27,6 +27,9 @@ const createdAt = () =>
 
 export const memberKind = pgEnum("member_kind", ["human", "agent"]);
 export const role = pgEnum("role", ["owner", "admin", "member", "guest"]);
+// What agents cannot do until an admin grants it (ADR 0021): deleting, changing
+// team and organization settings, managing members, and creating agents.
+export const agentPower = pgEnum("agent_power", ["delete", "settings", "members", "agents"]);
 
 // The tenant root.
 export const organizations = pgTable("organizations", {
@@ -49,6 +52,18 @@ export const members = pgTable(
     // the member stays so events keep their actor.
     userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
     role: role("role").notNull(),
+    // Agents only: humans take their name from their user.
+    name: text("name"),
+    description: text("description").notNull().default(""),
+    // A connected agent's human (ADR 0015). Null for admin-created agents.
+    connectedBy: uuid("connected_by"),
+    // The MCP client a connected agent was registered as, e.g. "Claude Code".
+    clientName: text("client_name"),
+    grants: agentPower("grants").array().notNull().default(sql`'{}'::agent_power[]`),
+    // A paused agent holds no tokens and cannot act until an admin resumes it.
+    pausedAt: timestamp("paused_at", { withTimezone: true }),
+    // ADR 0018, for an agent's name, description, role and grants.
+    version: integer("version").notNull().default(1),
     createdAt: createdAt(),
     // A removed member keeps its row for the event log; re-inviting the same
     // user brings the same member back.
@@ -58,11 +73,59 @@ export const members = pgTable(
     unique("members_org_id_id_unique").on(table.orgId, table.id),
     unique("members_org_id_user_id_unique").on(table.orgId, table.userId),
     index("members_user_id_idx").on(table.userId),
+    // Reconnecting the same client as the same human reuses the agent.
+    uniqueIndex("members_connected_client_unique")
+      .on(table.orgId, table.connectedBy, table.clientName)
+      .where(sql`${table.connectedBy} IS NOT NULL`),
     check("members_agent_has_no_user", sql`${table.kind} = 'human' OR ${table.userId} IS NULL`),
     check(
       "members_agent_role",
       sql`${table.kind} = 'human' OR ${table.role} IN ('member', 'guest')`,
     ),
+    check("members_agent_has_name", sql`${table.kind} = 'human' OR ${table.name} IS NOT NULL`),
+    check(
+      "members_human_is_not_connected",
+      sql`${table.kind} = 'agent' OR (${table.connectedBy} IS NULL AND ${table.pausedAt} IS NULL)`,
+    ),
+    foreignKey({
+      name: "members_connected_by_fk",
+      columns: [table.orgId, table.connectedBy],
+      foreignColumns: [table.orgId, table.id],
+    }),
+  ],
+);
+
+// ADR 0021. A secret that lets one agent call the API as itself. Only its
+// SHA-256 hash is stored.
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull(),
+    agentId: uuid("agent_id").notNull(),
+    name: text("name").notNull(),
+    // The secret's first characters, to tell keys apart.
+    prefix: text("prefix").notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    // Narrows the agent's team access. Null: the agent's own access.
+    teamIds: uuid("team_ids").array(),
+    createdBy: uuid("created_by").notNull(),
+    createdAt: createdAt(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("api_keys_agent_id_idx").on(table.agentId),
+    foreignKey({
+      name: "api_keys_agent_fk",
+      columns: [table.orgId, table.agentId],
+      foreignColumns: [members.orgId, members.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "api_keys_created_by_fk",
+      columns: [table.orgId, table.createdBy],
+      foreignColumns: [members.orgId, members.id],
+    }),
   ],
 );
 

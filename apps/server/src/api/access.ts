@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNull, or, type SQL } from "drizzle-orm";
 import { members, teamMembers, teams, user, type Transaction } from "@edicthq/db";
-import type { Member, Role, Team } from "@edicthq/schema";
+import type { AgentPower, Member, Role, Team } from "@edicthq/schema";
+import type { Caller } from "./callers.js";
 import { forbidden, notFound } from "./errors.js";
 
 export type MemberRow = typeof members.$inferSelect;
@@ -25,9 +26,35 @@ export async function callerMember(tx: Transaction, orgId: string, userId: strin
   return member;
 }
 
-export function requireRole(caller: MemberRow, min: Role, action: string): void {
-  if (!atLeast(caller.role, min)) {
+// Whether the caller's role allows an action. Agents are never Admins, so an
+// action above an agent's role needs the power behind it granted (ADR 0021),
+// and a connected agent also needs its human to be allowed. Nothing lifts an
+// agent to Owner.
+export function may(caller: Caller, min: Role, power: AgentPower): boolean {
+  if (caller.kind === "human") {
+    return atLeast(caller.role, min);
+  }
+  const allowed = atLeast(caller.role, min) || (min !== "owner" && caller.grants.includes(power));
+  const human = caller.access.id === caller.id ? undefined : caller.access;
+  return allowed && (!human || atLeast(human.role, min));
+}
+
+// `power` is what an agent needs granted to pass: settings unless the action
+// manages members or agents.
+export function requireRole(caller: Caller, min: Role, action: string, power: AgentPower = "settings"): void {
+  if (!may(caller, min, power)) {
+    if (caller.kind === "agent" && min !== "owner") {
+      throw forbidden(`Agents cannot ${action} unless an admin grants them the "${power}" power.`);
+    }
     throw forbidden(`Only ${min === "owner" ? "Owners" : "Admins and Owners"} can ${action}.`);
+  }
+}
+
+// For actions any human member may take but agents only with a power granted,
+// like deleting (ADR 0008).
+export function requireAgentPower(caller: Caller, power: AgentPower, action: string): void {
+  if (caller.kind === "agent" && !caller.grants.includes(power)) {
+    throw forbidden(`Agents cannot ${action} unless an admin grants them the "${power}" power.`);
   }
 }
 
@@ -43,19 +70,23 @@ export async function activeMember(tx: Transaction, orgId: string, memberId: str
 }
 
 // Admins and Owners see every team. Members see public teams and the private
-// teams they belong to. Guests see only the teams they belong to.
-export function teamVisibility(tx: Transaction, caller: MemberRow): SQL | undefined {
-  if (atLeast(caller.role, "admin")) {
-    return undefined;
+// teams they belong to. Guests see only the teams they belong to. A connected
+// agent sees what its human sees, and an API key can narrow an agent to some
+// of its teams.
+export function teamVisibility(tx: Transaction, caller: Caller): SQL | undefined {
+  const access = caller.access;
+  const keyTeams = caller.keyTeamIds ? inArray(teams.id, caller.keyTeamIds) : undefined;
+  if (atLeast(access.role, "admin")) {
+    return keyTeams;
   }
   const own = inArray(
     teams.id,
-    tx.select({ id: teamMembers.teamId }).from(teamMembers).where(eq(teamMembers.memberId, caller.id)),
+    tx.select({ id: teamMembers.teamId }).from(teamMembers).where(eq(teamMembers.memberId, access.id)),
   );
-  return caller.role === "guest" ? own : or(eq(teams.private, false), own);
+  return and(access.role === "guest" ? own : or(eq(teams.private, false), own), keyTeams);
 }
 
-export async function visibleTeam(tx: Transaction, caller: MemberRow, teamId: string): Promise<TeamRow> {
+export async function visibleTeam(tx: Transaction, caller: Caller, teamId: string): Promise<TeamRow> {
   const [team] = await tx
     .select()
     .from(teams)
@@ -70,6 +101,7 @@ export async function visibleTeam(tx: Transaction, caller: MemberRow, teamId: st
 export const memberColumns = {
   id: members.id,
   kind: members.kind,
+  agentName: members.name,
   role: members.role,
   createdAt: members.createdAt,
   userName: user.name,
@@ -83,6 +115,7 @@ export function memberWithUser(tx: Transaction) {
 type MemberWithUser = {
   id: string;
   kind: MemberRow["kind"];
+  agentName: string | null;
   role: Role;
   createdAt: Date;
   userName: string | null;
@@ -94,9 +127,8 @@ export function toMember(row: MemberWithUser): Member {
     id: row.id,
     kind: row.kind,
     role: row.role,
-    // Agents get names of their own in M3. A human whose user was deleted
-    // keeps their member for the event log.
-    name: row.userName ?? (row.kind === "agent" ? "Agent" : "Deleted user"),
+    // A human whose user was deleted keeps their member for the event log.
+    name: row.kind === "agent" ? (row.agentName ?? "Agent") : (row.userName ?? "Deleted user"),
     email: row.userEmail,
     createdAt: row.createdAt.toISOString(),
   };

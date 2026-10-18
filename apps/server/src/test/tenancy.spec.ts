@@ -32,7 +32,7 @@ async function twoOrgs() {
     const [org] = await db.insert(organizations).values({ name: slug, slug }).returning();
     const [member] = await db
       .insert(members)
-      .values({ orgId: org!.id, kind: "agent", role: "member" })
+      .values({ orgId: org!.id, kind: "agent", role: "member", name: "Agent" })
       .returning();
     const [team] = await db
       .insert(teams)

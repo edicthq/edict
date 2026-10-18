@@ -1,9 +1,10 @@
 import { DEFAULT_MAX_ATTACHMENT_BYTES } from "../env.js";
 import { localDiskStorage } from "../storage.js";
+import { agentRoutes } from "./agents.js";
 import { attachmentRoutes, type AttachmentDeps } from "./attachments.js";
 import { changeRoutes } from "./changes.js";
 import { commentRoutes } from "./comments.js";
-import { router } from "./context.js";
+import { identify, router } from "./context.js";
 import { eventRoutes } from "./events.js";
 import { instanceRoutes } from "./instance.js";
 import { inviteRoutes } from "./invites.js";
@@ -23,10 +24,7 @@ export { fileRoutes, type AttachmentDeps } from "./attachments.js";
 export function createApi(deps: AttachmentDeps) {
   const api = router();
 
-  api.use(async (c, next) => {
-    c.set("user", await deps.getUser(c.req.raw.headers));
-    await next();
-  });
+  api.use(identify(deps));
 
   api.route("/", organizationRoutes(deps));
   api.route("/", teamRoutes(deps));
@@ -38,6 +36,7 @@ export function createApi(deps: AttachmentDeps) {
   api.route("/", changeRoutes(deps));
   api.route("/", labelRoutes(deps));
   api.route("/", relationRoutes(deps));
+  api.route("/", agentRoutes(deps));
   api.route("/", inviteRoutes(deps));
   api.route("/", eventRoutes(deps));
   api.route("/", instanceRoutes(deps));

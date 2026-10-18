@@ -13,8 +13,8 @@ export const events = pgTable(
     type: text("type").notNull(),
     actorId: uuid("actor_id").notNull(),
     // The human whose OAuth approval let an agent act. Null for humans and for
-    // agents using an API key.
-    onBehalfOfId: uuid("on_behalf_of_id"),
+    // agents using an API key. Defaults to the scope's (onBehalfOf in scope.ts).
+    onBehalfOfId: uuid("on_behalf_of_id").default(sql`nullif(current_setting('edict.on_behalf_of', true), '')::uuid`),
     subjectId: uuid("subject_id").notNull(),
     // The change the event is part of: every event one transaction writes
     // shares it (ADR 0019). inScope sets it, so an event written outside a

@@ -2,7 +2,8 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { and, asc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { emit, issueLabels, issues, labels, type Transaction } from "@edicthq/db";
 import { CreateLabel, Id, Label, UpdateLabel } from "@edicthq/schema";
-import { requireRole, visibleTeam, type MemberRow } from "./access.js";
+import type { Caller } from "./callers.js";
+import { requireAgentPower, requireRole, visibleTeam } from "./access.js";
 import { body, errors, inOrg, json, noContent, OrgParams, router, type ApiDeps } from "./context.js";
 import { changesOf, conflict, forbidden, notFound, requireVersion } from "./errors.js";
 
@@ -54,7 +55,7 @@ async function requireFreeName(tx: Transaction, orgId: string, teamId: string | 
 
 // Admins and Owners manage organization labels. Anyone but a guest who can
 // see a team manages its labels.
-async function requireLabelRights(tx: Transaction, caller: MemberRow, teamId: string | null) {
+async function requireLabelRights(tx: Transaction, caller: Caller, teamId: string | null) {
   if (teamId === null) {
     requireRole(caller, "admin", "manage organization labels");
     return;
@@ -63,9 +64,10 @@ async function requireLabelRights(tx: Transaction, caller: MemberRow, teamId: st
   if (caller.role === "guest") {
     throw forbidden("Guests can't manage labels.");
   }
+  requireAgentPower(caller, "settings", "manage labels");
 }
 
-async function labelForUpdate(tx: Transaction, caller: MemberRow, labelId: string): Promise<LabelRow> {
+async function labelForUpdate(tx: Transaction, caller: Caller, labelId: string): Promise<LabelRow> {
   const [label] = await tx.select().from(labels).where(eq(labels.id, labelId)).for("update");
   if (!label) throw notFound("label");
   if (label.teamId) await visibleTeam(tx, caller, label.teamId).catch(() => Promise.reject(notFound("label")));
@@ -218,6 +220,7 @@ export function labelRoutes(deps: ApiDeps) {
   app.openapi(deleteLabel, async (c) => {
     const { orgId, labelId } = c.req.valid("param");
     await inOrg(deps, c, orgId, async (tx, caller) => {
+      requireAgentPower(caller, "delete", "delete labels");
       const label = await labelForUpdate(tx, caller, labelId);
 
       // Each issue that loses the label changes like any other edit: a new
