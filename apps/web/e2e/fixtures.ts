@@ -23,7 +23,8 @@ export const test = base.extend<{}, { instanceUrl: string }>({
       // Attachment bytes (ADR 0020) go under their own temp dir.
       const dataDir = await mkdtemp(join(tmpdir(), "edict-e2e-"));
       // Stands in for GitHub's latest release, so the update check never
-      // leaves the machine and always finds 99.0.0.
+      // leaves the machine and always finds 99.0.0, and for the telemetry
+      // collector.
       const releases = createHttpServer((_req, res) => {
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({ tag_name: "v99.0.0", html_url: "https://github.com/edicthq/edict/releases/tag/v99.0.0" }));
@@ -45,6 +46,8 @@ export const test = base.extend<{}, { instanceUrl: string }>({
           SMTP_URL: "",
           DATA_DIR: dataDir,
           RELEASES_URL: `http://127.0.0.1:${releasesPort}/releases/latest`,
+          // Telemetry is off unless a test turns it on; even then, no ping leaves.
+          TELEMETRY_URL: `http://127.0.0.1:${releasesPort}/v1/ping`,
         },
         stdio: ["ignore", "inherit", "inherit"],
       });

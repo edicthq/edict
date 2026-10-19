@@ -20,6 +20,7 @@ export interface TestServer {
   close: () => Promise<void>;
   purgeTrash: App["purgeTrash"];
   archiveIssues: App["archiveIssues"];
+  sendTelemetry: App["sendTelemetry"];
 }
 
 // A throwaway Postgres database, dropped when the current test finishes.
@@ -65,6 +66,8 @@ export async function startTestServer(
     signIn?: SignInProviders;
     // Where the update check asks for the latest release. Nowhere real.
     releasesUrl?: string;
+    // Where telemetry pings go. Nowhere real.
+    telemetryUrl?: string;
   } = {},
 ): Promise<TestServer> {
   const database = options.database ?? (await createTestDatabase());
@@ -85,6 +88,7 @@ export async function startTestServer(
     privateWebhookTargets: options.privateWebhookTargets,
     signIn: options.signIn,
     releasesUrl: options.releasesUrl ?? "http://127.0.0.1:9/releases/latest",
+    telemetryUrl: options.telemetryUrl ?? "http://127.0.0.1:9/v1/ping",
   }, { mailer: options.mailer });
   await app.start();
 
@@ -97,7 +101,7 @@ export async function startTestServer(
   };
   onTestFinished(close);
 
-  return { baseUrl: `http://127.0.0.1:${app.port}`, close, purgeTrash: app.purgeTrash, archiveIssues: app.archiveIssues };
+  return { baseUrl: `http://127.0.0.1:${app.port}`, close, purgeTrash: app.purgeTrash, archiveIssues: app.archiveIssues, sendTelemetry: app.sendTelemetry };
 }
 
 async function adminQuery(adminUrl: string, sql: string): Promise<void> {

@@ -97,6 +97,7 @@ export function InstancePage() {
         <FormError message={setMode.error?.message} />
         <InstanceStatusSection />
         <UpdatesSection />
+        <TelemetrySection />
         <InstanceUsersSection />
       </PageBody>
     </>
@@ -206,6 +207,50 @@ function UpdatesSection() {
           </span>
         ) : null}
         <FormError message={update.error?.message ?? checkNow.error?.message} />
+      </div>
+    </section>
+  );
+}
+
+// Opt-in telemetry (ADR 0026): the switch, and the exact payload it sends.
+function TelemetrySection() {
+  const status = useInstanceStatus(true);
+  const update = useUpdateInstance();
+  const [pending, setPending] = useState<boolean | null>(null);
+  if (!status.data) return null;
+  const { telemetry } = status.data;
+  const enabled = pending ?? telemetry.enabled;
+  return (
+    <section aria-labelledby="telemetry-heading" className="flex flex-col gap-2">
+      <GroupHeader>
+        <span id="telemetry-heading">Telemetry</span>
+      </GroupHeader>
+      <div className="mx-3 flex flex-col gap-3 text-ui">
+        <label className="flex items-start gap-2">
+          <input
+            type="checkbox"
+            className="mt-0.5 size-4 accent-[var(--ink)]"
+            checked={enabled}
+            disabled={update.isPending}
+            onChange={(event) => {
+              setPending(event.target.checked);
+              update.mutate({ telemetry: event.target.checked }, { onSettled: () => setPending(null) });
+            }}
+          />
+          <span className="flex flex-col gap-1">
+            <span className="font-medium text-ink">Share usage numbers with Edict</span>
+            <span className="text-ink-2 text-pretty">
+              Off unless you turn it on. Once a day, Edict sends exactly this to telemetry.edict.dev: no instance id, no
+              address, and the collector keeps no IP addresses. It helps the project see which versions are in use.
+            </span>
+          </span>
+        </label>
+        <pre aria-label="Telemetry payload" className="rounded-md border border-line bg-surface px-3 py-2 font-mono text-sm text-ink">
+          {JSON.stringify(telemetry.payload, null, 2)}
+        </pre>
+        {enabled && telemetry.sentAt ? <p className="text-ink-2">Last sent {checkedAgo(telemetry.sentAt)}.</p> : null}
+        {enabled && telemetry.error ? <p className="text-ink-2">The last ping failed: {telemetry.error}</p> : null}
+        <FormError message={update.error?.message} />
       </div>
     </section>
   );

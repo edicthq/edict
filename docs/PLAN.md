@@ -177,6 +177,7 @@ apps/server      Hono API, /mcp, WebSocket, serves the web build
 apps/web         Vite + React SPA
 apps/desktop     Tauri 2 shell
 apps/docs        Fumadocs site
+apps/telemetry   Collector for opt-in telemetry pings
 packages/schema  Zod schemas, the source of truth for the API
 packages/client  Typed API client generated from OpenAPI, published to npm
 packages/ui      Design system
@@ -216,7 +217,7 @@ Sign-up mode (open, invite-only, domain), SMTP, storage, the user list, the upda
 
 ### Telemetry
 
-Opt-in and off by default. The instance admin page shows the exact payload: version and a user-count bucket.
+Opt-in and off by default. The instance admin page shows the exact payload: version and a user-count bucket. It goes once a day to Edict's own collector (`apps/telemetry`), which keeps daily counts and no IP addresses. See [ADR 0026](./adr/0026-telemetry-counts-not-instances.md).
 
 ## Self-hosting
 

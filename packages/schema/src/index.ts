@@ -519,6 +519,35 @@ export const UpdateCheck = z
   .meta({ id: "UpdateCheck" });
 export type UpdateCheck = z.infer<typeof UpdateCheck>;
 
+// How many users an instance has, as telemetry reports it (ADR 0026).
+export const UserCountBucket = z
+  .enum(["1", "2-10", "11-50", "51-200", "201-1000", "1001+"])
+  .meta({ id: "UserCountBucket" });
+export type UserCountBucket = z.infer<typeof UserCountBucket>;
+
+// The whole of a telemetry ping: no instance id, no URL (ADR 0026).
+export const TelemetryPing = z
+  .object({
+    version: z.string().regex(/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/).max(64),
+    users: UserCountBucket,
+  })
+  .strict()
+  .meta({ id: "TelemetryPing" });
+export type TelemetryPing = z.infer<typeof TelemetryPing>;
+
+// Opt-in telemetry, off by default. When on, the instance sends payload once
+// a day, exactly as shown.
+export const Telemetry = z
+  .object({
+    enabled: z.boolean(),
+    payload: TelemetryPing,
+    // When the last ping went, and why it failed if it did.
+    sentAt: z.iso.datetime().nullable(),
+    error: z.string().nullable(),
+  })
+  .meta({ id: "Telemetry" });
+export type Telemetry = z.infer<typeof Telemetry>;
+
 // How the instance is set up, for its admins.
 export const InstanceStatus = z
   .object({
@@ -530,6 +559,7 @@ export const InstanceStatus = z
     }),
     version: z.string(),
     updates: UpdateCheck,
+    telemetry: Telemetry,
   })
   .meta({ id: "InstanceStatus" });
 
@@ -551,7 +581,7 @@ export const InstanceUsers = z
   .meta({ id: "InstanceUsers" });
 
 export const UpdateInstanceSettings = z
-  .object({ signUpMode: SignUpMode, signUpDomains: z.array(EmailDomain).max(50), updateCheck: z.boolean() })
+  .object({ signUpMode: SignUpMode, signUpDomains: z.array(EmailDomain).max(50), updateCheck: z.boolean(), telemetry: z.boolean() })
   .partial()
   .meta({ id: "UpdateInstanceSettings" });
 

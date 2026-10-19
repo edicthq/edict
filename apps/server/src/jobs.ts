@@ -1,6 +1,6 @@
 // Background jobs on pg-boss, which keeps its queue in Postgres (ADR 0007):
-// the daily trash purge (ADR 0019), webhook deliveries (ADR 0022) and the
-// daily update check.
+// the daily trash purge (ADR 0019), webhook deliveries (ADR 0022), the
+// daily update check and opt-in telemetry (ADR 0026).
 import { PgBoss } from "pg-boss";
 import { and, eq, inArray, isNotNull, isNull, lt, notInArray, or, sql } from "drizzle-orm";
 import {
@@ -19,6 +19,7 @@ import {
 import type { AttachmentStorage } from "./storage.js";
 import { readInstanceSettings } from "./instance.js";
 import { listen } from "./listen.js";
+import { sendTelemetry } from "./telemetry.js";
 import { checkForUpdate } from "./updates.js";
 import { DELIVERY_QUEUE, startWebhooks, type DeliveryJob, type DeliveryOptions } from "./webhooks.js";
 
@@ -149,6 +150,7 @@ export async function archiveClosedIssues(db: Database, now = new Date()): Promi
 
 const purgeQueue = "trash-purge";
 const updateCheckQueue = "update-check";
+const telemetryQueue = "telemetry";
 
 // The delivery log keeps each delivery this long.
 export const DELIVERY_LOG_DAYS = 30;
@@ -177,7 +179,7 @@ export async function startJobs(
   pool: Pool,
   storage: AttachmentStorage,
   delivery: DeliveryOptions,
-  updates: { releasesUrl: string },
+  outbound: { releasesUrl: string; telemetryUrl: string },
 ): Promise<Jobs> {
   const boss = new PgBoss({ connectionString: databaseUrl, schema: "pgboss" });
   boss.on("error", (error) => console.error("background jobs:", error));
@@ -198,11 +200,22 @@ export async function startJobs(
   await boss.createQueue(updateCheckQueue);
   await boss.schedule(updateCheckQueue, "41 4 * * *");
   await boss.work(updateCheckQueue, async () => {
-    await checkForUpdate(db, updates.releasesUrl);
+    await checkForUpdate(db, outbound.releasesUrl);
   });
-  const { updateCheckedAt } = await readInstanceSettings(db);
-  if (!updateCheckedAt || Date.now() - updateCheckedAt.getTime() > 24 * 60 * 60 * 1000) {
+  // Opt-in telemetry (ADR 0026), the same way: sendTelemetry does nothing
+  // while it is off.
+  await boss.createQueue(telemetryQueue);
+  await boss.schedule(telemetryQueue, "53 5 * * *");
+  await boss.work(telemetryQueue, async () => {
+    await sendTelemetry(db, outbound.telemetryUrl);
+  });
+  const settings = await readInstanceSettings(db);
+  const dayOld = (at: Date | null) => !at || Date.now() - at.getTime() > 24 * 60 * 60 * 1000;
+  if (dayOld(settings.updateCheckedAt)) {
     await boss.send(updateCheckQueue, {}, { singletonKey: "boot", singletonSeconds: 60 * 60 });
+  }
+  if (settings.telemetry && dayOld(settings.telemetrySentAt)) {
+    await boss.send(telemetryQueue, {}, { singletonKey: "boot", singletonSeconds: 60 * 60 });
   }
   // A missed notification only delays deliveries: the sweep catches them.
   const stopWebhooks = await startWebhooks(db, boss, (onNotify) => listen(pool, WEBHOOK_CHANNEL, () => onNotify(), onNotify), delivery);

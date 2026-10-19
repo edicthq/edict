@@ -17,6 +17,7 @@ import { startRealtime } from "./realtime.js";
 import { DEFAULT_WEBHOOK_RETRY } from "./webhooks.js";
 import { archiveClosedIssues, purgeTrash, startJobs, type PurgeResult } from "./jobs.js";
 import { localDiskStorage, s3Storage } from "./storage.js";
+import { sendTelemetry, TELEMETRY_URL } from "./telemetry.js";
 import { RELEASES_URL } from "./updates.js";
 
 export interface App {
@@ -31,6 +32,8 @@ export interface App {
   purgeTrash: (now?: Date) => Promise<PurgeResult>;
   // The daily archive of closed issues, run now as if at `now`.
   archiveIssues: (now?: Date) => Promise<number>;
+  // The daily telemetry ping, sent now if telemetry is on.
+  sendTelemetry: (now?: Date) => Promise<void>;
 }
 
 export interface AppOptions {
@@ -44,6 +47,8 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
   const mailer =
     options.mailer ??
     (config.smtpUrl && config.emailFrom ? createSmtpMailer(config.smtpUrl, config.emailFrom) : undefined);
+
+  const telemetryUrl = config.telemetryUrl ?? TELEMETRY_URL;
 
   // Built in start(): the auth secret may live in the database.
   let auth: EdictAuth | undefined;
@@ -125,7 +130,7 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
         jobs = await startJobs(config.databaseUrl, db, pool, deps.storage, {
           retry: config.webhookRetry ?? DEFAULT_WEBHOOK_RETRY,
           allowPrivate: config.privateWebhookTargets ?? false,
-        }, { releasesUrl: deps.releasesUrl });
+        }, { releasesUrl: deps.releasesUrl, telemetryUrl });
       }
 
       server = await listen(app, config.port);
@@ -134,6 +139,7 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
     },
     purgeTrash: (now) => purgeTrash(db, deps.storage, now),
     archiveIssues: (now) => archiveClosedIssues(db, now),
+    sendTelemetry: (now) => sendTelemetry(db, telemetryUrl, now),
     shutdown: async () => {
       // Before server.close(): open sockets would hold it open, and only
       // stopping realtime ends them.

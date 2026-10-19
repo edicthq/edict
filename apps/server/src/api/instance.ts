@@ -5,6 +5,7 @@ import { InstanceSettings, InstanceStatus, InstanceUsers, UpdateCheck, UpdateIns
 import { VERSION } from "../version.js";
 import type { SignInProviders } from "../env.js";
 import { changeInstanceSettings, hasUsers, readInstanceSettings } from "../instance.js";
+import { telemetryOf } from "../telemetry.js";
 import { checkForUpdate, RELEASES_URL, updateCheckOf } from "../updates.js";
 import { body, errors, json, router, signedIn, type ApiDeps } from "./context.js";
 import { forbidden, invalid } from "./errors.js";
@@ -21,7 +22,7 @@ const getStatus = createRoute({
   method: "get",
   path: "/instance/status",
   tags: ["Instance"],
-  summary: "How the instance is set up: email, storage and version",
+  summary: "How the instance is set up: email, storage, version, updates and telemetry",
   description: "Instance admins only.",
   responses: { 200: json(InstanceStatus, "The instance's setup"), ...errors("unauthorized", "forbidden") },
 });
@@ -76,7 +77,7 @@ const updateInstance = createRoute({
   path: "/instance",
   tags: ["Instance"],
   summary: "Change instance settings",
-  description: "Instance admins only. Answers with the public settings; the update check shows in GET /instance/status.",
+  description: "Instance admins only. Answers with the public settings; the update check and telemetry show in GET /instance/status.",
   request: body(UpdateInstanceSettings),
   responses: {
     200: json(InstanceSettings, "The settings after the change"),
@@ -93,12 +94,14 @@ export function instanceRoutes(deps: InstanceDeps) {
 
   app.openapi(getStatus, async (c) => {
     requireInstanceAdmin(c);
+    const settings = await readInstanceSettings(deps.db);
     return c.json(
       {
         email: { configured: Boolean(deps.mailer), from: deps.instanceInfo?.emailFrom ?? null },
         storage: deps.instanceInfo?.storage ?? { kind: "disk" as const, location: "" },
         version: VERSION,
-        updates: updateCheckOf(await readInstanceSettings(deps.db)),
+        updates: updateCheckOf(settings),
+        telemetry: await telemetryOf(deps.db, settings),
       },
       200,
     );

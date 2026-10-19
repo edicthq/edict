@@ -37,7 +37,7 @@ export async function readInstanceSettings(db: Database): Promise<InstanceSettin
 export async function changeInstanceSettings(
   db: Database,
   actorUserId: string,
-  change: { signUpMode?: SignUpMode; signUpDomains?: string[]; updateCheck?: boolean },
+  change: { signUpMode?: SignUpMode; signUpDomains?: string[]; updateCheck?: boolean; telemetry?: boolean },
 ): Promise<void> {
   await db.transaction(async (tx) => {
     const [current] = await tx.select().from(instanceSettings).for("update");
@@ -65,6 +65,14 @@ export async function changeInstanceSettings(
         type: "instance.update_check_changed",
         actorUserId,
         data: { from: current.updateCheck, to: change.updateCheck },
+      });
+    }
+    if (change.telemetry !== undefined && change.telemetry !== current.telemetry) {
+      await tx.update(instanceSettings).set({ telemetry: change.telemetry });
+      await tx.insert(instanceEvents).values({
+        type: "instance.telemetry_changed",
+        actorUserId,
+        data: { from: current.telemetry, to: change.telemetry },
       });
     }
   });

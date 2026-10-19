@@ -47,6 +47,9 @@ export interface ServerConfig {
   // Where the update check asks for Edict's latest release (RELEASES_URL).
   // GitHub's API by default; tests point it at a stand-in.
   releasesUrl?: string;
+  // Where opt-in telemetry pings go (TELEMETRY_URL, ADR 0026). Edict's
+  // collector by default.
+  telemetryUrl?: string;
 }
 
 // Sign-in methods beyond email and password, each on when configured.
@@ -107,6 +110,7 @@ export function readConfig(env: NodeJS.ProcessEnv): ServerConfig {
     privateWebhookTargets: env.PRIVATE_WEBHOOK_TARGETS === "allow",
     signIn: readSignIn(env),
     releasesUrl: env.RELEASES_URL || undefined,
+    telemetryUrl: env.TELEMETRY_URL || undefined,
     agentLimits: {
       requestsPerMinute: readLimit("AGENT_REQUESTS_PER_MINUTE", env.AGENT_REQUESTS_PER_MINUTE, DEFAULT_AGENT_LIMITS.requestsPerMinute),
       issuesPerHour: readLimit("AGENT_ISSUES_PER_HOUR", env.AGENT_ISSUES_PER_HOUR, DEFAULT_AGENT_LIMITS.issuesPerHour),

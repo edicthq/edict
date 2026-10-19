@@ -25,6 +25,11 @@ export const instanceSettings = pgTable(
     latestRelease: jsonb("latest_release").$type<{ version: string; url: string; publishedAt: string | null }>(),
     updateCheckedAt: timestamp("update_checked_at", { withTimezone: true }),
     updateCheckError: text("update_check_error"),
+    // Opt-in telemetry (ADR 0026): whether the daily ping is on, when the
+    // last one went and why it failed if it did.
+    telemetry: boolean("telemetry").notNull().default(false),
+    telemetrySentAt: timestamp("telemetry_sent_at", { withTimezone: true }),
+    telemetryError: text("telemetry_error"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
   },
   (table) => [check("instance_settings_single_row", sql`${table.id} = 1`)],

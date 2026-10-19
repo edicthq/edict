@@ -6938,7 +6938,7 @@ export interface paths {
         head?: never;
         /**
          * Change instance settings
-         * @description Instance admins only. Answers with the public settings; the update check shows in GET /instance/status.
+         * @description Instance admins only. Answers with the public settings; the update check and telemetry show in GET /instance/status.
          */
         patch: {
             parameters: {
@@ -7001,7 +7001,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * How the instance is set up: email, storage and version
+         * How the instance is set up: email, storage, version, updates and telemetry
          * @description Instance admins only.
          */
         get: {
@@ -8002,6 +8002,7 @@ export interface components {
             };
             version: string;
             updates: components["schemas"]["UpdateCheck"];
+            telemetry: components["schemas"]["Telemetry"];
         };
         UpdateCheck: {
             check: boolean;
@@ -8016,6 +8017,19 @@ export interface components {
             checkedAt: string | null;
             error: string | null;
         };
+        Telemetry: {
+            enabled: boolean;
+            payload: components["schemas"]["TelemetryPing"];
+            /** Format: date-time */
+            sentAt: string | null;
+            error: string | null;
+        };
+        TelemetryPing: {
+            version: string;
+            users: components["schemas"]["UserCountBucket"];
+        };
+        /** @enum {string} */
+        UserCountBucket: "1" | "2-10" | "11-50" | "51-200" | "201-1000" | "1001+";
         InstanceUsers: {
             users: components["schemas"]["InstanceUser"][];
             total: number;
@@ -8034,6 +8048,7 @@ export interface components {
             signUpMode?: components["schemas"]["SignUpMode"];
             signUpDomains?: string[];
             updateCheck?: boolean;
+            telemetry?: boolean;
         };
     };
     responses: never;

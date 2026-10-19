@@ -2973,13 +2973,17 @@
           },
           "updates": {
             "$ref": "#/components/schemas/UpdateCheck"
+          },
+          "telemetry": {
+            "$ref": "#/components/schemas/Telemetry"
           }
         },
         "required": [
           "email",
           "storage",
           "version",
-          "updates"
+          "updates",
+          "telemetry"
         ]
       },
       "UpdateCheck": {
@@ -3037,6 +3041,65 @@
           "available",
           "checkedAt",
           "error"
+        ]
+      },
+      "Telemetry": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/TelemetryPing"
+          },
+          "sentAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "enabled",
+          "payload",
+          "sentAt",
+          "error"
+        ]
+      },
+      "TelemetryPing": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?$"
+          },
+          "users": {
+            "$ref": "#/components/schemas/UserCountBucket"
+          }
+        },
+        "required": [
+          "version",
+          "users"
+        ],
+        "additionalProperties": false
+      },
+      "UserCountBucket": {
+        "type": "string",
+        "enum": [
+          "1",
+          "2-10",
+          "11-50",
+          "51-200",
+          "201-1000",
+          "1001+"
         ]
       },
       "InstanceUsers": {
@@ -3108,6 +3171,9 @@
             "maxItems": 50
           },
           "updateCheck": {
+            "type": "boolean"
+          },
+          "telemetry": {
             "type": "boolean"
           }
         }
@@ -11151,7 +11217,7 @@
           "Instance"
         ],
         "summary": "Change instance settings",
-        "description": "Instance admins only. Answers with the public settings; the update check shows in GET /instance/status.",
+        "description": "Instance admins only. Answers with the public settings; the update check and telemetry show in GET /instance/status.",
         "requestBody": {
           "required": true,
           "content": {
@@ -11211,7 +11277,7 @@
         "tags": [
           "Instance"
         ],
-        "summary": "How the instance is set up: email, storage and version",
+        "summary": "How the instance is set up: email, storage, version, updates and telemetry",
         "description": "Instance admins only.",
         "responses": {
           "200": {

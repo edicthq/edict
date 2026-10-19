@@ -237,13 +237,19 @@ export function useInstanceUsers(page: number, enabled: boolean) {
 export function useUpdateInstance() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (body: { signUpMode?: SignUpMode; signUpDomains?: string[]; updateCheck?: boolean }) =>
+    mutationFn: (body: { signUpMode?: SignUpMode; signUpDomains?: string[]; updateCheck?: boolean; telemetry?: boolean }) =>
       unwrap(api.PATCH("/instance", { body })),
-    // The update check's switch flips at once; the status refetches after.
-    onMutate: ({ updateCheck }) => {
-      if (updateCheck === undefined) return;
+    // The update check's and telemetry's switches flip at once; the status
+    // refetches after.
+    onMutate: ({ updateCheck, telemetry }) => {
       client.setQueryData<InstanceStatus>(["instance", "status"], (old) =>
-        old ? { ...old, updates: { ...old.updates, check: updateCheck } } : old,
+        old
+          ? {
+              ...old,
+              updates: { ...old.updates, check: updateCheck ?? old.updates.check },
+              telemetry: { ...old.telemetry, enabled: telemetry ?? old.telemetry.enabled },
+            }
+          : old,
       );
     },
     onSuccess: (data) => client.setQueryData(keys.instance, data),
