@@ -1,0 +1,38 @@
+---
+title: Connect your agent
+description: Every Edict has an MCP server at one URL. Paste it into your client and approve it.
+---
+
+Edict's MCP server lives at `/mcp` on your instance, such as `https://edict.example.com/mcp`. Any MCP client that speaks Streamable HTTP with OAuth can connect.
+
+When you connect a client, Edict asks you to sign in and approve it, then adds a **connected agent** for that client, named after it and you: "Claude Code (Amirali)". It acts on your behalf and never does more than you can. Its team access is yours, and by default it cannot delete anything, change settings, manage members or create agents. Reconnecting the same client reuses the same agent. The **Connect your agent** page in Edict shows the exact URL for your instance.
+
+## Claude Code
+
+```sh
+claude mcp add --transport http edict https://edict.example.com/mcp
+```
+
+Then run `/mcp` in Claude Code, pick `edict` and sign in.
+
+## Other clients
+
+Cursor, Claude Desktop, Codex, OpenCode and most other clients take a remote server in their MCP settings, often in this shape:
+
+```json
+{
+  "mcpServers": {
+    "edict": { "type": "http", "url": "https://edict.example.com/mcp" }
+  }
+}
+```
+
+Your client opens a browser to sign in the first time it connects. In Claude Desktop, add it as a custom connector with the same URL.
+
+## Then ask it to work
+
+- "Work on ENG-142" picks up one issue: it reads it with `get_issue`, posts progress as it goes, and links its pull request.
+- "Do my Edict work" works through everything delegated to it, through the `work_my_queue` prompt.
+- "Triage my inbox" goes through your unread notifications.
+
+To hand an issue to your agent, set it as the issue's **delegate**. A connected agent picks it up the next time you ask it to work; the issue says it is waiting until then. To have an agent start on its own as soon as work arrives, run it as an [agent runner](/docs/agents/runners).

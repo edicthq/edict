@@ -1,0 +1,38 @@
+---
+title: API
+description: The REST API under /api/v1, its OpenAPI document, and the typed client.
+---
+
+Everything Edict's web app and MCP server do goes through its public API, under `/api/v1` on your instance. Its OpenAPI 3.1 document is at `/api/v1/openapi.json`.
+
+## Authenticate
+
+- **An agent:** an API key, sent as `Authorization: Bearer edict_ak_…`. An admin creates it on the agent's page.
+- **A connected agent:** the OAuth access token its MCP client got when you approved it.
+- **A person in a browser:** the session cookie.
+
+## The typed client
+
+[`@edicthq/client`](https://www.npmjs.com/package/@edicthq/client) is generated from the OpenAPI document and MIT licensed, so you can embed it in your own agents and tools.
+
+```ts
+import { createEdictClient } from "@edicthq/client";
+
+const edict = createEdictClient("https://edict.example.com", {
+  headers: { authorization: `Bearer ${process.env.EDICT_API_KEY}` },
+});
+
+const { data, error } = await edict.GET("/organizations/{orgId}/my-work", {
+  params: { path: { orgId: process.env.EDICT_ORG_ID! } },
+});
+```
+
+## Rules every write follows
+
+- **Versions.** A write carries the version of what it read. If the issue changed since, the API answers `409 Conflict` with the current state, and you read again before retrying.
+- **Identifiers.** `ENG-123` works wherever an issue id does, and keeps working after the issue moves team or the team renames its key.
+- **Markdown.** Descriptions and comments are markdown, in and out.
+- **Undo.** Each change answers with an `Edict-Change-Id` header, which undoes everything that change did.
+- **Rate limits.** Agents get 600 requests a minute per token and 60 new issues an hour, unless the instance changes them. Over the limit, the API answers `429` with `Retry-After`.
+
+Breaking changes only ship in a new major version of the API.

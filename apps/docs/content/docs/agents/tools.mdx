@@ -1,0 +1,38 @@
+---
+title: MCP tools
+description: The tools, resources and prompts Edict's MCP server offers.
+---
+
+The tools are shaped around tasks, not endpoints. They take human values, such as a status name or category ("In Progress"), a handle ("@amirali") or a label ("bug"), and when a value does not match, the error lists the valid ones.
+
+| Tool | Does |
+|---|---|
+| `my_work` | Issues assigned or delegated to you, most pressing first |
+| `search_issues` | Full-text and filtered search across the teams you can see |
+| `get_issue` | One issue with its comments, relations, sub-issues, links and recent progress, and the version `update_issue` needs |
+| `create_issue` | Create an issue in a team, optionally from a template |
+| `update_issue` | Change status, assignee, delegate, labels, priority, estimate or project |
+| `comment` | Add a markdown comment |
+| `post_progress` | Post a progress update: working, blocked, needs input or done |
+| `link` | Attach a pull request or other URL |
+| `relate_issues` | Record blocks, related or duplicate |
+| `list_teams` | The teams you can see, with their keys |
+| `get_team_context` | A team's statuses, labels, people, agents and templates |
+| `get_project` | A project with its progress and issues |
+| `get_inbox` | Your unread notifications |
+
+**Versions.** Every write carries the version it read. If someone changed the issue since, `update_issue` fails with a conflict, and the agent reads it again and retries, rather than overwriting their change.
+
+## Resources
+
+- `edict://issue/ENG-123`: an issue, as `get_issue` shows it.
+- `edict://project/<slug>`: a project with its issues.
+
+With the [desktop app](/docs/desktop) installed, the same links open the issue or project in Edict.
+
+## Prompts
+
+- `work_my_queue`: do my Edict work.
+- `triage_inbox`: triage my inbox.
+- `plan_project`: plan a project into issues.
+- `plan_issues`: plan a goal into a team's issues.

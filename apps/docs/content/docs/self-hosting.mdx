@@ -1,0 +1,76 @@
+---
+title: Self-hosting
+description: Run Edict with docker compose, one image and Postgres.
+---
+
+Edict runs as one container, which serves the web app, the API and the MCP server, next to Postgres. Postgres is the only service it needs.
+
+## Install
+
+Put the two files from the latest release in a folder and start them:
+
+```sh
+mkdir edict && cd edict
+curl -fsSLO https://github.com/edicthq/edict/releases/latest/download/compose.yml
+curl -fsSLO https://github.com/edicthq/edict/releases/latest/download/postgres-init.sh
+docker compose up -d
+```
+
+Edict answers on [http://localhost:3000](http://localhost:3000). The first person to sign up becomes the **instance admin**, who manages sign-up, email, storage, updates and telemetry from the Instance page.
+
+`postgres-init.sh` runs once, when the database is first created. It makes the `edict` role Edict connects as, which owns the database but is not a superuser, so Postgres row-level security keeps every organization's data apart.
+
+## Put it on your domain
+
+Run Edict behind a reverse proxy (Caddy, Traefik, nginx) that terminates TLS, and tell Edict the URL people use:
+
+```sh title=".env"
+BETTER_AUTH_URL=https://edict.example.com
+TRUSTED_PROXIES=172.16.0.0/12
+```
+
+Sign-in only works from `BETTER_AUTH_URL`, and every emailed link points there. `TRUSTED_PROXIES` lists the proxies whose `X-Forwarded-For` Edict believes, so rate limits and sessions see each person's own address. The proxy must pass WebSocket upgrades on `/ws`, which carries live updates.
+
+## Settings
+
+Compose reads these from the environment or a `.env` file beside `compose.yml`, which describes each one.
+
+| Setting | Does |
+|---|---|
+| `BETTER_AUTH_URL` | The URL people reach Edict at. Required in production. |
+| `BETTER_AUTH_SECRET` | Signs sessions. Without it, Edict generates one on first boot and keeps it in Postgres. |
+| `EDICT_DB_PASSWORD`, `POSTGRES_PASSWORD` | Passwords for the `edict` role and the Postgres superuser. Change both before the first start. |
+| `SMTP_URL`, `EMAIL_FROM` | Outgoing email through any SMTP provider, like `smtps://user:password@smtp.resend.com:465`. Without it, invites are links you share yourself and there is no password reset. |
+| `GOOGLE_CLIENT_ID`, `GITHUB_CLIENT_ID`, `OIDC_ISSUER` and their secrets | Sign-in with Google, GitHub or any OpenID Connect provider such as Authentik or Keycloak. Each turns on when its id and secret are set. |
+| `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Store attachments in an S3-compatible bucket instead of the `app-data` volume. |
+| `ATTACHMENT_MAX_BYTES` | The largest attachment, 25 MB by default. |
+| `PRIVATE_WEBHOOK_TARGETS` | `allow` lets webhooks reach private addresses, like an agent runner on your own network. |
+| `EDICT_VERSION` | The image tag to run. See below. |
+
+## Upgrade
+
+```sh
+docker compose pull && docker compose up -d
+```
+
+Migrations run on boot, behind a Postgres lock, so several replicas can start at once. `EDICT_VERSION` picks how far you follow: `1`, the default, takes every 1.x release, `1.4` only its patches, and `1.4.2` stays put. Before 1.0 there is no `1` tag, so set `EDICT_VERSION=latest`.
+
+The Instance page says when a newer release is out. Once a day Edict asks GitHub for its latest release, a plain request that carries nothing about your instance. You can turn it off there.
+
+## Back up
+
+Everything lives in Postgres, plus the attachments in the `app-data` volume unless you use S3.
+
+```sh
+docker compose exec db pg_dump -U postgres edict > edict-$(date +%F).sql
+```
+
+An organization's owners and admins can also download a full export, its data as JSON with its attachments, from the organization's settings.
+
+## Telemetry
+
+Off unless the instance admin turns it on. Then Edict sends one ping a day with its version and how many users the instance has, as a range such as `2-10`. It carries no instance id or address, and the collector keeps only daily counts. The Instance page shows exactly what is sent.
+
+## Several replicas
+
+Edict's replicas share everything through Postgres: jobs, live updates and settings. Attachments need S3 or a volume all replicas share. Redis is never required.
