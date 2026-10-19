@@ -61,6 +61,12 @@ export function readConfig(env: NodeJS.ProcessEnv): ServerConfig {
     throw new ConfigError(`PORT is not a valid port number: ${env.PORT}`);
   }
 
+  // Links, cookies and the OAuth issuer follow this URL. Without it they
+  // follow each request's Host header, which is fine only in development.
+  if (env.NODE_ENV === "production" && !env.BETTER_AUTH_URL) {
+    throw new ConfigError("BETTER_AUTH_URL is not set. Set it to the URL people reach Edict at, like https://edict.example.com.");
+  }
+
   const smtpUrl = env.SMTP_URL || undefined;
   const emailFrom = env.EMAIL_FROM || undefined;
   if (smtpUrl && !emailFrom) {

@@ -11,11 +11,19 @@ export interface AgentLimits {
 export const DEFAULT_AGENT_LIMITS: AgentLimits = { requestsPerMinute: 600, issuesPerHour: 60 };
 
 // A token bucket per key: it holds up to `perMinute` requests and refills at
-// that rate.
+// that rate. Keys are bearer strings, valid or not, so anyone can make new
+// ones: the map keeps at most `maxKeys`, dropping the least recently used.
 export class RequestLimiter {
   private buckets = new Map<string, { tokens: number; at: number }>();
 
-  constructor(private readonly perMinute: number) {}
+  constructor(
+    private readonly perMinute: number,
+    private readonly maxKeys = 50_000,
+  ) {}
+
+  get size(): number {
+    return this.buckets.size;
+  }
 
   // Takes one request for the key. Returns 0 when allowed, else the seconds
   // until the next one is.
@@ -24,19 +32,16 @@ export class RequestLimiter {
     const bucket = this.buckets.get(key) ?? { tokens: this.perMinute, at: now };
     bucket.tokens = Math.min(this.perMinute, bucket.tokens + (now - bucket.at) * rate);
     bucket.at = now;
+    // Re-inserted, so the map's order runs from least to most recently used.
+    this.buckets.delete(key);
     this.buckets.set(key, bucket);
+    while (this.buckets.size > this.maxKeys) {
+      this.buckets.delete(this.buckets.keys().next().value!);
+    }
     if (bucket.tokens >= 1) {
       bucket.tokens -= 1;
       return 0;
     }
-    if (this.buckets.size > 10_000) this.sweep(now);
     return Math.ceil((1 - bucket.tokens) / rate / 1000);
-  }
-
-  // Drops buckets that have refilled, so idle tokens do not pile up.
-  private sweep(now: number): void {
-    for (const [key, bucket] of this.buckets) {
-      if (bucket.tokens + (now - bucket.at) * (this.perMinute / 60_000) >= this.perMinute) this.buckets.delete(key);
-    }
   }
 }

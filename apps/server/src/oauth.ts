@@ -13,13 +13,17 @@ export interface OAuthDiscovery {
   ensureResource: (origin: string) => Promise<void>;
 }
 
+// Without a public URL every Host header names a new resource, so only this
+// many are registered. Production requires the URL (env.ts).
+const MAX_ORIGINS = 20;
+
 export function oauthDiscovery(db: Database, baseUrl: string | undefined): OAuthDiscovery {
   const known = new Set<string>();
   return {
     originOf: (c) => (baseUrl ?? new URL(c.req.url).origin).replace(/\/$/, ""),
     ensureResource: async (origin) => {
       const identifier = mcpResource(origin);
-      if (known.has(identifier)) {
+      if (known.has(identifier) || known.size >= MAX_ORIGINS) {
         return;
       }
       // Better Auth's own table, not tenant data.
