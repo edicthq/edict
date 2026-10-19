@@ -43,6 +43,11 @@ export const OrganizationSlug = z
   .string()
   .regex(/^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?$/, "1-48 lowercase letters, digits and dashes");
 
+// The agent color presets (docs/design/tokens.md). A member picks one; an
+// organization sets the one new members start from.
+export const Accent = z.enum(["violet", "blue", "teal", "pink", "lime"]).meta({ id: "Accent" });
+export type Accent = z.infer<typeof Accent>;
+
 export const Organization = z
   .object({
     id: Id,
@@ -51,6 +56,7 @@ export const Organization = z
     // Anyone with a verified address at this domain may join as a Member.
     // Null: people join by invite only.
     joinDomain: z.string().nullable(),
+    defaultAccent: Accent,
     createdAt: z.iso.datetime(),
   })
   .meta({ id: "Organization" });
@@ -67,6 +73,7 @@ export const UpdateOrganization = z
   .object({
     name: z.string().trim().min(1).max(80).optional(),
     joinDomain: EmailDomain.nullable().optional(),
+    defaultAccent: Accent.optional(),
   })
   .meta({ id: "UpdateOrganization" });
 
@@ -492,6 +499,36 @@ export const InstanceSettings = z
     }),
   })
   .meta({ id: "InstanceSettings" });
+
+// How the instance is set up, for its admins.
+export const InstanceStatus = z
+  .object({
+    email: z.object({ configured: z.boolean(), from: z.string().nullable() }),
+    storage: z.object({
+      kind: z.enum(["disk", "s3"]),
+      // The directory, or the bucket and its endpoint.
+      location: z.string(),
+    }),
+    version: z.string(),
+  })
+  .meta({ id: "InstanceStatus" });
+
+export const InstanceUser = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    email: z.string(),
+    emailVerified: z.boolean(),
+    instanceAdmin: z.boolean(),
+    // How many organizations they are a member of.
+    organizations: z.number().int(),
+    createdAt: z.iso.datetime(),
+  })
+  .meta({ id: "InstanceUser" });
+
+export const InstanceUsers = z
+  .object({ users: z.array(InstanceUser), total: z.number().int() })
+  .meta({ id: "InstanceUsers" });
 
 export const UpdateInstanceSettings = z
   .object({ signUpMode: SignUpMode, signUpDomains: z.array(EmailDomain).max(50) })

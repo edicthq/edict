@@ -63,6 +63,12 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
     requestLimiter: new RequestLimiter(agentLimits.requestsPerMinute),
     privateWebhookTargets: config.privateWebhookTargets ?? false,
     signIn: config.signIn ?? {},
+    instanceInfo: {
+      emailFrom: config.emailFrom ?? null,
+      storage: config.s3
+        ? { kind: "s3" as const, location: `${config.s3.bucket}${config.s3.endpoint ? ` at ${config.s3.endpoint}` : ""}` }
+        : { kind: "disk" as const, location: config.dataDir },
+    },
     queueDelivery: async (job: { orgId: string; deliveryId: string }) => {
       await jobs?.queueDelivery(job);
     },

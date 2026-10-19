@@ -13,7 +13,7 @@
       try {
         const a = JSON.parse(localStorage.getItem("edict.appearance") || "{}");
         if (a.theme === "light" || a.theme === "dark") document.documentElement.dataset.theme = a.theme;
-        document.documentElement.dataset.accent = a.accent || "violet";
+        document.documentElement.dataset.accent = a.accent || a.orgAccent || "violet";
       } catch {}
     </script>
   </head>

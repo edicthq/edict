@@ -5,6 +5,7 @@ export type { components, paths } from "./schema.js";
 
 type Schemas = components["schemas"];
 export type Organization = Schemas["Organization"];
+export type Accent = Schemas["Accent"];
 export type Member = Schemas["Member"];
 export type Membership = Schemas["Membership"];
 export type Role = Schemas["Role"];

@@ -50,7 +50,14 @@ import { domainOf } from "../instance.js";
 type OrganizationRow = typeof organizations.$inferSelect;
 
 export function toOrganization(row: OrganizationRow): Organization {
-  return { id: row.id, name: row.name, slug: row.slug, joinDomain: row.joinDomain, createdAt: row.createdAt.toISOString() };
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    joinDomain: row.joinDomain,
+    defaultAccent: row.defaultAccent,
+    createdAt: row.createdAt.toISOString(),
+  };
 }
 
 const updateOrganization = createRoute({
@@ -197,6 +204,7 @@ export function organizationRoutes(deps: ApiDeps) {
     const input = c.req.valid("json");
     const organization = await inOrg(deps, c, orgId, async (tx, caller) => {
       if (input.name !== undefined) requireRole(caller, "admin", "rename the organization");
+      if (input.defaultAccent !== undefined) requireRole(caller, "admin", "set the organization's default agent color");
       // Letting a domain in is managing members.
       if (input.joinDomain !== undefined) requireRole(caller, "admin", "set who may join by domain", "members");
       const [current] = await tx.select().from(organizations).where(eq(organizations.id, orgId)).for("update");

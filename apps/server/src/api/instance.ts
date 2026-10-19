@@ -1,11 +1,48 @@
-import { createRoute } from "@hono/zod-openapi";
-import { InstanceSettings, UpdateInstanceSettings } from "@edicthq/schema";
+import { createRoute, z } from "@hono/zod-openapi";
+import { asc, count, sql } from "drizzle-orm";
+import { user } from "@edicthq/db";
+import { InstanceSettings, InstanceStatus, InstanceUsers, UpdateInstanceSettings } from "@edicthq/schema";
+import { VERSION } from "../version.js";
 import type { SignInProviders } from "../env.js";
 import { hasUsers, readInstanceSettings, setSignUp } from "../instance.js";
 import { body, errors, json, router, signedIn, type ApiDeps } from "./context.js";
 import { forbidden, invalid } from "./errors.js";
 
-type InstanceDeps = ApiDeps & { signIn?: SignInProviders };
+type InstanceDeps = ApiDeps & {
+  signIn?: SignInProviders;
+  // What the status page reports about email and storage.
+  instanceInfo?: { emailFrom: string | null; storage: { kind: "disk" | "s3"; location: string } };
+};
+
+const getStatus = createRoute({
+  method: "get",
+  path: "/instance/status",
+  tags: ["Instance"],
+  summary: "How the instance is set up: email, storage and version",
+  description: "Instance admins only.",
+  responses: { 200: json(InstanceStatus, "The instance's setup"), ...errors("unauthorized", "forbidden") },
+});
+
+const listUsers = createRoute({
+  method: "get",
+  path: "/instance/users",
+  tags: ["Instance"],
+  summary: "Every user on the instance, oldest first",
+  description: "Instance admins only.",
+  request: {
+    query: z.object({
+      limit: z.coerce.number().int().min(1).max(200).default(100),
+      offset: z.coerce.number().int().min(0).default(0),
+    }),
+  },
+  responses: { 200: json(InstanceUsers, "A page of users and how many there are"), ...errors("unauthorized", "forbidden") },
+});
+
+function requireInstanceAdmin(c: Parameters<typeof signedIn>[0]) {
+  const user = signedIn(c);
+  if (!user.instanceAdmin) throw forbidden("Only instance admins can see this.");
+  return user;
+}
 
 const getInstance = createRoute({
   method: "get",
@@ -37,6 +74,55 @@ export function instanceRoutes(deps: InstanceDeps) {
 
   app.openapi(getInstance, async (c) => {
     return c.json(await publicSettings(deps), 200);
+  });
+
+  app.openapi(getStatus, async (c) => {
+    requireInstanceAdmin(c);
+    return c.json(
+      {
+        email: { configured: Boolean(deps.mailer), from: deps.instanceInfo?.emailFrom ?? null },
+        storage: deps.instanceInfo?.storage ?? { kind: "disk" as const, location: "" },
+        version: VERSION,
+      },
+      200,
+    );
+  });
+
+  // Users are the instance's, not an organization's: an instance admin reads
+  // them across every organization, as the jobs do.
+  app.openapi(listUsers, async (c) => {
+    requireInstanceAdmin(c);
+    const { limit, offset } = c.req.valid("query");
+    const rows = await deps.db
+      .select({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        emailVerified: user.emailVerified,
+        role: user.role,
+        createdAt: user.createdAt,
+        organizations: sql<number>`(SELECT count(*)::int FROM members m WHERE m.user_id = "user"."id" AND m.removed_at IS NULL)`,
+      })
+      .from(user)
+      .orderBy(asc(user.createdAt), asc(user.id))
+      .limit(limit)
+      .offset(offset);
+    const [total] = await deps.db.select({ n: count() }).from(user);
+    return c.json(
+      {
+        users: rows.map((row) => ({
+          id: row.id,
+          name: row.name,
+          email: row.email,
+          emailVerified: row.emailVerified,
+          instanceAdmin: row.role === "admin",
+          organizations: row.organizations,
+          createdAt: row.createdAt.toISOString(),
+        })),
+        total: total?.n ?? 0,
+      },
+      200,
+    );
   });
 
   app.openapi(updateInstance, async (c) => {

@@ -30,6 +30,8 @@ export const role = pgEnum("role", ["owner", "admin", "member", "guest"]);
 // What agents cannot do until an admin grants it (ADR 0021): deleting, changing
 // team and organization settings, managing members, and creating agents.
 export const agentPower = pgEnum("agent_power", ["delete", "settings", "members", "agents"]);
+// The agent color presets (docs/design/tokens.md).
+export const accent = pgEnum("accent", ["violet", "blue", "teal", "pink", "lime"]);
 
 // The tenant root.
 export const organizations = pgTable("organizations", {
@@ -39,6 +41,8 @@ export const organizations = pgTable("organizations", {
   // Anyone with a verified address at this lowercase domain may join as a
   // Member (PLAN.md, Members and roles). Null: invites only.
   joinDomain: text("join_domain"),
+  // The agent color new members start from, until they pick their own.
+  defaultAccent: accent("default_accent").notNull().default("violet"),
   createdAt: createdAt(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
 });

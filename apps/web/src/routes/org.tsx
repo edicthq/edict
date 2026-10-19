@@ -6,7 +6,7 @@ import { Avatar, Button, Count, Kbd, LogoMark, ProgressBadge, TeamKey, cn } from
 import { CreateTeamDialog } from "../components/create-team-dialog.js";
 import { InviteDialog } from "../components/invite-dialog.js";
 import { CommandPalette } from "../components/palette.js";
-import { cycleAccent, cycleTheme, isTyping } from "../lib/appearance.js";
+import { cycleAccent, cycleTheme, isTyping, setOrganizationAccent } from "../lib/appearance.js";
 import { UndoProvider } from "../components/undo.js";
 import { VerifyBanner } from "../components/verify-banner.js";
 import { AuthShell, Loading } from "../components/shell.js";
@@ -40,7 +40,13 @@ export function OrgLayout() {
   const session = useSession();
   const navigate = useNavigate();
   const [dialog, setDialog] = useState<"team" | "invite" | "palette" | null>(null);
-  useRealtime(memberships.data?.find((m) => m.organization.slug === slug)?.organization.id);
+  const current = memberships.data?.find((m) => m.organization.slug === slug);
+  useRealtime(current?.organization.id);
+  // Members who have not picked an agent color see the organization's.
+  const orgAccent = current?.organization.defaultAccent;
+  useEffect(() => {
+    if (orgAccent) setOrganizationAccent(orgAccent);
+  }, [orgAccent]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {

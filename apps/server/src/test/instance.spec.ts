@@ -108,3 +108,29 @@ describe("client IP", () => {
     expect(await sessionIp(t.baseUrl, res)).toBe("203.0.113.7");
   });
 });
+
+describe("the instance admin's view", () => {
+  it("shows how email and storage are set up, and every user, to instance admins only", async () => {
+    const { recordingMailer } = await import("./mail.js");
+    const { mailer } = recordingMailer();
+    const t = await startTestServer({ mailer });
+    const admin = await signUpAs(t.baseUrl, "Admin");
+    const mia = await signUpAs(t.baseUrl, "Mia");
+    await mia.post("/organizations", { name: "Mia's", slug: "mias" });
+
+    expect((await mia.get("/instance/status")).status).toBe(403);
+    expect((await mia.get("/instance/users")).status).toBe(403);
+
+    const status = (await admin.get("/instance/status")).body;
+    expect(status).toMatchObject({ email: { configured: true }, storage: { kind: "disk" } });
+    const users = (await admin.get("/instance/users")).body;
+    expect(users.total).toBe(2);
+    expect(users.users).toEqual([
+      expect.objectContaining({ name: "Admin", email: "admin@example.com", instanceAdmin: true, organizations: 0 }),
+      expect.objectContaining({ name: "Mia", email: "mia@example.com", instanceAdmin: false, organizations: 1 }),
+    ]);
+    const page = (await admin.get("/instance/users?limit=1&offset=1")).body;
+    expect(page.users.map((u: { name: string }) => u.name)).toEqual(["Mia"]);
+  });
+});
+

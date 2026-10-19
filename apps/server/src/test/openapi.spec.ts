@@ -36,6 +36,8 @@ describe("OpenAPI document", () => {
       "DELETE /organizations/{orgId}/teams/{teamId}/templates/{templateId}",
       "DELETE /organizations/{orgId}/webhooks/{webhookId}",
       "GET /instance",
+      "GET /instance/status",
+      "GET /instance/users",
       "GET /invites/{token}",
       "GET /organizations",
       "GET /organizations/joinable",

@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Agent, AgentPower, Attachment, Comment, InboxItem, Issue, Label, paths, ProjectStatus, RelationType, Role, SavedView, SavedViewQuery, SignUpMode, Webhook, WebLink } from "@edicthq/client";
+import type { Accent, Agent, AgentPower, Attachment, Comment, InboxItem, Issue, Label, paths, ProjectStatus, RelationType, Role, SavedView, SavedViewQuery, SignUpMode, Webhook, WebLink } from "@edicthq/client";
 import { ApiFailure, api, unwrap } from "./api.js";
 
 export const keys = {
@@ -117,7 +117,7 @@ export function useJoinOrganization() {
 export function useUpdateOrganization(orgId: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (body: { name?: string; joinDomain?: string | null }) =>
+    mutationFn: (body: { name?: string; joinDomain?: string | null; defaultAccent?: Accent }) =>
       unwrap(api.PATCH("/organizations/{orgId}", { params: { path: { orgId } }, body })),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.memberships }),
   });
@@ -215,6 +215,20 @@ export function useAcceptInvite(token: string) {
   return useMutation({
     mutationFn: () => unwrap(api.POST("/invites/{token}/accept", { params: { path: { token } } })),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.memberships }),
+  });
+}
+
+// Instance admins only.
+export function useInstanceStatus(enabled: boolean) {
+  return useQuery({ queryKey: ["instance", "status"] as const, queryFn: () => unwrap(api.GET("/instance/status")), enabled });
+}
+
+export function useInstanceUsers(page: number, enabled: boolean) {
+  return useQuery({
+    queryKey: ["instance", "users", page] as const,
+    queryFn: () => unwrap(api.GET("/instance/users", { params: { query: { limit: 50, offset: page * 50 } } })),
+    enabled,
+    placeholderData: (previous) => previous,
   });
 }
 

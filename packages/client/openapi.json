@@ -46,6 +46,9 @@
               "null"
             ]
           },
+          "defaultAccent": {
+            "$ref": "#/components/schemas/Accent"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -56,7 +59,18 @@
           "name",
           "slug",
           "joinDomain",
+          "defaultAccent",
           "createdAt"
+        ]
+      },
+      "Accent": {
+        "type": "string",
+        "enum": [
+          "violet",
+          "blue",
+          "teal",
+          "pink",
+          "lime"
         ]
       },
       "Member": {
@@ -177,6 +191,9 @@
               "null"
             ],
             "pattern": "^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$"
+          },
+          "defaultAccent": {
+            "$ref": "#/components/schemas/Accent"
           }
         }
       },
@@ -2909,6 +2926,110 @@
           "open",
           "invite_only",
           "domain"
+        ]
+      },
+      "InstanceStatus": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "object",
+            "properties": {
+              "configured": {
+                "type": "boolean"
+              },
+              "from": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "configured",
+              "from"
+            ]
+          },
+          "storage": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "disk",
+                  "s3"
+                ]
+              },
+              "location": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "location"
+            ]
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "storage",
+          "version"
+        ]
+      },
+      "InstanceUsers": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InstanceUser"
+            }
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "users",
+          "total"
+        ]
+      },
+      "InstanceUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "emailVerified": {
+            "type": "boolean"
+          },
+          "instanceAdmin": {
+            "type": "boolean"
+          },
+          "organizations": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "emailVerified",
+          "instanceAdmin",
+          "organizations",
+          "createdAt"
         ]
       },
       "UpdateInstanceSettings": {
@@ -10994,6 +11115,114 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller's role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/instance/status": {
+      "get": {
+        "tags": [
+          "Instance"
+        ],
+        "summary": "How the instance is set up: email, storage and version",
+        "description": "Instance admins only.",
+        "responses": {
+          "200": {
+            "description": "The instance's setup",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller's role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/instance/users": {
+      "get": {
+        "tags": [
+          "Instance"
+        ],
+        "summary": "Every user on the instance, oldest first",
+        "description": "Instance admins only.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "default": 0
+            },
+            "required": false,
+            "name": "offset",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of users and how many there are",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceUsers"
                 }
               }
             }

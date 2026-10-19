@@ -6993,6 +6993,123 @@ export interface paths {
         };
         trace?: never;
     };
+    "/instance/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How the instance is set up: email, storage and version
+         * @description Instance admins only.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The instance's setup */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["InstanceStatus"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The caller's role does not allow this */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/instance/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every user on the instance, oldest first
+         * @description Instance admins only.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                    offset?: number | null;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description A page of users and how many there are */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["InstanceUsers"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The caller's role does not allow this */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -7007,9 +7124,12 @@ export interface components {
             name: string;
             slug: string;
             joinDomain: string | null;
+            defaultAccent: components["schemas"]["Accent"];
             /** Format: date-time */
             createdAt: string;
         };
+        /** @enum {string} */
+        Accent: "violet" | "blue" | "teal" | "pink" | "lime";
         Member: {
             /** Format: uuid */
             id: string;
@@ -7039,6 +7159,7 @@ export interface components {
         UpdateOrganization: {
             name?: string;
             joinDomain?: string | null;
+            defaultAccent?: components["schemas"]["Accent"];
         };
         UpdateMember: {
             role: components["schemas"]["Role"];
@@ -7803,6 +7924,32 @@ export interface components {
         };
         /** @enum {string} */
         SignUpMode: "open" | "invite_only" | "domain";
+        InstanceStatus: {
+            email: {
+                configured: boolean;
+                from: string | null;
+            };
+            storage: {
+                /** @enum {string} */
+                kind: "disk" | "s3";
+                location: string;
+            };
+            version: string;
+        };
+        InstanceUsers: {
+            users: components["schemas"]["InstanceUser"][];
+            total: number;
+        };
+        InstanceUser: {
+            id: string;
+            name: string;
+            email: string;
+            emailVerified: boolean;
+            instanceAdmin: boolean;
+            organizations: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
         UpdateInstanceSettings: {
             signUpMode?: components["schemas"]["SignUpMode"];
             signUpDomains?: string[];
