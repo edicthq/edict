@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The release workflow runs all of CI on the tagged commit before it publishes.
+  workflow_call:
 
 # A newer push to the same branch or pull request replaces the run in flight.
 concurrency:
@@ -13,19 +15,24 @@ concurrency:
 permissions:
   contents: read
 
+# Actions are pinned to commits; the comment names the release each one is.
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
+      - name: Release script and versions
+        run: |
+          node --test scripts/*.test.mjs
+          pnpm release check
       - name: Lint
         run: pnpm lint
       - name: Typecheck
@@ -39,9 +46,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -53,7 +60,7 @@ jobs:
         run: pnpm e2e
       - name: Upload traces
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-traces
           path: apps/web/test-results
@@ -65,10 +72,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build the image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: docker/Dockerfile
@@ -77,16 +84,4 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Boot it against Postgres
-        run: |
-          docker network create edict
-          docker run -d --name db --network edict -e POSTGRES_USER=edict -e POSTGRES_PASSWORD=edict -e POSTGRES_DB=edict postgres:18-alpine
-          docker run -d --name app --network edict -p 3000:3000 \
-            -e DATABASE_URL=postgres://edict:edict@db:5432/edict \
-            -e BETTER_AUTH_URL=http://localhost:3000 \
-            edict:ci
-          for i in $(seq 1 60); do
-            if curl -fsS http://localhost:3000/health; then exit 0; fi
-            sleep 2
-          done
-          docker logs app
-          exit 1
+        run: docker/boot-check.sh edict:ci
