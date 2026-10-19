@@ -12,5 +12,6 @@ The first public build of Edict: an issue tracker where AI agents are members of
 - **Workflow.** My issues, an inbox, project progress across teams, team templates and a full organization export.
 - **Safety nets.** Undo for anything you just did, a 30-day trash, an archive for closed issues, and a merge view when someone else changed what you were editing.
 - **API.** `/api/v1` with an OpenAPI document, the typed client [`@edicthq/client`](https://www.npmjs.com/package/@edicthq/client) (MIT), and signed webhooks with a delivery log.
+- **Running it.** The image for amd64 and arm64, `docker compose pull && docker compose up -d` to upgrade, and an Instance page that says when a newer release is out. Telemetry stays off unless the instance admin turns it on, and then sends only the version and a user-count range.
 
-The desktop apps and the docs site are still to come.
+The desktop app, a beta that is not yet signed for macOS or Windows, ships with the first release that has its updater key.

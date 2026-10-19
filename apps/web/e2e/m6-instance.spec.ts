@@ -1,16 +1,28 @@
-import { expect, test } from "./fixtures.js";
+import type { Page } from "@playwright/test";
+import { expect, test, type Instance } from "./fixtures.js";
 
-test("Milestone 6: the instance admin sees a newer release and can turn the check off", async ({ page, baseURL }) => {
-  const headers = { origin: baseURL! };
-  // The instance admin is whoever signed up first: Amirali, from the M1 test,
-  // or Amirali now when this test runs on its own against a fresh instance.
+// Signs Amirali in as an instance admin. Amirali is the M1 test's first user,
+// and so the admin, but a failure elsewhere restarts the worker on a fresh
+// instance where someone else may have signed up first; then the database
+// makes Amirali an admin.
+async function signInAsInstanceAdmin(page: Page, instance: Instance) {
+  const headers = { origin: instance.url };
   const admin = { email: "amirali@example.com", password: "correct-horse-battery" };
-  const signIn = await page.request.post("/api/auth/sign-in/email", { headers, data: admin });
-  if (!signIn.ok()) {
+  const signIn = () => page.request.post("/api/auth/sign-in/email", { headers, data: admin });
+  if (!(await signIn()).ok()) {
     const signUp = await page.request.post("/api/auth/sign-up/email", { headers, data: { ...admin, name: "Amirali Beigi" } });
     expect(signUp.ok(), await signUp.text()).toBe(true);
   }
+  if ((await page.request.get("/api/v1/instance/status")).status() === 403) {
+    await instance.sql(`UPDATE "user" SET role = 'admin' WHERE email = '${admin.email}'`);
+    expect((await signIn()).ok()).toBe(true);
+  }
   expect((await page.request.get("/api/v1/instance/status")).ok()).toBe(true);
+  return headers;
+}
+
+test("Milestone 6: the instance admin sees a newer release and can turn the check off", async ({ page, instance }) => {
+  const headers = await signInAsInstanceAdmin(page, instance);
 
   await page.request.post("/api/v1/organizations", { headers, data: { name: "Updates", slug: "updates" } });
   await page.goto("/updates/instance");
@@ -28,14 +40,8 @@ test("Milestone 6: the instance admin sees a newer release and can turn the chec
   await expect(updates.getByRole("button", { name: "Check now" })).toHaveCount(0);
 });
 
-test("Milestone 6: the instance admin sees the exact telemetry payload and turns it on", async ({ page, baseURL }) => {
-  const headers = { origin: baseURL! };
-  const admin = { email: "amirali@example.com", password: "correct-horse-battery" };
-  const signIn = await page.request.post("/api/auth/sign-in/email", { headers, data: admin });
-  if (!signIn.ok()) {
-    const signUp = await page.request.post("/api/auth/sign-up/email", { headers, data: { ...admin, name: "Amirali Beigi" } });
-    expect(signUp.ok(), await signUp.text()).toBe(true);
-  }
+test("Milestone 6: the instance admin sees the exact telemetry payload and turns it on", async ({ page, instance }) => {
+  const headers = await signInAsInstanceAdmin(page, instance);
   await page.request.post("/api/v1/organizations", { headers, data: { name: "Telemetry", slug: "telemetry" } });
   const { version } = (await (await page.request.get("/api/v1/instance/status")).json()) as { version: string };
 

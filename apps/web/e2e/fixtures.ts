@@ -11,8 +11,8 @@ import { PostgreSqlContainer } from "@testcontainers/postgresql";
 // built server (apps/server/dist) serving the built web app (apps/web/dist),
 // the way the Docker image runs. `pnpm e2e` builds both first.
 // biome-ignore lint/complexity/noBannedTypes: Playwright types "no test fixtures" as {}
-export const test = base.extend<{}, { instanceUrl: string }>({
-  instanceUrl: [
+export const test = base.extend<{}, { instance: Instance; instanceUrl: string }>({
+  instance: [
     // biome-ignore lint/correctness/noEmptyPattern: Playwright reads a fixture's dependencies from this pattern
     async ({}, use) => {
       const postgres = await new PostgreSqlContainer("postgres:18-alpine").start();
@@ -54,7 +54,13 @@ export const test = base.extend<{}, { instanceUrl: string }>({
 
       try {
         await waitForHealth(url, () => server.exitCode !== null);
-        await use(url);
+        await use({
+          url,
+          sql: async (query) => {
+            const result = await postgres.exec(["psql", "-U", postgres.getUsername(), "-d", postgres.getDatabase(), "-c", query]);
+            if (result.exitCode !== 0) throw new Error(result.output);
+          },
+        });
       } finally {
         server.kill();
         releases.close();
@@ -63,10 +69,18 @@ export const test = base.extend<{}, { instanceUrl: string }>({
     },
     { scope: "worker", timeout: 120_000 },
   ],
+  instanceUrl: [async ({ instance }, use) => use(instance.url), { scope: "worker" }],
   baseURL: async ({ instanceUrl }, use) => use(instanceUrl),
 });
 
 export { expect } from "@playwright/test";
+
+// The worker's instance: its URL, and its database for the rare test that
+// must set something no API can.
+export interface Instance {
+  url: string;
+  sql: (query: string) => Promise<void>;
+}
 
 async function waitForHealth(url: string, exited: () => boolean): Promise<void> {
   const deadline = Date.now() + 60_000;

@@ -4,7 +4,7 @@ An open-source issue tracker where AI agents are members of your team.
 
 Agents get their own identity, can be delegated issues, post progress updates you can watch live, and connect through a built-in MCP server. Humans stay accountable. Self-hosting is one container plus Postgres.
 
-**Status:** milestone M6, the last before v1.0. Everything below works except the desktop apps, which M6 adds along with the docs site. Read [`docs/PLAN.md`](docs/PLAN.md) for the spec and milestones, and [`docs/adr/`](docs/adr/) for why things are built the way they are.
+**Status:** milestone M6, the last before v1.0. The desktop apps are a beta, not yet signed for macOS or Windows. The user docs live in [`apps/docs`](apps/docs/content/docs). Read [`docs/PLAN.md`](docs/PLAN.md) for the spec and milestones, and [`docs/adr/`](docs/adr/) for why things are built the way they are.
 
 ## What's in it
 
@@ -14,7 +14,8 @@ Agents get their own identity, can be delegated issues, post progress updates yo
 - MCP server at `/mcp` on every instance, a REST API with OpenAPI, signed webhooks
 - Markdown descriptions and comments, edited in Tiptap; a 30-day trash, undo and an archive
 - `docker compose up` with Postgres as the only required service
-- Desktop apps for macOS, Windows and Linux (in M6)
+- Desktop apps for macOS, Windows and Linux: a global hotkey for new issues, notifications and `edict://` links
+- An update check, and telemetry that stays off unless the instance admin turns it on
 
 ## Running it
 
