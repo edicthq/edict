@@ -1,0 +1,9 @@
+# Builds the app image from this checkout instead of pulling a release, for
+# development and for testing a change before it ships:
+#   docker compose -f docker/compose.yml -f docker/compose.build.yml up --build
+services:
+  app:
+    image: edict:dev
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile

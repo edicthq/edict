@@ -19,9 +19,10 @@ services:
       retries: 10
 
   app:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
+    # Upgrading is `docker compose pull && docker compose up -d`. EDICT_VERSION
+    # picks the image tag: 1 follows every 1.x release, 1.4 only its patches,
+    # 1.4.2 stays put. To build from source instead, add compose.build.yml.
+    image: ghcr.io/edicthq/edict:${EDICT_VERSION:-1}
     environment:
       DATABASE_URL: postgres://edict:${EDICT_DB_PASSWORD:-edict}@db:5432/edict
       # Optional. Without it, Edict generates a secret on first boot and keeps it in Postgres.
