@@ -8,7 +8,7 @@ test("a fresh instance: set up, create an organization and a team, invite someon
   await page.getByLabel("Name").fill("Amirali Beigi");
   await page.getByLabel("Email").fill("amirali@example.com");
   await page.getByLabel("Password").fill("correct-horse-battery");
-  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("button", { name: "Sign up", exact: true }).click();
 
   await expect(page.getByRole("heading", { name: "Create an organization" })).toBeVisible();
   await page.getByLabel("Name").fill("Edict Labs");
@@ -36,11 +36,11 @@ test("a fresh instance: set up, create an organization and a team, invite someon
   const mia = await (await browser.newContext({ baseURL })).newPage();
   await mia.goto(inviteUrl);
   await expect(mia.getByRole("heading", { name: "Join Edict Labs" })).toBeVisible();
-  await mia.getByRole("button", { name: "Create an account to join" }).click();
+  await mia.getByRole("button", { name: "Sign up to join" }).click();
   await expect(mia.getByLabel("Email")).toHaveValue("mia@example.com");
   await mia.getByLabel("Name").fill("Mia Chen");
   await mia.getByLabel("Password").fill("correct-horse-battery");
-  await mia.getByRole("button", { name: "Create account" }).click();
+  await mia.getByRole("button", { name: "Sign up", exact: true }).click();
   await mia.getByRole("button", { name: "Join Edict Labs" }).click();
 
   await expect(mia).toHaveURL(/\/edict-labs$/);

@@ -20,10 +20,10 @@ describe("instance settings", () => {
     const t = await startTestServer();
     const res = await apiClient(t.baseUrl).get("/instance");
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ signUpMode: "open", setUp: false, sendsEmail: false });
+    expect(res.body).toEqual({ signUpMode: "open", setUp: false, sendsEmail: false, signUpDomains: [], signInMethods: { magicLink: false, google: false, github: false, oidc: null } });
 
     await signUpAs(t.baseUrl, "Admin");
-    expect((await apiClient(t.baseUrl).get("/instance")).body).toEqual({ signUpMode: "open", setUp: true, sendsEmail: false });
+    expect((await apiClient(t.baseUrl).get("/instance")).body).toEqual({ signUpMode: "open", setUp: true, sendsEmail: false, signUpDomains: [], signInMethods: { magicLink: false, google: false, github: false, oidc: null } });
   });
 
   it("only the instance admin changes it", async () => {
@@ -36,7 +36,7 @@ describe("instance settings", () => {
 
     const res = await admin.patch("/instance", { signUpMode: "invite_only" });
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ signUpMode: "invite_only", setUp: true, sendsEmail: false });
+    expect(res.body).toEqual({ signUpMode: "invite_only", setUp: true, sendsEmail: false, signUpDomains: [], signInMethods: { magicLink: false, google: false, github: false, oidc: null } });
     expect((await apiClient(t.baseUrl).get("/instance")).body.signUpMode).toBe("invite_only");
   });
 

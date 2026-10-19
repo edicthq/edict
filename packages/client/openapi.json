@@ -40,6 +40,12 @@
             "type": "string",
             "pattern": "^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?$"
           },
+          "joinDomain": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -49,6 +55,7 @@
           "id",
           "name",
           "slug",
+          "joinDomain",
           "createdAt"
         ]
       },
@@ -155,6 +162,23 @@
           "name",
           "slug"
         ]
+      },
+      "UpdateOrganization": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "joinDomain": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$"
+          }
+        }
       },
       "UpdateMember": {
         "type": "object",
@@ -2829,19 +2853,62 @@
           },
           "sendsEmail": {
             "type": "boolean"
+          },
+          "signUpDomains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "signInMethods": {
+            "type": "object",
+            "properties": {
+              "magicLink": {
+                "type": "boolean"
+              },
+              "google": {
+                "type": "boolean"
+              },
+              "github": {
+                "type": "boolean"
+              },
+              "oidc": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            },
+            "required": [
+              "magicLink",
+              "google",
+              "github",
+              "oidc"
+            ]
           }
         },
         "required": [
           "signUpMode",
           "setUp",
-          "sendsEmail"
+          "sendsEmail",
+          "signUpDomains",
+          "signInMethods"
         ]
       },
       "SignUpMode": {
         "type": "string",
         "enum": [
           "open",
-          "invite_only"
+          "invite_only",
+          "domain"
         ]
       },
       "UpdateInstanceSettings": {
@@ -2849,6 +2916,14 @@
         "properties": {
           "signUpMode": {
             "$ref": "#/components/schemas/SignUpMode"
+          },
+          "signUpDomains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$"
+            },
+            "maxItems": 50
           }
         }
       }
@@ -2936,6 +3011,203 @@
           },
           "401": {
             "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{orgId}": {
+      "patch": {
+        "tags": [
+          "Organizations"
+        ],
+        "summary": "Rename the organization, or set who may join by their email's domain",
+        "description": "Admins and Owners. With a joinDomain, anyone with a verified address at it may join as a Member.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrganization"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Organization"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the schema",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller's role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/joinable": {
+      "get": {
+        "tags": [
+          "Organizations"
+        ],
+        "summary": "Organizations the signed-in person may join by their verified email's domain",
+        "responses": {
+          "200": {
+            "description": "Organizations open to the caller's domain",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Organization"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller's role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{orgId}/join": {
+      "post": {
+        "tags": [
+          "Organizations"
+        ],
+        "summary": "Join an organization whose domain rule matches your verified email",
+        "description": "You join as a Member. Someone removed from the organization needs an invite to come back.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The organization and the caller's member in it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Membership"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller's role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state",
             "content": {
               "application/json": {
                 "schema": {

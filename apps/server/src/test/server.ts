@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { onTestFinished } from "vitest";
 import { Pool } from "pg";
 import { createApp, type App } from "../app.js";
-import { DEFAULT_MAX_ATTACHMENT_BYTES } from "../env.js";
+import { DEFAULT_MAX_ATTACHMENT_BYTES, type SignInProviders } from "../env.js";
 import type { Mailer } from "../email.js";
 import type { AgentLimits } from "../api/rate-limit.js";
 import type { WebhookRetry } from "../webhooks.js";
@@ -62,6 +62,7 @@ export async function startTestServer(
     webhookRetry?: WebhookRetry;
     // Let webhooks reach private addresses, like the tests' 127.0.0.1 receivers.
     privateWebhookTargets?: boolean;
+    signIn?: SignInProviders;
   } = {},
 ): Promise<TestServer> {
   const database = options.database ?? (await createTestDatabase());
@@ -80,6 +81,7 @@ export async function startTestServer(
     agentLimits: options.agentLimits,
     webhookRetry: options.webhookRetry,
     privateWebhookTargets: options.privateWebhookTargets,
+    signIn: options.signIn,
   }, { mailer: options.mailer });
   await app.start();
 

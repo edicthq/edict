@@ -1,20 +1,29 @@
 import type { SignUpMode } from "@edicthq/client";
-import { cn } from "@edicthq/ui";
+import { Button, Input, cn } from "@edicthq/ui";
+import { useState } from "react";
 import { FormError, GroupHeader, Loading, PageBody, PageHeader } from "../components/shell.js";
-import { useInstance, useSetSignUpMode } from "../lib/queries.js";
+import { useInstance, useUpdateInstance } from "../lib/queries.js";
 
 const modes: { value: SignUpMode; label: string; description: string }[] = [
-  { value: "open", label: "Open", description: "Anyone who can reach this instance can create an account." },
+  { value: "open", label: "Open", description: "Anyone who can reach this instance can sign up." },
   {
     value: "invite_only",
     label: "Invite only",
-    description: "Only people with an open invite to an organization here can create an account.",
+    description: "Only people with an open invite to an organization here can sign up.",
+  },
+  {
+    value: "domain",
+    label: "Domain",
+    description: "People with an invite, and anyone who verifies an address at one of these domains.",
   },
 ];
 
 export function InstancePage() {
   const instance = useInstance();
-  const setMode = useSetSignUpMode();
+  const setMode = useUpdateInstance();
+  const [domains, setDomains] = useState<string | null>(null);
+  const domainText = domains ?? instance.data?.signUpDomains.join(", ") ?? "";
+  const parsedDomains = domainText.split(/[\s,]+/).filter(Boolean);
 
   return (
     <>
@@ -46,12 +55,38 @@ export function InstancePage() {
                     name="sign-up-mode"
                     value={mode.value}
                     checked={checked}
-                    onChange={() => setMode.mutate(mode.value)}
+                    disabled={mode.value === "domain" && !instance.data?.sendsEmail}
+                    onChange={() =>
+                      setMode.mutate(mode.value === "domain" ? { signUpMode: "domain", signUpDomains: parsedDomains } : { signUpMode: mode.value })
+                    }
                     className="mt-0.5 size-4 accent-[var(--ink)]"
                   />
-                  <span>
+                  <span className="flex flex-1 flex-col gap-2">
                     <span className="block text-body font-medium">{mode.label}</span>
-                    <span className="block text-ui text-ink-2 text-pretty">{mode.description}</span>
+                    <span className="block text-ui text-ink-2 text-pretty">
+                      {mode.description}
+                      {mode.value === "domain" && !instance.data?.sendsEmail
+                        ? " It needs email set up, so Edict can verify each address."
+                        : ""}
+                    </span>
+                    {mode.value === "domain" && instance.data?.sendsEmail ? (
+                      <span className="flex flex-wrap items-center gap-2">
+                        <Input
+                          aria-label="Domains"
+                          placeholder="acme.com, acme.dev"
+                          value={domainText}
+                          onChange={(event) => setDomains(event.target.value)}
+                          className="max-w-[320px]"
+                        />
+                        <Button
+                          type="button"
+                          disabled={setMode.isPending || parsedDomains.length === 0}
+                          onClick={() => setMode.mutate({ signUpDomains: parsedDomains, ...(checked ? {} : { signUpMode: "domain" }) })}
+                        >
+                          Save domains
+                        </Button>
+                      </span>
+                    ) : null}
                   </span>
                 </label>
               );

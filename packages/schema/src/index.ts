@@ -48,10 +48,27 @@ export const Organization = z
     id: Id,
     name: z.string(),
     slug: OrganizationSlug,
+    // Anyone with a verified address at this domain may join as a Member.
+    // Null: people join by invite only.
+    joinDomain: z.string().nullable(),
     createdAt: z.iso.datetime(),
   })
   .meta({ id: "Organization" });
 export type Organization = z.infer<typeof Organization>;
+
+// A domain like acme.com, stored lowercase.
+export const EmailDomain = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/, "A domain like acme.com");
+
+export const UpdateOrganization = z
+  .object({
+    name: z.string().trim().min(1).max(80).optional(),
+    joinDomain: EmailDomain.nullable().optional(),
+  })
+  .meta({ id: "UpdateOrganization" });
 
 export const CreateOrganization = z
   .object({
@@ -448,7 +465,9 @@ export type Event = z.infer<typeof Event>;
 
 // Who can create a user on this instance: anyone, or only people with an open
 // invite. The first user can always sign up.
-export const SignUpMode = z.enum(["open", "invite_only"]).meta({ id: "SignUpMode" });
+// open: anyone. invite_only: people with an invite. domain: people with an
+// invite, or a verified address at one of the instance's sign-up domains.
+export const SignUpMode = z.enum(["open", "invite_only", "domain"]).meta({ id: "SignUpMode" });
 export type SignUpMode = z.infer<typeof SignUpMode>;
 
 export const InstanceSettings = z
@@ -459,11 +478,23 @@ export const InstanceSettings = z
     // Whether the instance has email set up. Without it there is no email
     // verification or password reset, and invites are links to share by hand.
     sendsEmail: z.boolean(),
+    // Domains the "domain" sign-up mode lets in, lowercase.
+    signUpDomains: z.array(z.string()),
+    // How people can sign in besides email and password, which is always on.
+    signInMethods: z.object({
+      // A link by email; on when the instance sends email.
+      magicLink: z.boolean(),
+      google: z.boolean(),
+      github: z.boolean(),
+      // A generic OpenID Connect provider, like Authentik or Keycloak, by the
+      // name its sign-in button shows.
+      oidc: z.object({ name: z.string() }).nullable(),
+    }),
   })
   .meta({ id: "InstanceSettings" });
 
 export const UpdateInstanceSettings = z
-  .object({ signUpMode: SignUpMode })
+  .object({ signUpMode: SignUpMode, signUpDomains: z.array(EmailDomain).max(50) })
   .partial()
   .meta({ id: "UpdateInstanceSettings" });
 

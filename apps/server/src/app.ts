@@ -62,6 +62,7 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
     agentLimits,
     requestLimiter: new RequestLimiter(agentLimits.requestsPerMinute),
     privateWebhookTargets: config.privateWebhookTargets ?? false,
+    signIn: config.signIn ?? {},
     queueDelivery: async (job: { orgId: string; deliveryId: string }) => {
       await jobs?.queueDelivery(job);
     },
@@ -105,6 +106,7 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
           baseURL: config.baseUrl,
           trustedProxies: config.trustedProxies,
           rateLimit: config.authRateLimit === false ? false : undefined,
+          signIn: config.signIn,
         },
         db,
         mailer,

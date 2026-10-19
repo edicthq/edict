@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, notExists, sql } from "drizzle-orm";
 import {
   emit,
   enterOrg,
@@ -15,8 +15,9 @@ import {
   Id,
   Member,
   Membership,
+  Organization,
   UpdateMember,
-  type Organization,
+  UpdateOrganization,
 } from "@edicthq/schema";
 import {
   activeMember,
@@ -43,13 +44,51 @@ import {
   signedIn,
   type ApiDeps,
 } from "./context.js";
-import { conflict, forbidden, invalid, isUniqueViolation } from "./errors.js";
+import { changesOf, conflict, forbidden, invalid, isUniqueViolation, notFound } from "./errors.js";
+import { domainOf } from "../instance.js";
 
 type OrganizationRow = typeof organizations.$inferSelect;
 
 export function toOrganization(row: OrganizationRow): Organization {
-  return { id: row.id, name: row.name, slug: row.slug, createdAt: row.createdAt.toISOString() };
+  return { id: row.id, name: row.name, slug: row.slug, joinDomain: row.joinDomain, createdAt: row.createdAt.toISOString() };
 }
+
+const updateOrganization = createRoute({
+  method: "patch",
+  path: "/organizations/{orgId}",
+  tags: ["Organizations"],
+  summary: "Rename the organization, or set who may join by their email's domain",
+  description: "Admins and Owners. With a joinDomain, anyone with a verified address at it may join as a Member.",
+  request: { params: OrgParams, ...body(UpdateOrganization) },
+  responses: {
+    200: json(Organization, "The organization"),
+    ...errors("invalid_request", "unauthorized", "forbidden", "not_found"),
+  },
+});
+
+const listJoinable = createRoute({
+  method: "get",
+  path: "/organizations/joinable",
+  tags: ["Organizations"],
+  summary: "Organizations the signed-in person may join by their verified email's domain",
+  responses: {
+    200: json(z.array(Organization), "Organizations open to the caller's domain"),
+    ...errors("unauthorized", "forbidden"),
+  },
+});
+
+const joinOrganization = createRoute({
+  method: "post",
+  path: "/organizations/{orgId}/join",
+  tags: ["Organizations"],
+  summary: "Join an organization whose domain rule matches your verified email",
+  description: "You join as a Member. Someone removed from the organization needs an invite to come back.",
+  request: { params: OrgParams },
+  responses: {
+    200: json(Membership, "The organization and the caller's member in it"),
+    ...errors("unauthorized", "forbidden", "not_found", "conflict"),
+  },
+});
 
 const MemberParams = OrgParams.extend({ memberId: Id });
 
@@ -151,6 +190,71 @@ export function organizationRoutes(deps: ApiDeps) {
       }
       throw error;
     }
+  });
+
+  app.openapi(updateOrganization, async (c) => {
+    const { orgId } = c.req.valid("param");
+    const input = c.req.valid("json");
+    const organization = await inOrg(deps, c, orgId, async (tx, caller) => {
+      if (input.name !== undefined) requireRole(caller, "admin", "rename the organization");
+      // Letting a domain in is managing members.
+      if (input.joinDomain !== undefined) requireRole(caller, "admin", "set who may join by domain", "members");
+      const [current] = await tx.select().from(organizations).where(eq(organizations.id, orgId)).for("update");
+      const changes = changesOf(current!, input);
+      if (Object.keys(changes).length === 0) return current!;
+      const [updated] = await tx
+        .update(organizations)
+        .set({ ...input, updatedAt: new Date() })
+        .where(eq(organizations.id, orgId))
+        .returning();
+      await emit(tx, orgId, { type: "organization.updated", actorId: caller.id, subjectId: orgId, data: { changes } });
+      return updated!;
+    });
+    return c.json(toOrganization(organization), 200);
+  });
+
+  app.openapi(listJoinable, async (c) => {
+    const user = signedIn(c);
+    if (!user.emailVerified) return c.json([], 200);
+    const domain = domainOf(user.email);
+    const rows = await inScope(deps.db, { userId: user.id, joinDomain: domain }, (tx) =>
+      tx
+        .select()
+        .from(organizations)
+        .where(
+          and(
+            eq(organizations.joinDomain, domain),
+            // Members already, and people who were removed, are left out.
+            notExists(tx.select({ id: members.id }).from(members).where(and(eq(members.orgId, organizations.id), eq(members.userId, user.id)))),
+          ),
+        )
+        .orderBy(asc(organizations.name)),
+    );
+    return c.json(rows.map(toOrganization), 200);
+  });
+
+  app.openapi(joinOrganization, async (c) => {
+    const { orgId } = c.req.valid("param");
+    const user = signedIn(c);
+    if (!user.emailVerified) {
+      throw forbidden("Verify your email first: a domain rule only trusts a proven address.");
+    }
+    const domain = domainOf(user.email);
+    const membership = await inScope(deps.db, { userId: user.id, joinDomain: domain }, async (tx) => {
+      const [organization] = await tx
+        .select()
+        .from(organizations)
+        .where(and(eq(organizations.id, orgId), eq(organizations.joinDomain, domain)));
+      if (!organization) throw notFound("organization");
+      await enterOrg(tx, orgId);
+      const [previous] = await tx.select().from(members).where(and(eq(members.orgId, orgId), eq(members.userId, user.id)));
+      if (previous && !previous.removedAt) throw conflict("You are already a member of this organization.");
+      if (previous) throw forbidden("You were removed from this organization. Ask an Admin for an invite to come back.");
+      const [member] = await tx.insert(members).values({ orgId, kind: "human", userId: user.id, role: "member" }).returning();
+      await emit(tx, orgId, { type: "member.joined", actorId: member!.id, subjectId: member!.id, data: { domain } });
+      return { organization: toOrganization(organization), member: await loadMember(tx, orgId, member!.id) };
+    });
+    return c.json(membership, 200);
   });
 
   app.openapi(listOrganizations, async (c) => {

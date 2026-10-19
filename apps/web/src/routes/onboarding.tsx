@@ -7,7 +7,7 @@ import { CreateOrganization } from "@edicthq/schema";
 import { Button, Field, Input } from "@edicthq/ui";
 import { AuthShell, FormError, Loading } from "../components/shell.js";
 import { ApiFailure } from "../lib/api.js";
-import { useCreateOrganization, useMemberships } from "../lib/queries.js";
+import { useCreateOrganization, useJoinable, useJoinOrganization, useMemberships } from "../lib/queries.js";
 
 // Home: the first organization the user belongs to, or onboarding.
 export function Home() {
@@ -61,6 +61,7 @@ export function NewOrganization() {
       title="Create an organization"
       lead="An organization holds your teams, the people in them and the agents working with them. You can invite others next."
     >
+      <Joinable />
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
         <Field label="Name" error={form.formState.errors.name?.message}>
           {(control) => <Input {...control} autoFocus autoComplete="organization" placeholder="Acme" {...name} />}
@@ -91,3 +92,33 @@ export function NewOrganization() {
     </AuthShell>
   );
 }
+
+// Organizations that let in the person's verified email domain: joining one
+// is often what they came for, so it comes before creating a new one.
+function Joinable() {
+  const navigate = useNavigate();
+  const joinable = useJoinable();
+  const join = useJoinOrganization();
+  if (!joinable.data?.length) return null;
+  return (
+    <div className="mb-6 flex flex-col gap-2 border-b border-line pb-6">
+      <p className="text-ui text-ink-2">Your email's domain can join:</p>
+      {joinable.data.map((organization) => (
+        <div key={organization.id} className="flex items-center gap-3">
+          <span className="flex-1 truncate text-body font-medium">{organization.name}</span>
+          <Button
+            variant="primary"
+            disabled={join.isPending}
+            onClick={() =>
+              join.mutate(organization.id, { onSuccess: () => navigate(`/${organization.slug}`, { replace: true }) })
+            }
+          >
+            Join
+          </Button>
+        </div>
+      ))}
+      <FormError message={join.error?.message} />
+    </div>
+  );
+}
+

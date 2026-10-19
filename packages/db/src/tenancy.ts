@@ -36,6 +36,9 @@ export const organizations = pgTable("organizations", {
   id: id(),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
+  // Anyone with a verified address at this lowercase domain may join as a
+  // Member (PLAN.md, Members and roles). Null: invites only.
+  joinDomain: text("join_domain"),
   createdAt: createdAt(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
 });

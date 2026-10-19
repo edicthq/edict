@@ -13,7 +13,7 @@ The person who manages an instance's sign-up mode, email, storage and updates. I
 _Avoid_: Superuser, sysadmin
 
 **Sign-up mode**:
-Who can create a user on an instance: anyone, or only people with an invite.
+Who can create a user on an instance: anyone, only people with an invite, or also anyone who verifies an address at one of the instance's domains.
 _Avoid_: Registration mode, access mode
 
 **Organization**:
@@ -65,6 +65,10 @@ _Avoid_: External, viewer, collaborator
 **Invite**:
 An offer to join an organization with a role and teams, made to one email address and accepted through a link.
 _Avoid_: Invitation, join link, referral
+
+**Domain rule**:
+An organization's setting that lets anyone with a verified email address at one domain join it as a Member, without an invite.
+_Avoid_: Auto-join, allowed domain
 
 ## Work
 

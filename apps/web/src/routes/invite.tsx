@@ -57,7 +57,7 @@ export function InvitePage() {
         {!user ? (
           <>
             <Button variant="primary" size="lg" onClick={() => navigate(`/sign-up?${params}`)}>
-              Create an account to join
+              Sign up to join
             </Button>
             <Button variant="secondary" size="lg" onClick={() => navigate(`/sign-in?${params}`)}>
               Sign in as {invite.email}

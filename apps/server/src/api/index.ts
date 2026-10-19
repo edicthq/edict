@@ -1,3 +1,4 @@
+import type { SignInProviders } from "../env.js";
 import { DEFAULT_MAX_ATTACHMENT_BYTES } from "../env.js";
 import { localDiskStorage } from "../storage.js";
 import { agentRoutes } from "./agents.js";
@@ -32,7 +33,7 @@ export { consentOrganization } from "./connections.js";
 
 // The public API, mounted at /api/v1. Its OpenAPI document is served at
 // /api/v1/openapi.json.
-export function createApi(deps: AttachmentDeps & WebhookDeps) {
+export function createApi(deps: AttachmentDeps & WebhookDeps & { signIn?: SignInProviders }) {
   const api = router();
 
   api.use(identify(deps));

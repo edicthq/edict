@@ -179,8 +179,9 @@ describe("realtime audiences", () => {
     await owner.post(`${org}/invites`, { email: "secret@example.com", role: "member" });
     await owner.post(`${org}/teams/${eng.id}/saved-views`, { name: "Mine", query: {} });
     await owner.post(`${org}/teams/${eng.id}/issues`, { title: "Everyone sees this" });
-    const until = Date.now() + 5_000;
-    while (theirs.length === 0 && Date.now() < until) await new Promise((resolve) => setTimeout(resolve, 50));
+    // The member's one event comes after the owner's three, which are all in.
+    const until = Date.now() + 10_000;
+    while ((mine.length < 3 || theirs.length === 0) && Date.now() < until) await new Promise((resolve) => setTimeout(resolve, 50));
     await new Promise((resolve) => setTimeout(resolve, 300));
     expect(mine.map((m) => m.type)).toEqual(["invite.created", "view.saved", "issue.created"]);
     expect(theirs.map((m) => m.type)).toEqual(["issue.created"]);

@@ -85,10 +85,11 @@ export function SignIn() {
           {form.formState.isSubmitting ? "Signing in…" : "Sign in"}
         </Button>
       </form>
+      <OtherWays next={next} email={form.watch("email")} />
       <p className="mt-8 text-ui text-ink-2">
         New here?{" "}
         <Link to={`/sign-up${query}`} className="font-medium text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink">
-          Create an account
+          Sign up
         </Link>
       </p>
     </AuthShell>
@@ -109,6 +110,7 @@ export function SignUp() {
   const [failure, setFailure] = useState<string | null>(null);
   const form = useForm({ resolver: zodResolver(SignUpForm), defaultValues: { name: "", email, password: "" } });
   const inviteOnly = instance.data?.signUpMode === "invite_only";
+  const domainOnly = instance.data?.signUpMode === "domain";
   const firstUser = instance.data?.setUp === false;
 
   const onSubmit = form.handleSubmit(async (values) => {
@@ -117,7 +119,7 @@ export function SignUp() {
     // were going, such as the invite page.
     const { error } = await authClient.signUp.email({ ...values, callbackURL: next });
     if (error) {
-      setFailure(error.message ?? "Creating your account failed. Try again.");
+      setFailure(error.message ?? "Signing up failed. Try again.");
       return;
     }
     await queryClient.invalidateQueries({ queryKey: keys.instance });
@@ -126,13 +128,15 @@ export function SignUp() {
 
   return (
     <AuthShell
-      title={firstUser ? "Set up Edict" : "Create your account"}
+      title={firstUser ? "Set up Edict" : "Sign up for Edict"}
       lead={
         firstUser
-          ? "You're the first person here, so your account becomes the instance admin. You'll create your organization next."
+          ? "You're the first person here, so you become the instance admin. You'll create your organization next."
           : inviteOnly && !invite
             ? "This instance is invite-only. Use the email address your invite was sent to."
-            : "Your account works across every organization on this instance."
+            : domainOnly && !invite
+              ? `Sign up with an address at ${instance.data?.signUpDomains.join(", ")}, or the one your invite was sent to. You'll verify it by email.`
+              : "One sign-in works across every organization on this instance."
       }
     >
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
@@ -156,11 +160,12 @@ export function SignUp() {
         </Field>
         <FormError message={failure} />
         <Button type="submit" variant="primary" size="lg" disabled={form.formState.isSubmitting} className="mt-2">
-          {form.formState.isSubmitting ? "Creating account…" : "Create account"}
+          {form.formState.isSubmitting ? "Signing up…" : "Sign up"}
         </Button>
       </form>
+      {firstUser ? null : <OtherWays next={next} />}
       <p className={firstUser ? "hidden" : "mt-8 text-ui text-ink-2"}>
-        Already have an account?{" "}
+        Already signed up?{" "}
         <Link to={`/sign-in${query}`} className="font-medium text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink">
           Sign in
         </Link>
@@ -168,3 +173,56 @@ export function SignUp() {
     </AuthShell>
   );
 }
+
+// Sign-in the instance offers besides a password: a link by email, Google,
+// GitHub or an OpenID Connect provider. Each one also signs up someone new,
+// within the instance's sign-up mode.
+function OtherWays({ next, email }: { next: string; email?: string }) {
+  const instance = useInstance();
+  const [sent, setSent] = useState<string | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
+  const methods = instance.data?.signInMethods;
+  if (!methods || (!methods.magicLink && !methods.google && !methods.github && !methods.oidc)) return null;
+
+  const social = async (provider: string) => {
+    setFailure(null);
+    const { error } = await authClient.signIn.social({ provider: provider as "google", callbackURL: next });
+    if (error) setFailure(error.message ?? "That sign-in failed. Try again.");
+  };
+  const link = async () => {
+    setFailure(null);
+    const address = email?.trim();
+    if (!address) return setFailure("Enter your email above, then ask for a link.");
+    const { error } = await authClient.signIn.magicLink({ email: address, callbackURL: next });
+    if (error) setFailure(error.message ?? "Sending the link failed. Try again.");
+    else setSent(address);
+  };
+
+  return (
+    <div className="mt-6 flex flex-col gap-2 border-t border-line pt-6">
+      {methods.oidc ? (
+        <Button type="button" size="lg" onClick={() => void social("oidc")}>
+          Continue with {methods.oidc.name}
+        </Button>
+      ) : null}
+      {methods.google ? (
+        <Button type="button" size="lg" onClick={() => void social("google")}>
+          Continue with Google
+        </Button>
+      ) : null}
+      {methods.github ? (
+        <Button type="button" size="lg" onClick={() => void social("github")}>
+          Continue with GitHub
+        </Button>
+      ) : null}
+      {methods.magicLink && email !== undefined ? (
+        <Button type="button" variant="ghost" size="lg" onClick={() => void link()}>
+          Email me a sign-in link
+        </Button>
+      ) : null}
+      {sent ? <p className="text-ui text-ink-2">Check {sent} for a link. It works once, for five minutes.</p> : null}
+      <FormError message={failure} />
+    </div>
+  );
+}
+

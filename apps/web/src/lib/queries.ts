@@ -94,6 +94,35 @@ export function useCreateOrganization() {
   });
 }
 
+// Organizations whose domain rule matches the signed-in person's verified
+// address, which they may join as a Member.
+export function useJoinable() {
+  return useQuery({
+    queryKey: ["joinable"] as const,
+    queryFn: () => unwrap(api.GET("/organizations/joinable")),
+  });
+}
+
+export function useJoinOrganization() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (orgId: string) => unwrap(api.POST("/organizations/{orgId}/join", org(orgId))),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: keys.memberships });
+      void client.invalidateQueries({ queryKey: ["joinable"] });
+    },
+  });
+}
+
+export function useUpdateOrganization(orgId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { name?: string; joinDomain?: string | null }) =>
+      unwrap(api.PATCH("/organizations/{orgId}", { params: { path: { orgId } }, body })),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.memberships }),
+  });
+}
+
 export function useCreateTeam(orgId: string) {
   const client = useQueryClient();
   return useMutation({
@@ -189,10 +218,10 @@ export function useAcceptInvite(token: string) {
   });
 }
 
-export function useSetSignUpMode() {
+export function useUpdateInstance() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (signUpMode: SignUpMode) => unwrap(api.PATCH("/instance", { body: { signUpMode } })),
+    mutationFn: (body: { signUpMode?: SignUpMode; signUpDomains?: string[] }) => unwrap(api.PATCH("/instance", { body })),
     onSuccess: (data) => client.setQueryData(keys.instance, data),
   });
 }
