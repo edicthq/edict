@@ -1,6 +1,7 @@
 // Contract tests for /mcp (ADR 0011): the real tools, through the MCP SDK's
 // own client over Streamable HTTP, against a seeded instance. Agents depend
 // on these tool names, inputs and messages.
+import { readFileSync } from "node:fs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { describe, expect, it } from "vitest";
@@ -81,6 +82,13 @@ describe("/mcp", () => {
     expect(templates).toEqual(["edict://issue/{identifier}", "edict://project/{slug}"]);
     const prompts = (await client.listPrompts()).prompts.map((p) => p.name).sort();
     expect(prompts).toEqual(["plan_issues", "plan_project", "triage_inbox", "work_my_queue"]);
+  });
+
+  it("names itself edict at the version the server ships as", async () => {
+    const { t, owner, orgId } = await seed();
+    const { client } = await mcpClient(t.baseUrl, (await connect(t.baseUrl, owner, orgId)).accessToken);
+    const { version } = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
+    expect(client.getServerVersion()).toMatchObject({ name: "edict", version });
   });
 
   it("serves each prompt, naming the tools it steers to", async () => {

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Pool } from "pg";
 import { apiClient, cookieHeader, createTestDatabase, signUpAs, startTestServer } from "./server.js";
@@ -110,7 +111,7 @@ describe("client IP", () => {
 });
 
 describe("the instance admin's view", () => {
-  it("shows how email and storage are set up, and every user, to instance admins only", async () => {
+  it("shows how email and storage are set up, the version, and every user, to instance admins only", async () => {
     const { recordingMailer } = await import("./mail.js");
     const { mailer } = recordingMailer();
     const t = await startTestServer({ mailer });
@@ -122,7 +123,8 @@ describe("the instance admin's view", () => {
     expect((await mia.get("/instance/users")).status).toBe(403);
 
     const status = (await admin.get("/instance/status")).body;
-    expect(status).toMatchObject({ email: { configured: true }, storage: { kind: "disk" } });
+    const { version } = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
+    expect(status).toMatchObject({ email: { configured: true }, storage: { kind: "disk" }, version });
     const users = (await admin.get("/instance/users")).body;
     expect(users.total).toBe(2);
     expect(users.users).toEqual([

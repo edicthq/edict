@@ -7,6 +7,7 @@ import type { Context, Hono } from "hono";
 import { z } from "zod";
 import { createEdictClient } from "@edicthq/client";
 import type { OAuthDiscovery } from "../oauth.js";
+import { VERSION } from "../version.js";
 import { Session } from "./session.js";
 import { registerTools, renderIssue, renderProject } from "./tools.js";
 
@@ -69,7 +70,7 @@ function challenge(c: Context, origin: string, message: string, error?: string) 
 
 function createServer(session: Session, organizationName: string): McpServer {
   const server = new McpServer(
-    { name: "edict", title: `Edict (${organizationName})`, version: "0.1.0" },
+    { name: "edict", title: `Edict (${organizationName})`, version: VERSION },
     { instructions },
   );
   registerTools(server, session);
