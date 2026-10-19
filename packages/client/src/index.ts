@@ -13,6 +13,7 @@ export type ProjectStatus = Schemas["ProjectStatus"];
 export type ProjectProgress = Schemas["ProjectProgress"];
 export type ProjectConflict = Schemas["ProjectConflict"]["error"];
 export type TrashedProject = Schemas["TrashedProject"];
+export type TrashedTeam = Schemas["TrashedTeam"];
 export type Team = Schemas["Team"];
 export type Invite = Schemas["Invite"];
 export type CreatedInvite = Schemas["CreatedInvite"];

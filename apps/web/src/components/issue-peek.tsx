@@ -12,6 +12,7 @@ import {
   useCreateLabel,
   useCreateRelation,
   useDeleteComment,
+  useArchiveIssue,
   useDeleteIssue,
   useDeleteRelation,
   useAddLink,
@@ -77,6 +78,7 @@ export function IssuePeek({
 }) {
   const update = useUpdateIssue(orgId);
   const remove = useDeleteIssue(orgId);
+  const archive = useArchiveIssue(orgId);
   const projects = useProjects(orgId);
   const createLabel = useCreateLabel(orgId, issue.teamId);
   const parent = useIssue(orgId, issue.parentId);
@@ -171,6 +173,23 @@ export function IssuePeek({
             </Button>
           )}
         />
+        {issue.archivedAt || issue.closedAt ? (
+          <Button
+            variant="ghost"
+            disabled={archive.isPending}
+            onClick={() =>
+              archive.mutate(
+                { issue, archive: !issue.archivedAt },
+                {
+                  onSuccess: () => offerUndo(issue.archivedAt ? `Unarchived ${issue.identifier}` : `Archived ${issue.identifier}`),
+                  onError: (error) => toast(error.message),
+                },
+              )
+            }
+          >
+            {issue.archivedAt ? "Unarchive" : "Archive"}
+          </Button>
+        ) : null}
         <Button
           variant="ghost"
           aria-label={`Delete ${issue.identifier}`}

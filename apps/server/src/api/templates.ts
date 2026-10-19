@@ -200,7 +200,8 @@ export function templateRoutes(deps: ApiDeps) {
         type: "template.deleted",
         actorId: caller.id,
         subjectId: templateId,
-        data: { teamId, name: current.name },
+        // Everything it held, so undo can bring it back.
+        data: { teamId, name: current.name, title: current.title, description: current.description, labelIds: current.labelIds },
       });
     });
     return c.body(null, 204);

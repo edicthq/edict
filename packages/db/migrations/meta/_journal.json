@@ -246,6 +246,13 @@
       "when": 1792390591201,
       "tag": "0035_inbox_from_events",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792392231811,
+      "tag": "0036_archive_and_team_trash",
+      "breakpoints": true
     }
   ]
 }

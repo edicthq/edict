@@ -15,7 +15,7 @@ import { mcpRoutes } from "./mcp/index.js";
 import { oauthDiscovery, oauthRoutes } from "./oauth.js";
 import { startRealtime } from "./realtime.js";
 import { DEFAULT_WEBHOOK_RETRY } from "./webhooks.js";
-import { purgeTrash, startJobs, type PurgeResult } from "./jobs.js";
+import { archiveClosedIssues, purgeTrash, startJobs, type PurgeResult } from "./jobs.js";
 import { localDiskStorage, s3Storage } from "./storage.js";
 
 export interface App {
@@ -28,6 +28,8 @@ export interface App {
   shutdown: () => Promise<void>;
   // The daily trash purge, run now as if at `now`. Tests use it.
   purgeTrash: (now?: Date) => Promise<PurgeResult>;
+  // The daily archive of closed issues, run now as if at `now`.
+  archiveIssues: (now?: Date) => Promise<number>;
 }
 
 export interface AppOptions {
@@ -121,6 +123,7 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
       realtime = await startRealtime(server, { db, pool, getUser: deps.getUser, publicUrl: config.baseUrl });
     },
     purgeTrash: (now) => purgeTrash(db, deps.storage, now),
+    archiveIssues: (now) => archiveClosedIssues(db, now),
     shutdown: async () => {
       // Before server.close(): open sockets would hold it open, and only
       // stopping realtime ends them.

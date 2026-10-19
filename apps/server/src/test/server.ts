@@ -19,6 +19,7 @@ export interface TestServer {
   baseUrl: string;
   close: () => Promise<void>;
   purgeTrash: App["purgeTrash"];
+  archiveIssues: App["archiveIssues"];
 }
 
 // A throwaway Postgres database, dropped when the current test finishes.
@@ -91,7 +92,7 @@ export async function startTestServer(
   };
   onTestFinished(close);
 
-  return { baseUrl: `http://127.0.0.1:${app.port}`, close, purgeTrash: app.purgeTrash };
+  return { baseUrl: `http://127.0.0.1:${app.port}`, close, purgeTrash: app.purgeTrash, archiveIssues: app.archiveIssues };
 }
 
 async function adminQuery(adminUrl: string, sql: string): Promise<void> {

@@ -102,6 +102,12 @@ export const issues = pgTable(
     // The version that last changed each field. A field missing here has not
     // changed since the issue was created, at version 1.
     fieldVersions: jsonb("field_versions").$type<IssueFieldVersions>().notNull().default({}),
+    // When and by whom the issue last moved into Done or Canceled. Cleared
+    // when it reopens. The archive job reads them (ADR 0025).
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    closedBy: uuid("closed_by"),
+    // Archived issues leave active views and stay searchable (GLOSSARY.md).
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     ...trashColumns(),
@@ -121,6 +127,8 @@ export const issues = pgTable(
     index("issues_delegate_id_idx").on(table.delegateId),
     index("issues_project_id_idx").on(table.projectId),
     index("issues_parent_id_idx").on(table.parentId),
+    index("issues_team_id_archived_at_idx").on(table.teamId, table.archivedAt),
+    index("issues_closed_at_idx").on(table.closedAt).where(sql`${table.closedAt} IS NOT NULL AND ${table.archivedAt} IS NULL`),
     check("issues_not_own_parent", sql`${table.parentId} <> ${table.id}`),
     check("issues_estimate_not_negative", sql`${table.estimate} >= 0`),
     foreignKey({

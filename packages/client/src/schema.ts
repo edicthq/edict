@@ -488,7 +488,58 @@ export interface paths {
         };
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Move a team and everything in it to the trash
+         * @description Admins and Owners. The team, its issues and their identifiers leave every list and answer 410 until restored. Its keys stay reserved. The trash keeps it for 30 days.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                    teamId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Done */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The caller's role does not allow this */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
         options?: never;
         head?: never;
         /**
@@ -1432,10 +1483,17 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A team's issues, newest first */
+        /**
+         * A team's issues, newest first
+         * @description Without `archived`, every issue that is not archived: open ones and recently closed ones. With `archived=true`, archived issues a page at a time: pass the lowest number you got as `before` for the next page.
+         */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    archived?: "true" | "false";
+                    before?: number;
+                    limit?: number;
+                };
                 header?: never;
                 path: {
                     orgId: string;
@@ -1524,6 +1582,152 @@ export interface paths {
                 };
                 /** @description Not found, or not visible to the caller */
                 404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{orgId}/issues/{issueRef}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive a closed issue
+         * @description It leaves the team's list and stays findable by identifier and by search. Reopening it unarchives it.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                    /** @description The issue's id or any identifier it has had, like ENG-123 */
+                    issueRef: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The issue */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Issue"];
+                    };
+                };
+                /** @description The request does not match the schema */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No longer valid */
+                410: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{orgId}/issues/{issueRef}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bring an archived issue back to the team's list */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                    /** @description The issue's id or any identifier it has had, like ENG-123 */
+                    issueRef: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The issue */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Issue"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No longer valid */
+                410: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2784,6 +2988,140 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/organizations/{orgId}/teams/{teamId}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bring a team back from the trash, with everything in it */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                    teamId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The restored team */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Team"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The caller's role does not allow this */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{orgId}/trash/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Trashed teams, most recently deleted first
+         * @description Admins and Owners.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Trashed teams */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TrashedTeam"][];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The caller's role does not allow this */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/organizations/{orgId}/issues/bulk-delete": {
@@ -6291,7 +6629,7 @@ export interface paths {
         };
         /**
          * A zip of the whole organization
-         * @description Owners and admins only. The zip holds one JSON document describing the organization — members, teams, statuses, labels, projects, templates, saved views, issues with their comments, relations, links, progress updates and attachment metadata — plus every attachment's bytes. Secrets are not included, so nothing in the zip can act on any other instance.
+         * @description Owners and admins only. The zip holds one JSON document describing the organization — members, teams, statuses, labels, projects, templates, saved views, issues with their comments, relations, links, progress updates, attachment metadata and the event log — plus every attachment's bytes at files/<attachment id>/<name>, the path markdown links to. Secrets are not included, so nothing in the zip can act on any other instance. The zip streams, so a large organization starts downloading at once.
          */
         get: {
             parameters: {
@@ -6304,7 +6642,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The export zip: edict-export.json and attachments/<attachment id>/<name> */
+                /** @description The export zip: edict-export.json and files/<attachment id>/<name> */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6494,6 +6832,7 @@ export interface components {
             name: string;
             key: string;
             private: boolean;
+            archiveAfterDays: number | null;
             version: number;
             /** Format: date-time */
             createdAt: string;
@@ -6509,6 +6848,7 @@ export interface components {
             name?: string;
             key?: string;
             private?: boolean;
+            archiveAfterDays?: number | null;
         };
         AddTeamMember: {
             /** Format: uuid */
@@ -6650,6 +6990,10 @@ export interface components {
             parentId: string | null;
             /** Format: uuid */
             creatorId: string;
+            /** Format: date-time */
+            closedAt: string | null;
+            /** Format: date-time */
+            archivedAt: string | null;
             version: number;
             /** Format: date-time */
             createdAt: string;
@@ -6839,6 +7183,18 @@ export interface components {
         UpdateComment: {
             version: number;
             body: string;
+        };
+        TrashedTeam: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            key: string;
+            /** Format: date-time */
+            deletedAt: string;
+            /** Format: uuid */
+            deletedById: string;
+            /** Format: uuid */
+            changeId: string;
         };
         BulkDeleteIssues: {
             issueIds: string[];

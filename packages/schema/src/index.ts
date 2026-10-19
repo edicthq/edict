@@ -348,6 +348,9 @@ export const Team = z
     name: z.string(),
     key: TeamKey,
     private: z.boolean(),
+    // Closed issues archive this many days after closing; null keeps them
+    // until someone archives them by hand.
+    archiveAfterDays: z.number().int().nullable(),
     version: Version,
     createdAt: z.iso.datetime(),
   })
@@ -370,8 +373,22 @@ export const UpdateTeam = z
     name: z.string().trim().min(1).max(80).optional(),
     key: TeamKey.optional(),
     private: z.boolean().optional(),
+    archiveAfterDays: z.number().int().min(1).max(3650).nullable().optional(),
   })
   .meta({ id: "UpdateTeam" });
+
+// A team in the trash, with everything in it.
+export const TrashedTeam = z
+  .object({
+    id: Id,
+    name: z.string(),
+    key: TeamKey,
+    deletedAt: z.iso.datetime(),
+    deletedById: Id,
+    changeId: Id,
+  })
+  .meta({ id: "TrashedTeam" });
+export type TrashedTeam = z.infer<typeof TrashedTeam>;
 
 export const AddTeamMember = z.object({ memberId: Id }).meta({ id: "AddTeamMember" });
 
@@ -584,6 +601,11 @@ export const Issue = z
     // Set on a sub-issue. The parent can be in any team.
     parentId: Id.nullable(),
     creatorId: Id,
+    // When the issue last moved into Done or Canceled; null while open.
+    closedAt: z.iso.datetime().nullable(),
+    // Set while the issue is archived: out of active views, still found by
+    // its identifier and by search.
+    archivedAt: z.iso.datetime().nullable(),
     version: Version,
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),

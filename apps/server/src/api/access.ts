@@ -121,17 +121,19 @@ export async function activeMember(tx: Transaction, orgId: string, memberId: str
 // teams they belong to. Guests see only the teams they belong to. A connected
 // agent sees what its human sees, and an API key can narrow an agent to some
 // of its teams.
+// A team in the trash is seen by nobody, and neither is anything in it.
 export function teamVisibility(tx: Transaction, caller: Caller): SQL | undefined {
   const access = caller.access;
   const keyTeams = caller.keyTeamIds ? inArray(teams.id, caller.keyTeamIds) : undefined;
+  const live = isNull(teams.deletedAt);
   if (atLeast(access.role, "admin")) {
-    return keyTeams;
+    return and(live, keyTeams);
   }
   const own = inArray(
     teams.id,
     tx.select({ id: teamMembers.teamId }).from(teamMembers).where(eq(teamMembers.memberId, access.id)),
   );
-  return and(access.role === "guest" ? own : or(eq(teams.private, false), own), keyTeams);
+  return and(live, access.role === "guest" ? own : or(eq(teams.private, false), own), keyTeams);
 }
 
 export async function visibleTeam(tx: Transaction, caller: Caller, teamId: string): Promise<TeamRow> {
@@ -196,6 +198,7 @@ export function toTeam(row: TeamRow): Team {
     name: row.name,
     key: row.key,
     private: row.private,
+    archiveAfterDays: row.archiveAfterDays,
     version: row.version,
     createdAt: row.createdAt.toISOString(),
   };
@@ -203,6 +206,9 @@ export function toTeam(row: TeamRow): Team {
 
 // Whether a member can see a team, by the rules of teamVisibility.
 export async function canSeeTeam(tx: Transaction, member: MemberRow, team: TeamRow): Promise<boolean> {
+  if (team.deletedAt) {
+    return false;
+  }
   if (atLeast(member.role, "admin")) {
     return true;
   }

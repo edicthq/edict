@@ -29,9 +29,8 @@ export function issuesCollection(orgId: string, teamId: string): IssuesCollectio
         queryFn: () =>
           unwrap(api.GET("/organizations/{orgId}/teams/{teamId}/issues", { params: { path: { orgId, teamId } } })),
         getKey: (issue) => issue.id,
+        // Realtime patches the collection as events arrive (lib/realtime.ts).
         staleTime: 30_000,
-        // Agents' progress shows up without a reload until realtime arrives.
-        refetchInterval: 10_000,
       }),
     ),
   );

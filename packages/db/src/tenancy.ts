@@ -142,6 +142,14 @@ export const teams = pgTable(
     // The last issue number given out. Only goes up, so numbers are never
     // reused (ADR 0017).
     issueCounter: integer("issue_counter").notNull().default(0),
+    // Closed issues archive this many days after closing (ADR 0025). Null:
+    // they stay until archived by hand.
+    archiveAfterDays: integer("archive_after_days").default(30),
+    // The trash (ADR 0019): a trashed team and everything in it is hidden,
+    // and is purged 30 days after deletion.
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    deletedBy: uuid("deleted_by"),
+    deletedChangeId: uuid("deleted_change_id"),
     // ADR 0018.
     version: integer("version").notNull().default(1),
     createdAt: createdAt(),

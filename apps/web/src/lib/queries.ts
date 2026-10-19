@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Agent, AgentPower, Attachment, Comment, InboxItem, Issue, Label, paths, ProjectStatus, RelationType, Role, SavedView, SavedViewQuery, SignUpMode, Webhook, WebLink } from "@edicthq/client";
 import { ApiFailure, api, unwrap } from "./api.js";
 
@@ -522,6 +522,77 @@ export function useDeleteIssue(orgId: string) {
     onSuccess: (_, issue) => {
       client.setQueryData<Issue[]>(keys.issues(orgId, issue.teamId), (list) => list?.filter((item) => item.id !== issue.id));
       void client.invalidateQueries({ queryKey: ["org", orgId] });
+    },
+  });
+}
+
+export function useTrashedTeams(orgId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["org", orgId, "trash", "teams"] as const,
+    queryFn: () => unwrap(api.GET("/organizations/{orgId}/trash/teams", org(orgId))),
+    enabled,
+  });
+}
+
+// A team goes to the trash with everything in it, so every list refetches.
+export function useDeleteTeam(orgId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (teamId: string) =>
+      unwrap(api.DELETE("/organizations/{orgId}/teams/{teamId}", { params: { path: { orgId, teamId } } })),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["org", orgId] }),
+  });
+}
+
+export function useRestoreTeam(orgId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (teamId: string) =>
+      unwrap(api.POST("/organizations/{orgId}/teams/{teamId}/restore", { params: { path: { orgId, teamId } } })),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["org", orgId] }),
+  });
+}
+
+export function useUpdateTeam(orgId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ teamId, ...body }: { teamId: string; version: number; archiveAfterDays?: number | null; name?: string }) =>
+      unwrap(api.PATCH("/organizations/{orgId}/teams/{teamId}", { params: { path: { orgId, teamId } }, body })),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.teams(orgId) }),
+  });
+}
+
+// ---------- archive (ADR 0025) ----------
+
+// A team's archived issues, a page at a time, newest number first. Only
+// fetched when someone asks to see them.
+export function useArchivedIssues(orgId: string, teamId: string, enabled: boolean) {
+  return useInfiniteQuery({
+    queryKey: [...keys.issues(orgId, teamId), "archived"] as const,
+    initialPageParam: undefined as number | undefined,
+    queryFn: ({ pageParam }) =>
+      unwrap(
+        api.GET("/organizations/{orgId}/teams/{teamId}/issues", {
+          params: { path: { orgId, teamId }, query: { archived: "true", limit: 50, before: pageParam } },
+        }),
+      ),
+    getNextPageParam: (page) => (page.length === 50 ? page[page.length - 1]!.number : undefined),
+    enabled,
+  });
+}
+
+export function useArchiveIssue(orgId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ issue, archive }: { issue: Issue; archive: boolean }) =>
+      unwrap(
+        api.POST(archive ? "/organizations/{orgId}/issues/{issueRef}/archive" : "/organizations/{orgId}/issues/{issueRef}/unarchive", {
+          params: { path: { orgId, issueRef: issue.id } },
+        }),
+      ),
+    onSuccess: (issue) => {
+      client.setQueryData(keys.issue(orgId, issue.id), issue);
+      void client.invalidateQueries({ queryKey: keys.issues(orgId, issue.teamId) });
     },
   });
 }

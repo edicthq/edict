@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { and, count, desc, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import { emit, events, issueLabels, issueNumbers, issues, statuses, type Transaction } from "@edicthq/db";
 import { BulkUpdateIssues, BulkUpdateResult, CreateIssue, Id, Issue, IssueConflict, IssueRef, LinkedIssue, UpdateIssue } from "@edicthq/schema";
 import type { teams } from "@edicthq/db";
@@ -15,6 +15,8 @@ import {
   checkParent,
   checkProject,
   checkStatus,
+  closedCategories,
+  closingFields,
   labelSet,
   linkedIssues,
   loadIssue,
@@ -46,7 +48,16 @@ const listIssues = createRoute({
   path: "/organizations/{orgId}/teams/{teamId}/issues",
   tags: ["Issues"],
   summary: "A team's issues, newest first",
-  request: { params: TeamParams },
+  description:
+    "Without `archived`, every issue that is not archived: open ones and recently closed ones. With `archived=true`, archived issues a page at a time: pass the lowest number you got as `before` for the next page.",
+  request: {
+    params: TeamParams,
+    query: z.object({
+      archived: z.enum(["true", "false"]).optional(),
+      before: z.coerce.number().int().min(1).optional(),
+      limit: z.coerce.number().int().min(1).max(200).default(50),
+    }),
+  },
   responses: {
     200: json(z.array(Issue), "Issues by number, highest first"),
     ...errors("unauthorized", "not_found"),
@@ -108,6 +119,46 @@ const listSubIssues = createRoute({
     ...errors("unauthorized", "not_found"),
   },
 });
+
+const archiveIssue = createRoute({
+  method: "post",
+  path: "/organizations/{orgId}/issues/{issueRef}/archive",
+  tags: ["Issues"],
+  summary: "Archive a closed issue",
+  description: "It leaves the team's list and stays findable by identifier and by search. Reopening it unarchives it.",
+  request: { params: IssueParams },
+  responses: { 200: json(Issue, "The issue"), ...errors("invalid_request", "unauthorized", "not_found", "gone") },
+});
+
+const unarchiveIssue = createRoute({
+  method: "post",
+  path: "/organizations/{orgId}/issues/{issueRef}/unarchive",
+  tags: ["Issues"],
+  summary: "Bring an archived issue back to the team's list",
+  request: { params: IssueParams },
+  responses: { 200: json(Issue, "The issue"), ...errors("unauthorized", "not_found", "gone") },
+});
+
+// Archives or unarchives one issue, with its event.
+export async function setArchived(
+  tx: Transaction,
+  caller: Pick<Caller, "id" | "orgId">,
+  row: typeof issues.$inferSelect,
+  teamKey: string,
+  archive: boolean,
+  extra: Record<string, unknown> = {},
+): Promise<void> {
+  await tx
+    .update(issues)
+    .set({ archivedAt: archive ? new Date() : null })
+    .where(eq(issues.id, row.id));
+  await emit(tx, row.orgId, {
+    type: archive ? "issue.archived" : "issue.unarchived",
+    actorId: caller.id,
+    subjectId: row.id,
+    data: { identifier: `${teamKey}-${row.number}`, ...extra },
+  });
+}
 
 // An agent creates at most `perHour` issues in any hour, counted from the
 // event log so every replica agrees.
@@ -180,6 +231,7 @@ export async function applyIssueUpdate(
     changes.identifier = { from: current.identifier, to: `${target.key}-${number}` };
   }
 
+  const closing = await closingFields(tx, row, next.statusId, caller.id);
   const nextVersion = row.version + 1;
   const fieldVersions = { ...row.fieldVersions };
   for (const field of Object.keys(changes)) {
@@ -199,6 +251,7 @@ export async function applyIssueUpdate(
       parentId: next.parentId,
       teamId: target.id,
       number,
+      ...closing,
       version: nextVersion,
       fieldVersions,
       updatedAt: new Date(),
@@ -217,6 +270,15 @@ export async function applyIssueUpdate(
     subjectId: row.id,
     data: { version: nextVersion, changes },
   });
+  if (closing.archivedAt === null) {
+    // Reopening takes it out of the archive, as its own event so undo puts it back.
+    await emit(tx, orgId, {
+      type: "issue.unarchived",
+      actorId: caller.id,
+      subjectId: row.id,
+      data: { identifier: `${target.key}-${number}`, reopened: true },
+    });
+  }
   return toIssue(updated!, target.key, next.labelIds, current.latestProgress);
 
   // A moving issue keeps its organization labels and drops its old team's.
@@ -259,9 +321,11 @@ export function issueRoutes(deps: ApiDeps) {
       await checkLabels(tx, team, labelIds);
 
       const { number, key } = await nextNumber(tx, teamId);
+      const [status] = await tx.select({ category: statuses.category }).from(statuses).where(eq(statuses.id, statusId));
+      const closed = closedCategories.includes(status!.category) ? { closedAt: new Date(), closedBy: caller.id } : {};
       const [row] = await tx
         .insert(issues)
-        .values({ ...input, orgId, teamId, statusId, number, creatorId: caller.id })
+        .values({ ...input, orgId, teamId, statusId, number, creatorId: caller.id, ...closed })
         .returning();
       await tx.insert(issueNumbers).values({ orgId, teamId, number, issueId: row!.id });
       if (labelIds.length) {
@@ -286,17 +350,52 @@ export function issueRoutes(deps: ApiDeps) {
 
   app.openapi(listIssues, async (c) => {
     const { orgId, teamId } = c.req.valid("param");
+    const { archived, before, limit } = c.req.valid("query");
     const list = await inOrg(deps, c, orgId, async (tx, caller) => {
       const team = await visibleTeam(tx, caller, teamId);
-      const rows = await tx
-        .select()
-        .from(issues)
-        .where(and(eq(issues.teamId, teamId), isNull(issues.deletedAt)))
-        .orderBy(desc(issues.number));
+      const live = and(eq(issues.teamId, teamId), isNull(issues.deletedAt));
+      const rows =
+        archived === "true"
+          ? await tx
+              .select()
+              .from(issues)
+              .where(and(live, isNotNull(issues.archivedAt), before ? lt(issues.number, before) : undefined))
+              .orderBy(desc(issues.number))
+              .limit(limit)
+          : await tx
+              .select()
+              .from(issues)
+              .where(and(live, isNull(issues.archivedAt)))
+              .orderBy(desc(issues.number));
       return toIssues(tx, rows, () => team.key);
     });
     return c.json(list, 200);
   });
+
+  // Archive and unarchive (ADR 0025). Only a closed issue is archived.
+  for (const [route, archive] of [
+    [archiveIssue, true],
+    [unarchiveIssue, false],
+  ] as const) {
+    app.openapi(route, async (c) => {
+      const { orgId, issueRef } = c.req.valid("param");
+      const issue = await inOrg(deps, c, orgId, async (tx, caller) => {
+        const { issue: row, team } = await visibleIssue(tx, caller, issueRef, { forUpdate: true });
+        if (archive && !row.archivedAt) {
+          const [status] = await tx.select({ category: statuses.category }).from(statuses).where(eq(statuses.id, row.statusId));
+          if (!closedCategories.includes(status!.category)) {
+            throw invalid("Only a closed issue (Done or Canceled) can be archived.");
+          }
+        }
+        if (Boolean(row.archivedAt) !== archive) {
+          await setArchived(tx, caller, row, team.key, archive);
+        }
+        const [after] = await tx.select().from(issues).where(eq(issues.id, row.id));
+        return loadIssue(tx, after!, team);
+      });
+      return c.json(issue, 200);
+    });
+  }
 
   app.openapi(getIssue, async (c) => {
     const { orgId, issueRef } = c.req.valid("param");

@@ -447,11 +447,18 @@ export function projectRoutes(deps: ApiDeps) {
           .returning();
 
         const updatedProject = toProject(updated!, current.progress);
+        // Each field's old and new value, as the API shows them, for history and undo.
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
+        for (const field of ["name", "slug", "description", "status", "leadId", "startDate", "targetDate"] as const) {
+          if (JSON.stringify(current[field]) !== JSON.stringify(updatedProject[field])) {
+            changes[field] = { from: current[field], to: updatedProject[field] };
+          }
+        }
         await emit(tx, orgId, {
           type: "project.updated",
           actorId: caller.id,
           subjectId: row.id,
-          data: { version: nextVersion },
+          data: { version: nextVersion, changes },
         });
         return updatedProject;
       } catch (error) {
