@@ -1047,7 +1047,7 @@ function Composer({
       />
       <div className="flex justify-end pt-1.5">
         <Button type="submit" variant="primary" disabled={!value.trim() || pending} className="text-sm">
-          Comment <Kbd>{mod + "↵"}</Kbd>
+          Comment <Kbd>{`${mod}↵`}</Kbd>
         </Button>
       </div>
     </form>

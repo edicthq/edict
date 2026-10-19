@@ -155,7 +155,7 @@ export async function attempt(db: Database, job: DeliveryJob, last: boolean, all
     return row;
   });
   // Gone with its webhook, or already sent.
-  if (!found || found.delivery.status !== "pending") return;
+  if (found?.delivery.status !== "pending") return;
   const { delivery, webhook } = found;
   if (webhook.disabledAt) {
     await inScope(db, { orgId: job.orgId }, (tx) =>

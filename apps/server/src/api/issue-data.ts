@@ -189,7 +189,7 @@ export async function checkStatus(tx: Transaction, team: TeamRow, statusId: stri
 // The assignee answers for the issue, so it is a human who can see its team.
 export async function checkAssignee(tx: Transaction, team: TeamRow, assigneeId: string): Promise<void> {
   const assignee = await activeMember(tx, team.orgId, assigneeId).catch(() => undefined);
-  if (!assignee || assignee.kind !== "human" || !(await canSeeTeam(tx, assignee, team))) {
+  if (assignee?.kind !== "human" || !(await canSeeTeam(tx, assignee, team))) {
     throw invalid(`The assignee must be a human member who can see team ${team.key}.`);
   }
 }

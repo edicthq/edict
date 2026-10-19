@@ -115,7 +115,7 @@ function PaletteBody({ context, others, onClose }: { context: OrgContext; others
     }
     list.push({ id: "sign-out", group: "Account", label: "Sign out", run: () => void context.signOut() });
     return list;
-  }, [teams.data, context, others, navigate, onClose]);
+  }, [teams.data, projects.data, context, others, navigate, onClose]);
 
   const issueCommands = useMemo<Command[]>(() => {
     return (searchResults.data ?? []).map((issue) => ({
@@ -184,6 +184,7 @@ function PaletteBody({ context, others, onClose }: { context: OrgContext; others
         />
         <Kbd>esc</Kbd>
       </div>
+      {/* biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: the ARIA combobox pattern; focus stays in the input, which points here with aria-activedescendant */}
       <ul id="palette-list" role="listbox" aria-label="Commands" className="max-h-[min(420px,60dvh)] overflow-y-auto p-2">
         {matches.length === 0 ? (
           <li className="px-3 py-6 text-center text-ui text-ink-2">Nothing matches “{query}”.</li>
@@ -194,6 +195,8 @@ function PaletteBody({ context, others, onClose }: { context: OrgContext; others
             return (
               <li key={command.id} role="presentation">
                 {header ? <p className="px-3 pt-2 pb-1 text-sm font-semibold text-ink-2">{command.group}</p> : null}
+                {/* biome-ignore lint/a11y/useKeyWithClickEvents: the input handles the keys (aria-activedescendant) */}
+                {/* biome-ignore lint/a11y/useFocusableInteractive: options are reached from the input, not focused */}
                 <div
                   id={`cmd-${command.id}`}
                   role="option"

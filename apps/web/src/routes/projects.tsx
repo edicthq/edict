@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import type { Issue, Project, ProjectStatus } from "@edicthq/client";
-import { Avatar, Button, Kbd, ProgressBar, ProjectStatusBadge, StatusIcon, PriorityIcon, TeamKey, cn } from "@edicthq/ui";
-import { ArrowLeft, Calendar, CheckCircle2, ChevronRight, FolderKanban, Plus, Trash2, User } from "lucide-react";
+import type { ProjectStatus } from "@edicthq/client";
+import { Avatar, Button, ProgressBar, ProjectStatusBadge, PriorityIcon, TeamKey, cn } from "@edicthq/ui";
+import { ArrowLeft, Calendar, Plus, Trash2, } from "lucide-react";
 import { CreateProjectDialog } from "../components/create-project-dialog.js";
 import { EmptyState, GroupHeader, Loading, PageBody, PageHeader, rowClass } from "../components/shell.js";
 import {
@@ -23,7 +23,7 @@ function formatDate(iso: string | null | undefined): string {
 }
 
 export function ProjectsPage() {
-  const { orgId, slug, canManage, membership } = useOrg();
+  const { orgId, slug, membership } = useOrg();
   const projects = useProjects(orgId);
   const members = useMembers(orgId);
   const [createOpen, setCreateOpen] = useState(false);
@@ -248,7 +248,6 @@ export function ProjectDetailPage() {
     navigate(`/${slug}/projects`);
   };
 
-  const lead = project.leadId ? memberMap.get(project.leadId) : null;
   const { total, completed, percentage, byCategory, estimate } = project.progress;
 
   return (

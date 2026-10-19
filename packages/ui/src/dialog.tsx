@@ -30,6 +30,7 @@ export function Dialog({
   }, [open]);
 
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: a backdrop click; Escape already closes a modal dialog
     <dialog
       ref={ref}
       aria-labelledby={labelledBy}

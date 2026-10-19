@@ -9,8 +9,10 @@ import { PostgreSqlContainer } from "@testcontainers/postgresql";
 // A fresh Edict instance per worker, which means per browser: Postgres plus the
 // built server (apps/server/dist) serving the built web app (apps/web/dist),
 // the way the Docker image runs. `pnpm e2e` builds both first.
+// biome-ignore lint/complexity/noBannedTypes: Playwright types "no test fixtures" as {}
 export const test = base.extend<{}, { instanceUrl: string }>({
   instanceUrl: [
+    // biome-ignore lint/correctness/noEmptyPattern: Playwright reads a fixture's dependencies from this pattern
     async ({}, use) => {
       const postgres = await new PostgreSqlContainer("postgres:18-alpine").start();
       // Any free port: a fixed one collides with whatever dev server is up.

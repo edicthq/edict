@@ -8,7 +8,7 @@
   "scripts": {
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
-    "lint": "turbo run lint",
+    "lint": "biome lint --error-on-warnings .",
     "test": "turbo run test",
     "dev": "turbo run dev --parallel",
     "db:generate": "pnpm --filter @edicthq/db generate",
@@ -16,6 +16,7 @@
     "e2e": "turbo run e2e"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.15",
     "turbo": "^2.11.8"
   }
 }

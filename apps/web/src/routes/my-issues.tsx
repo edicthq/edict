@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import type { Issue } from "@edicthq/client";
-import { Avatar, Button, PriorityIcon, StatusIcon, TeamKey, cn } from "@edicthq/ui";
-import { CheckSquare, UserCheck, Bot } from "lucide-react";
-import { EmptyState, GroupHeader, Loading, PageBody, PageHeader, rowClass } from "../components/shell.js";
+import { Avatar, PriorityIcon, TeamKey, cn } from "@edicthq/ui";
+import { Bot } from "lucide-react";
+import { EmptyState, Loading, PageBody, PageHeader, rowClass } from "../components/shell.js";
 import { useMembers, useMyWork, useTeams } from "../lib/queries.js";
 import { ago } from "../lib/issues.js";
 import { useOrg } from "./org.js";

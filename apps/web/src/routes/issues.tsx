@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-r
 import type { Agent, Issue, Label, Member, Priority, SavedViewQuery, Status, Team } from "@edicthq/client";
 import { Avatar, Button, Kbd, LabelPill, Menu, PriorityIcon, ProgressBadge, StatusIcon, TeamKey, cn } from "@edicthq/ui";
 import type { MenuItem } from "@edicthq/ui";
-import { ArrowDown, ArrowUp, Bookmark, CheckSquare, ListFilter, Search, Square, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Bookmark, ListFilter, Search, Trash2, X } from "lucide-react";
 import { CreateIssueDialog } from "../components/create-issue-dialog.js";
 import { AssigneePicker, DelegatePicker, NoAssignee, PriorityPicker, StatusPicker } from "../components/issue-fields.js";
 import { IssuePeek, type PeekMenu } from "../components/issue-peek.js";
@@ -53,19 +53,6 @@ import { isTyping } from "../lib/appearance.js";
 import { useOrg } from "./org.js";
 
 type View = "list" | "board";
-
-// Keys that act on the page only when no field, menu or dialog has focus.
-function typing(event: KeyboardEvent): boolean {
-  const target = event.target as HTMLElement;
-  return (
-    event.metaKey ||
-    event.ctrlKey ||
-    event.altKey ||
-    target.isContentEditable ||
-    ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) ||
-    document.querySelector("dialog[open]") !== null
-  );
-}
 
 export function TeamIssuesPage() {
   const { teamId = "" } = useParams();
@@ -290,6 +277,8 @@ function TeamIssues({ team }: { team: Team }) {
     setParam("issue", null);
   };
 
+  // Runs when the lookup settles, not on every render's new callbacks.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: see above
   useEffect(() => {
     if (!peekRef || !lookup.data && !lookup.error) return;
     if (lookup.data) {
@@ -300,8 +289,6 @@ function TeamIssues({ team }: { team: Team }) {
       toast(`There's no issue ${peekRef.toUpperCase()} you can see.`);
       setParam("issue", null, true);
     }
-    // Runs when the lookup settles.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lookup.data, lookup.error]);
 
   // The listener stays registered once and always runs this render's handler,
@@ -1023,7 +1010,6 @@ function IssueList({
                     }}
                     onFocus={() => onFocus(issue.id)}
                     aria-current={openId === issue.id ? "true" : undefined}
-                    aria-selected={isSelected || undefined}
                     data-focused={focusId === issue.id || undefined}
                     data-selected={isSelected || undefined}
                     className={cn(
@@ -1163,7 +1149,6 @@ function IssueBoard({
                     }
                   }}
                   onFocus={() => onFocus(issue.id)}
-                  aria-selected={isSelected || undefined}
                   data-focused={focusId === issue.id || undefined}
                   data-selected={isSelected || undefined}
                   className={cn(

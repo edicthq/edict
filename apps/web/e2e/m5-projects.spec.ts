@@ -57,7 +57,7 @@ test("Milestone 5: Projects cross-team tracking, progress metrics, and My Issues
   const projectId = projectsRes[0].id as string;
 
   // 4. Create cross-team issues linked to project via API
-  const engIssue = await (
+  await (
     await page.request.post(`/api/v1/organizations/${orgId}/teams/${engTeam.id}/issues`, {
       headers,
       data: {
@@ -68,7 +68,7 @@ test("Milestone 5: Projects cross-team tracking, progress metrics, and My Issues
     })
   ).json();
 
-  const desIssue = await (
+  await (
     await page.request.post(`/api/v1/organizations/${orgId}/teams/${desTeam.id}/issues`, {
       headers,
       data: {

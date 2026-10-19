@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { cn } from "./cn.js";
 
 type Category = "backlog" | "todo" | "in_progress" | "done" | "canceled";
@@ -27,7 +28,7 @@ export function StatusIcon({
       strokeDasharray={dashed ? "1.75 1.75" : undefined}
     />
   );
-  let inner;
+  let inner: ReactNode;
   if (category === "backlog") inner = ring(true);
   else if (category === "todo") inner = ring(false);
   else if (category === "in_progress") {
@@ -82,7 +83,7 @@ export function StatusIcon({
 // Signal bars for high, medium and low; a filled square with "!" for urgent;
 // three faint dashes for none.
 export function PriorityIcon({ priority, className }: { priority: Priority; className?: string }) {
-  let inner;
+  let inner: ReactNode;
   if (priority === "urgent") {
     inner = (
       <>

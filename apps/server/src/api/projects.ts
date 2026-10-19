@@ -3,11 +3,10 @@ import { and, desc, eq, inArray, isNull, ne, sql, type SQL } from "drizzle-orm";
 import { emit, issues, projects, statuses, teams, type Transaction } from "@edicthq/db";
 import {
   CreateProject,
-  Id,
   Issue,
   Project,
   ProjectConflict,
-  ProjectProgress,
+  type ProjectProgress,
   ProjectRef,
   UpdateProject,
 } from "@edicthq/schema";

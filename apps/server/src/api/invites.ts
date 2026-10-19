@@ -17,7 +17,7 @@ import { CreateInvite, CreatedInvite, Id, Invite, InvitePreview, Membership } fr
 import { inviteEmail } from "../email.js";
 import { loadMember, requireRole, requireVisibleTeams, requireWithinCaller } from "./access.js";
 import { OrgParams, body, errors, inOrg, json, noContent, router, signedIn, type ApiDeps } from "./context.js";
-import { conflict, forbidden, gone, invalid, notFound } from "./errors.js";
+import { conflict, forbidden, gone, notFound } from "./errors.js";
 import { toOrganization } from "./organizations.js";
 
 const INVITE_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;

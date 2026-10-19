@@ -246,6 +246,7 @@
 /* Set for one frame while the theme or accent switches, so colors swap at once. */
 .no-transition,
 .no-transition * {
+  /* biome-ignore lint/complexity/noImportantStyles: reduced motion must win over every transition */
   transition: none !important;
 }
 

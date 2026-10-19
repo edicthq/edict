@@ -1,6 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { and, asc, eq, isNull } from "drizzle-orm";
-import { comments, emit, members, user } from "@edicthq/db";
+import { comments, emit, } from "@edicthq/db";
 import { Comment, CommentConflict, CreateComment, Id, IssueRef, UpdateComment } from "@edicthq/schema";
 import type { Caller } from "./callers.js";
 import { body, errors, inOrg, json, OrgParams, router, type ApiDeps } from "./context.js";

@@ -9,7 +9,6 @@ import {
   oauthConsent,
   oauthRefreshToken,
   teamMembers,
-  teams,
   webhooks,
   type Transaction,
 } from "@edicthq/db";

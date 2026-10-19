@@ -72,6 +72,8 @@ export function Menu<T extends string>({
     : matches;
   const isSelected = (item: MenuItem<T>) => (multiple ? (values ?? []).includes(item.value) : item.value === value);
 
+  // Resets only when it opens.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: see above
   useEffect(() => {
     if (!open) return;
     setQuery("");
@@ -81,8 +83,6 @@ export function Menu<T extends string>({
     };
     document.addEventListener("pointerdown", onPointer);
     return () => document.removeEventListener("pointerdown", onPointer);
-    // Reset only when it opens.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const close = () => {
@@ -152,18 +152,20 @@ export function Menu<T extends string>({
             }}
             className="mb-1 h-8 rounded-sm bg-transparent px-2 text-ui text-ink placeholder:text-ink-2 focus-visible:outline-none"
           />
-          <ul
+          {/* biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: the ARIA combobox pattern; focus stays in the input, which points here with aria-activedescendant */}
+          <ul role="listbox"
             id={`${id}-list`}
-            role="listbox"
             aria-label={label}
             aria-multiselectable={multiple || undefined}
             className="flex max-h-72 flex-col overflow-y-auto"
           >
             {shown.map((item, index) => (
-              <li
+              // biome-ignore lint/a11y/useKeyWithClickEvents: the input handles the keys (aria-activedescendant)
+              // biome-ignore lint/a11y/useFocusableInteractive: options are reached from the input, not focused
+              // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: options of the listbox above
+              <li role="option"
                 key={item.value}
                 id={`${id}-${item.value}`}
-                role="option"
                 aria-selected={isSelected(item)}
                 onPointerMove={() => setActive(index)}
                 onClick={() => pick(item)}
