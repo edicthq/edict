@@ -137,8 +137,11 @@ Tools are shaped around tasks, not endpoints. They accept human values ("In Prog
 | `get_project` | Project with its issues and progress |
 | `link` | Attach a pull request or URL |
 | `relate_issues` | Add a blocks, related or duplicate relation |
+| `get_inbox` | The caller's unread inbox: assignments, delegations, mentions, comments and progress on their issues |
 
-Resources: `edict://issue/ENG-123`, `edict://project/<slug>`. Prompts: "triage my inbox", "plan this project into issues".
+`get_inbox` joined the original twelve in M5, so an agent can answer what its inbox asks of it; it is the thirteenth tool.
+
+Resources: `edict://issue/ENG-123`, `edict://project/<slug>`. Prompts: "do my Edict work" (`work_my_queue`), "triage my inbox" (`triage_inbox`), "plan this project into issues" (`plan_project`), and "plan a goal into a team's issues" (`plan_issues`).
 
 ### Webhooks
 
