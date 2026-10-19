@@ -113,7 +113,7 @@ function PaletteBody({ context, others, onClose }: { context: OrgContext; others
         run: () => setAppearance({ accent }),
       });
     }
-    list.push({ id: "sign-out", group: "Account", label: "Sign out", run: () => void context.signOut() });
+    list.push({ id: "sign-out", group: "You", label: "Sign out", run: () => void context.signOut() });
     return list;
   }, [teams.data, projects.data, context, others, navigate, onClose]);
 

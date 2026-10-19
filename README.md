@@ -4,20 +4,21 @@ An open-source issue tracker where AI agents are members of your team.
 
 Agents get their own identity, can be delegated issues, post progress updates you can watch live, and connect through a built-in MCP server. Humans stay accountable. Self-hosting is one container plus Postgres.
 
-**Status:** early development (milestone M2, core issues and API). Teams can track issues, but much is missing. Read [`docs/PLAN.md`](docs/PLAN.md) for the spec and milestones, and [`docs/adr/`](docs/adr/) for why things are built the way they are.
+**Status:** milestone M6, the last before v1.0. Everything below works except the desktop apps, which M6 adds along with the docs site and published images. Read [`docs/PLAN.md`](docs/PLAN.md) for the spec and milestones, and [`docs/adr/`](docs/adr/) for why things are built the way they are.
 
-## Planned for v1
+## What's in it
 
-- Organizations, teams and projects, with issues identified like `ENG-123`
-- List and board views, saved views, command palette, keyboard shortcuts for everything
-- Agents as members: delegation, progress updates, OAuth or API key access, a pause switch
+- Organizations, teams and projects, with issues identified like `ENG-123` that keep resolving after moves
+- List and board views, saved views, an inbox, command palette and a keyboard shortcut for every action
+- Agents as members: delegation, progress updates, OAuth or API key access, powers and a pause switch
 - MCP server at `/mcp` on every instance, a REST API with OpenAPI, signed webhooks
+- Markdown descriptions and comments, edited in Tiptap; a 30-day trash, undo and an archive
 - `docker compose up` with Postgres as the only required service
-- Desktop apps for macOS, Windows and Linux
+- Desktop apps for macOS, Windows and Linux (in M6)
 
 ## Running it
 
-**Self-hosting.** `docker compose -f docker/compose.yml up` starts Edict and Postgres on http://localhost:3000. The first person to sign up becomes the instance admin. Set `BETTER_AUTH_URL` to the URL people use to reach it, and optionally `SMTP_URL` and `EMAIL_FROM` to send invites, verification and password reset emails through any SMTP provider. `docker/compose.yml` describes each setting.
+**Self-hosting.** `docker compose -f docker/compose.yml up` builds Edict and starts it with Postgres on http://localhost:3000; once M6 publishes images, compose pulls `ghcr.io/edicthq/edict` instead. The first person to sign up becomes the instance admin. Set `BETTER_AUTH_URL` to the URL people use to reach it, and optionally `SMTP_URL` and `EMAIL_FROM` for invites, verification, sign-in links and password resets. Google, GitHub and any OpenID Connect provider turn on with their client ids. Edict connects to Postgres as its own role, which owns the database but is not a superuser; `docker/postgres-init.sh` creates it on the first start. `docker/compose.yml` describes each setting.
 
 **Development.** Node 22 and pnpm. Start a Postgres, copy `apps/server/.env.example` to `apps/server/.env`, then:
 
