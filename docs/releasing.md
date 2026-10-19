@@ -1,10 +1,11 @@
 # Releasing
 
-A release is a `v*` tag on a commit of `main`. Pushing the tag runs [`.github/workflows/release.yml`](../.github/workflows/release.yml), which publishes three things, in this order:
+A release is a `v*` tag on a commit of `main`. Pushing the tag runs [`.github/workflows/release.yml`](../.github/workflows/release.yml), which publishes four things, in this order:
 
 1. The image `ghcr.io/edicthq/edict` for amd64 and arm64, each built on its own runner and booted against Postgres before anything is tagged.
 2. `@edicthq/client` on npm, with provenance.
-3. A GitHub Release with the notes from [`CHANGELOG.md`](../CHANGELOG.md), plus `compose.yml` and `postgres-init.sh` for new installs.
+3. The desktop app for macOS (one universal `.dmg`), Windows (`-setup.exe` and `.msi`) and Linux (`.AppImage`, `.deb`, `.rpm`), unsigned for the operating systems but signed for its own updater, once the updater's key is set up (below).
+4. A GitHub Release with the notes from [`CHANGELOG.md`](../CHANGELOG.md), plus `compose.yml` and `postgres-init.sh` for new installs, the desktop installers, and `latest.json` for the desktop app's updater.
 
 The GitHub Release comes last because the update check and the desktop updater read GitHub releases: a release they can see always has its image and client out.
 
@@ -53,3 +54,7 @@ These are one-time settings outside the repository:
   4. Delete the `NPM_TOKEN` secret and revoke the token. npm ends direct publishing with tokens in January 2027 anyway.
 - **GHCR.** The first push creates the `edict` package in the `edicthq` organization as private. Make it public in the package's settings, or nobody can pull it.
 - **Runners.** The arm64 image builds on `ubuntu-24.04-arm`, which is free for public repositories.
+- **The desktop app's updater key.** The desktop jobs stay off, and a release ships without installers, until this exists. The Tauri updater checks every update against a public key built into the app, so the private key must never leak and never be lost: an app signed with a lost key can never update again.
+  1. On your own machine, run `pnpm --filter @edicthq/desktop tauri signer generate -w ~/.tauri/edict-updater.key` and give it a password. Keep the key file and the password in your password manager.
+  2. In the repository's settings, create an environment named `desktop`, limited to the tag rule `v*` like `npm`. Add the contents of `~/.tauri/edict-updater.key` as its `TAURI_SIGNING_PRIVATE_KEY` secret and the password as `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
+  3. Add the contents of `~/.tauri/edict-updater.key.pub` as the repository variable `TAURI_UPDATER_PUBKEY`. The next release builds the apps, puts the key in them and publishes `latest.json`, which installed apps read to update.

@@ -85,3 +85,18 @@ jobs:
           cache-to: type=gha,mode=max
       - name: Boot it against Postgres
         run: docker/boot-check.sh edict:ci
+
+  # The desktop shell compiles and its tests pass. The release builds the
+  # installers for every platform.
+  desktop:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Linux libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev
+      - name: Test
+        working-directory: apps/desktop/src-tauri
+        run: cargo test --locked
