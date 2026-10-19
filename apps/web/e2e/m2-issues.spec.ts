@@ -112,7 +112,8 @@ test("create an issue, change its status in the peek, see it on the board, and f
   await expect(page.getByRole("region", { name: "In Progress" }).getByRole("button", { name: /ENG-1/ })).toBeVisible();
 
   // Escape leaves the field, which saves it; a second Escape closes the peek.
-  await peek.getByLabel("Description").fill("Agents hold identifiers in **context**.");
+  await peek.getByLabel("Description").click();
+  await page.keyboard.type("Agents hold identifiers in **context**.");
   await peek.getByLabel("Description").press("Escape");
   await expect
     .poll(async () => (await (await page.request.get(`/api/v1/organizations/${orgId}/issues/ENG-1`)).json()).description)
@@ -163,12 +164,13 @@ test("comment on an issue and attach a file in the peek", async ({ page, baseURL
   const discussion = peek.locator('section[aria-labelledby="peek-discussion"]');
   await expect(discussion.getByText("created the issue")).toBeVisible();
   const composer = discussion.getByLabel("Add a comment");
-  await composer.fill("Agreed — shipping the **first** pass");
+  await composer.click();
+  await page.keyboard.type("Agreed — shipping the **first** pass");
   await composer.press("ControlOrMeta+Enter");
   await expect(discussion.getByText("whole pass")).toBeHidden();
   await expect(discussion.getByText("first pass")).toBeVisible();
   await expect(discussion.locator("article strong")).toHaveText("first");
-  await expect(composer).toHaveValue("");
+  await expect(composer).toHaveText("");
 
   // Hover shows Edit; only the creator sees it (this user created it).
   await discussion.locator("article").first().hover();

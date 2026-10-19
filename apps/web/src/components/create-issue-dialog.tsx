@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MarkdownEditor } from "./markdown-editor.js";
 import type { Label, Member, Priority, Status, Team } from "@edicthq/client";
 import { Button, Dialog, Kbd, TeamKey } from "@edicthq/ui";
 import { mod } from "../lib/labels.js";
@@ -154,16 +155,13 @@ function CreateIssueForm({
           maxLength={255}
           className="bg-transparent text-xl font-semibold tracking-[-0.015em] text-ink placeholder:text-ink-3 focus-visible:outline-none"
         />
-        <label className="sr-only" htmlFor="new-issue-description">
-          Description
-        </label>
-        <textarea
+        <MarkdownEditor
           id="new-issue-description"
+          label="Description"
           value={description}
-          onChange={(event) => setDescription(event.target.value)}
-          placeholder="Add a description… Markdown works."
-          rows={5}
-          className="field-sizing-content min-h-24 resize-none bg-transparent text-body text-ink placeholder:text-ink-3 focus-visible:outline-none"
+          onChange={setDescription}
+          placeholder="Add a description…"
+          className="min-h-24"
         />
       </div>
       <div className="flex flex-wrap items-center gap-1.5 px-5 pt-2 pb-4">

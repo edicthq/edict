@@ -29,6 +29,7 @@ import {
 import { AgentLane } from "./agent-lane.js";
 import { AssigneePicker, DelegatePicker, EstimatePicker, LabelPicker, NoAssignee, PriorityPicker, ProjectPicker, StatusPicker } from "./issue-fields.js";
 import { Markdown } from "./markdown.js";
+import { blurActive, MarkdownEditor } from "./markdown-editor.js";
 import { useToast } from "./toast.js";
 import { useOfferUndo } from "./undo.js";
 
@@ -326,37 +327,20 @@ function TitleField({ issue, onSave }: { issue: Issue; onSave: (title: string) =
   );
 }
 
-// Markdown, edited as text until the Tiptap editor arrives.
+// Saved when the field is left; Escape leaves it too.
 function DescriptionField({ issue, onSave }: { issue: Issue; onSave: (description: string) => void }) {
-  const [draft, setDraft] = useState(issue.description);
-  const focused = useRef(false);
-  useEffect(() => {
-    if (!focused.current) setDraft(issue.description);
-  }, [issue.description]);
   return (
-    <>
-      <label htmlFor="peek-description" className="sr-only">
-        Description
-      </label>
-      <textarea
-        id="peek-description"
-        value={draft}
-        placeholder="Add a description… Markdown works."
-        onChange={(event) => setDraft(event.target.value)}
-        onFocus={() => (focused.current = true)}
-        onBlur={() => {
-          focused.current = false;
-          if (draft !== issue.description) onSave(draft);
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            event.stopPropagation();
-            event.currentTarget.blur();
-          }
-        }}
-        className="field-sizing-content min-h-24 w-full max-w-[68ch] resize-none bg-transparent text-body leading-[1.62] text-ink placeholder:text-ink-3 focus-visible:outline-none"
-      />
-    </>
+    <MarkdownEditor
+      id="peek-description"
+      label="Description"
+      value={issue.description}
+      placeholder="Add a description…"
+      onBlur={(description) => {
+        if (description !== issue.description) onSave(description);
+      }}
+      onEscape={blurActive}
+      className="min-h-24 max-w-[68ch] leading-[1.62]"
+    />
   );
 }
 
@@ -945,25 +929,18 @@ function CommentRow({
       >
         <div />
         <div className="rounded-md p-2.5 shadow-[inset_0_0_0_1px_var(--line-strong)] focus-within:shadow-[inset_0_0_0_1px_var(--ink)]">
-          <label htmlFor={editId} className="sr-only">
-            Edit your comment
-          </label>
-          <textarea
+          <MarkdownEditor
             id={editId}
+            label="Edit your comment"
             autoFocus
             value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-                event.preventDefault();
-                event.currentTarget.form?.requestSubmit();
-              } else if (event.key === "Escape") {
-                event.stopPropagation();
-                setDraft(comment.body);
-                setEditing(false);
-              }
+            onChange={setDraft}
+            onSubmit={() => (document.getElementById(editId)?.closest("form") as HTMLFormElement | null)?.requestSubmit()}
+            onEscape={() => {
+              setDraft(comment.body);
+              setEditing(false);
             }}
-            className="field-sizing-content min-h-10 max-h-64 w-full resize-none bg-transparent text-body leading-[1.55] focus-visible:outline-none"
+            className="min-h-10 max-h-64 overflow-y-auto"
           />
           <div className="flex justify-end gap-2 pt-1.5">
             <Button
@@ -1045,24 +1022,15 @@ function Composer({
         onSend();
       }}
     >
-      <label htmlFor="peek-comment" className="sr-only">
-        Add a comment
-      </label>
-      <textarea
+      <MarkdownEditor
         id="peek-comment"
+        label="Add a comment"
         value={value}
-        placeholder="Add a comment… Markdown works."
-        onChange={(event) => onChange(event.target.value)}
-        onKeyDown={(event) => {
-          if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-            event.preventDefault();
-            onSend();
-          } else if (event.key === "Escape") {
-            event.stopPropagation();
-            event.currentTarget.blur();
-          }
-        }}
-        className="field-sizing-content min-h-10 max-h-64 w-full resize-none bg-transparent text-body leading-[1.55] placeholder:text-ink-3 focus-visible:outline-none"
+        placeholder="Add a comment…"
+        onChange={onChange}
+        onSubmit={onSend}
+        onEscape={blurActive}
+        className="min-h-10 max-h-64 overflow-y-auto"
       />
       <div className="flex justify-end pt-1.5">
         <Button type="submit" variant="primary" disabled={!value.trim() || pending} className="text-sm">

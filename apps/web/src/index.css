@@ -2,3 +2,12 @@
 @import "@edicthq/ui/tokens.css";
 
 @source "../../../packages/ui/src";
+
+/* The editor's placeholder, in the place of its first, empty line. */
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--ink-2);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

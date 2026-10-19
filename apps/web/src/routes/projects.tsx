@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MarkdownEditor } from "../components/markdown-editor.js";
 import { Link, useNavigate, useParams } from "react-router";
 import type { ProjectStatus } from "@edicthq/client";
 import { Avatar, Button, ProgressBar, ProjectStatusBadge, PriorityIcon, TeamKey, cn } from "@edicthq/ui";
@@ -384,12 +385,18 @@ export function ProjectDetailPage() {
 
           {isEditingDesc ? (
             <div className="flex flex-col gap-2">
-              <textarea
-                value={descDraft}
-                onChange={(e) => setDescDraft(e.target.value)}
-                placeholder="What is this project aiming to accomplish?"
-                className="min-h-24 w-full rounded-md border border-line bg-surface p-3 text-ui text-ink outline-none focus:border-ink placeholder:text-ink-3"
-              />
+              <div className="rounded-md border border-line bg-surface p-3 focus-within:border-ink">
+                <MarkdownEditor
+                  label="Project description"
+                  autoFocus
+                  value={descDraft}
+                  onChange={setDescDraft}
+                  onSubmit={() => void handleSaveDescription()}
+                  onEscape={() => setIsEditingDesc(false)}
+                  placeholder="What is this project aiming to accomplish?"
+                  className="min-h-24 text-ui"
+                />
+              </div>
               <div className="flex justify-end gap-2">
                 <Button variant="ghost" onClick={() => setIsEditingDesc(false)}>
                   Cancel
