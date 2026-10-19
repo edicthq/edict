@@ -32,6 +32,20 @@ function workspacePackages() {
   );
 }
 
+// The desktop app's Rust crate carries the version too, in its manifest and
+// its lockfile. Tauri reads its own version from apps/desktop/package.json.
+const CRATE = "apps/desktop/src-tauri";
+const CRATE_VERSION = /^(\[package\]\nname = "edict-desktop"\nversion = ")[^"]*"/m;
+const LOCK_VERSION = /^(name = "edict-desktop"\nversion = ")[^"]*"/m;
+
+function crateVersions() {
+  const read = (file) => (existsSync(join(root, file)) ? readFileSync(join(root, file), "utf8") : null);
+  return [
+    [`${CRATE}/Cargo.toml`, read(`${CRATE}/Cargo.toml`), CRATE_VERSION],
+    [`${CRATE}/Cargo.lock`, read(`${CRATE}/Cargo.lock`), LOCK_VERSION],
+  ].filter(([, text]) => text !== null);
+}
+
 function setVersion(version) {
   if (!SEMVER.test(version)) throw new ReleaseError(`${version} is not a version like 1.4.2 or 1.5.0-rc.1`);
   const files = ["package.json", ...workspacePackages()];
@@ -44,6 +58,11 @@ function setVersion(version) {
     if (JSON.parse(next).version !== version) throw new ReleaseError(`Could not set the version in ${file}`);
     writeFileSync(join(root, file), next);
   }
+  for (const [file, text, pattern] of crateVersions()) {
+    if (!pattern.test(text)) throw new ReleaseError(`Could not find edict-desktop's version in ${file}`);
+    writeFileSync(join(root, file), text.replace(pattern, `$1${version}"`));
+    files.push(file);
+  }
   return `Set ${version} in ${files.join(", ")}`;
 }
 
@@ -51,6 +70,9 @@ function check() {
   const { version } = read("package.json");
   if (!version || !SEMVER.test(version)) throw new ReleaseError("package.json has no release version");
   const stale = workspacePackages().filter((file) => read(file).version !== version);
+  for (const [file, text, pattern] of crateVersions()) {
+    if (pattern.exec(text)?.[0].endsWith(`"${version}"`) !== true) stale.push(file);
+  }
   if (stale.length > 0) {
     throw new ReleaseError(`${stale.join(", ")} not at ${version}. Run: pnpm release version ${version}`);
   }

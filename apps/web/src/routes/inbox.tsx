@@ -10,7 +10,7 @@ import { useOrg } from "./org.js";
 
 // One line about what happened first, then the issue itself. The wording is
 // the sender's acting, so the sentence reads "Amirali assigned ENG-12".
-const typeLine: Record<InboxItem["type"], string> = {
+export const typeLine: Record<InboxItem["type"], string> = {
   assigned: "assigned",
   delegated: "delegated",
   comment_created: "commented on",
@@ -20,7 +20,7 @@ const typeLine: Record<InboxItem["type"], string> = {
   webhook_disabled: "",
 };
 
-const progressWords: Record<NonNullable<InboxItem["progressState"]>, string> = {
+export const progressWords: Record<NonNullable<InboxItem["progressState"]>, string> = {
   working: "is working on",
   blocked: "is blocked on",
   needs_input: "needs input on",

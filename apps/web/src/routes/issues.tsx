@@ -91,6 +91,20 @@ function TeamIssues({ team }: { team: Team }) {
   const issueView = useMemo(() => parseView(params), [params]);
   // The create dialog, and the issue it makes a sub-issue of.
   const [creating, setCreating] = useState<{ parent?: Issue } | null>(null);
+  // ?create=1 opens the new-issue dialog: the desktop app's quick-create
+  // hotkey lands here.
+  useEffect(() => {
+    if (params.get("create") !== "1") return;
+    setCreating({});
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("create");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [params, setParams]);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [menu, setMenu] = useState<PeekMenu>(null);
   const bulkUpdate = useBulkUpdateIssues(orgId);

@@ -6,6 +6,7 @@ import { Avatar, Button, Count, Kbd, LogoMark, ProgressBadge, TeamKey, cn } from
 import { CreateTeamDialog } from "../components/create-team-dialog.js";
 import { InviteDialog } from "../components/invite-dialog.js";
 import { CommandPalette } from "../components/palette.js";
+import { useDesktopBridge } from "../lib/desktop.js";
 import { cycleAccent, cycleTheme, isTyping, setOrganizationAccent } from "../lib/appearance.js";
 import { UndoProvider } from "../components/undo.js";
 import { VerifyBanner } from "../components/verify-banner.js";
@@ -32,6 +33,12 @@ export interface OrgContext {
 
 export function useOrg(): OrgContext {
   return useOutletContext<OrgContext>();
+}
+
+// The desktop app's hotkey, deep links and notifications (lib/desktop.ts).
+function DesktopBridge({ slug, orgId }: { slug: string; orgId: string }) {
+  useDesktopBridge(slug, orgId);
+  return null;
 }
 
 export function OrgLayout() {
@@ -101,6 +108,7 @@ export function OrgLayout() {
 
   return (
     <UndoProvider orgId={context.orgId}>
+    <DesktopBridge slug={context.slug} orgId={context.orgId} />
     <div className="flex min-h-dvh">
       <a
         href="#main"
