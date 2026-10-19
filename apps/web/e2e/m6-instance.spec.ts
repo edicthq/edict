@@ -41,7 +41,7 @@ test("Milestone 6: the instance admin sees the exact telemetry payload and turns
 
   await page.goto("/telemetry/instance");
   const section = page.getByRole("region", { name: "Telemetry" });
-  const payload = JSON.parse((await section.getByLabel("Telemetry payload").textContent()) ?? "");
+  const payload = JSON.parse((await section.getByRole("figure", { name: "The payload, as sent" }).locator("pre").textContent()) ?? "");
   expect(Object.keys(payload).sort()).toEqual(["users", "version"]);
   expect(payload.version).toBe(version);
 

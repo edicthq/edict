@@ -245,9 +245,12 @@ function TelemetrySection() {
             </span>
           </span>
         </label>
-        <pre aria-label="Telemetry payload" className="rounded-md border border-line bg-surface px-3 py-2 font-mono text-sm text-ink">
-          {JSON.stringify(telemetry.payload, null, 2)}
-        </pre>
+        <figure className="flex flex-col gap-1">
+          <figcaption className="text-ink-2">The payload, as sent</figcaption>
+          <pre className="rounded-md border border-line bg-surface px-3 py-2 font-mono text-sm text-ink">
+            {JSON.stringify(telemetry.payload, null, 2)}
+          </pre>
+        </figure>
         {enabled && telemetry.sentAt ? <p className="text-ink-2">Last sent {checkedAgo(telemetry.sentAt)}.</p> : null}
         {enabled && telemetry.error ? <p className="text-ink-2">The last ping failed: {telemetry.error}</p> : null}
         <FormError message={update.error?.message} />
