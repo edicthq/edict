@@ -3,9 +3,10 @@ import type { Agent, Issue, Member, ProgressUpdate } from "@edicthq/client";
 import { Avatar, Button, ProgressBadge } from "@edicthq/ui";
 import { GitPullRequest } from "lucide-react";
 import { Link } from "react-router";
-import { agentState, connectionLine, firstName, waitingLine, workOnPhrase } from "../lib/agents.js";
+import { connectionLine, firstName, waitingLine, workOnPhrase } from "../lib/agents.js";
 import { ago } from "../lib/issues.js";
 import { useProgress } from "../lib/queries.js";
+import { DelegatePicker } from "./issue-fields.js";
 import { Markdown } from "./markdown.js";
 
 // The peek's agent lane, from the C2 concept: the delegate's progress as it
@@ -16,14 +17,25 @@ export function AgentLane({
   issue,
   agents,
   members,
+  onDelegate,
 }: {
   orgId: string;
   slug: string;
   issue: Issue;
   agents: Agent[];
   members: Member[];
+  onDelegate: (agentId: string | null) => void;
 }) {
+  const progress = useProgress(orgId, issue.id);
+  // Newest first, as the API returns them.
+  const all = progress.data ?? [];
   const delegate = agents.find((agent) => agent.id === issue.delegateId);
+  // An agent can post progress on an issue that was never delegated to it.
+  // Showing that work is better than claiming no agent touched the issue.
+  const lastAgent = agents.find((agent) => agent.id === all[0]?.agentId);
+  const agent = delegate ?? lastAgent;
+  const updates = agent ? all.filter((update) => update.agentId === agent.id).reverse() : [];
+
   return (
     <section
       aria-labelledby="agent-lane"
@@ -32,33 +44,38 @@ export function AgentLane({
       <h2 id="agent-lane" className="sr-only">
         Agent lane
       </h2>
-      {delegate ? (
-        <DelegateLane orgId={orgId} slug={slug} issue={issue} agent={delegate} members={members} />
+      {agent ? (
+        <AgentLaneBody
+          slug={slug}
+          issue={issue}
+          agent={agent}
+          updates={updates}
+          members={members}
+        />
       ) : (
-        <EmptyLane slug={slug} issue={issue} agents={agents} members={members} />
+        <EmptyLane slug={slug} issue={issue} agents={agents} members={members} onDelegate={onDelegate} />
       )}
     </section>
   );
 }
 
-function DelegateLane({
-  orgId,
+function AgentLaneBody({
   slug,
   issue,
   agent,
+  updates,
   members,
 }: {
-  orgId: string;
   slug: string;
   issue: Issue;
   agent: Agent;
+  updates: ProgressUpdate[];
   members: Member[];
 }) {
-  const progress = useProgress(orgId, issue.id);
   const human = members.find((m) => m.id === agent.connectedBy);
-  // Updates from this agent, oldest first, as a run reads.
-  const updates = [...(progress.data ?? [])].filter((u) => u.agentId === agent.id).reverse();
-  const state = agentState(issue, agent);
+  // The lane's state follows this agent's own updates, whether or not it is
+  // the issue's delegate.
+  const state = agent.pausedAt ? "paused" : (updates.at(-1)?.state ?? "waiting");
   return (
     <>
       <header className="flex items-start gap-3 border-b border-line px-4 py-4">
@@ -155,37 +172,68 @@ function WaitingNote({ issue, agent, slug }: { issue: Issue; agent: Agent; slug:
   );
 }
 
-function EmptyLane({ slug, issue, agents, members }: { slug: string; issue: Issue; agents: Agent[]; members: Member[] }) {
+function EmptyLane({
+  slug,
+  issue,
+  agents,
+  members,
+  onDelegate,
+}: {
+  slug: string;
+  issue: Issue;
+  agents: Agent[];
+  members: Member[];
+  onDelegate: (agentId: string | null) => void;
+}) {
   const assignee = members.find((m) => m.id === issue.assigneeId);
   const active = agents.filter((agent) => !agent.pausedAt);
   return (
     <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 py-4">
       <div>
-        <p className="text-ui font-semibold">Agent lane</p>
+        <p className="text-ui font-semibold">No agent yet</p>
         <p className="mt-1 text-ui text-ink-2 text-pretty">
-          No agent on this issue yet. Delegate it and the agent's progress streams here
+          Delegate this issue and the agent's progress streams here
           {assignee ? `, while ${firstName(assignee.name)} stays accountable.` : "."}
         </p>
       </div>
-      <AskBox identifier={issue.identifier} lead="Ask any agent connected to Edict:" />
-      <div className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold text-ink-2">Connect your agent</h3>
-        {active.map((agent) => (
-          <div key={agent.id} className="flex items-start gap-2.5 rounded-sm bg-surface px-3 py-2.5 shadow-[inset_0_0_0_1px_var(--line)]">
-            <Avatar name={agent.name} kind="agent" size={22} />
-            <div className="min-w-0">
-              <p className="truncate text-ui font-medium">{agent.name}</p>
-              <p className="text-sm text-ink-2 text-pretty">{connectionLine(agent, members)}</p>
-            </div>
-          </div>
-        ))}
+
+      {active.length ? (
+        <DelegatePicker
+          agents={agents}
+          members={members}
+          value={issue.delegateId}
+          onChange={onDelegate}
+          trigger={(props) => (
+            <Button {...props} variant="secondary" className="self-start">
+              Delegate to an agent
+            </Button>
+          )}
+        />
+      ) : (
         <Link
           to={`/${slug}/connect`}
           className="text-ui font-medium text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink"
         >
           Connect an MCP client
         </Link>
-      </div>
+      )}
+
+      <AskBox identifier={issue.identifier} lead="Or ask an agent connected to Edict:" />
+
+      {active.length ? (
+        <div className="flex flex-col gap-2">
+          <h3 className="text-sm font-semibold text-ink-2">Agents here</h3>
+          {active.map((agent) => (
+            <div key={agent.id} className="flex items-start gap-2.5 rounded-sm bg-surface px-3 py-2.5 shadow-[inset_0_0_0_1px_var(--line)]">
+              <Avatar name={agent.name} kind="agent" size={22} />
+              <div className="min-w-0">
+                <p className="truncate text-ui font-medium">{agent.name}</p>
+                <p className="text-sm text-ink-2 text-pretty">{connectionLine(agent, members)}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

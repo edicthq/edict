@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { MarkdownEditor } from "../components/markdown-editor.js";
+import { Markdown, plainText } from "../components/markdown.js";
 import { Link, useNavigate, useParams } from "react-router";
 import type { ProjectStatus } from "@edicthq/client";
-import { Avatar, Button, ProgressBar, ProjectStatusBadge, PriorityIcon, TeamKey, cn } from "@edicthq/ui";
-import { ArrowLeft, Calendar, Plus, Trash2, } from "lucide-react";
+import { Avatar, Button, ProgressBar, ProjectStatusBadge, PriorityIcon, Tabs, TeamKey, cn } from "@edicthq/ui";
+import { ArrowLeft, Calendar, FolderKanban, Plus, Trash2 } from "lucide-react";
 import { CreateProjectDialog } from "../components/create-project-dialog.js";
 import { EmptyState, GroupHeader, Loading, PageBody, PageHeader, rowClass } from "../components/shell.js";
 import {
@@ -28,7 +29,7 @@ export function ProjectsPage() {
   const projects = useProjects(orgId);
   const members = useMembers(orgId);
   const [createOpen, setCreateOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "completed">("all");
 
   const memberMap = new Map((members.data ?? []).map((m) => [m.id, m]));
 
@@ -58,38 +59,16 @@ export function ProjectsPage() {
           <Loading label="Loading projects" />
         ) : projects.data?.length ? (
           <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-1 border-b border-line px-3 pb-2 text-ui">
-              <button
-                type="button"
-                onClick={() => setStatusFilter("all")}
-                className={cn(
-                  "rounded-sm px-2.5 py-1 text-sm font-medium transition-[color,background-color]",
-                  statusFilter === "all" ? "bg-hover text-ink" : "text-ink-2 hover:text-ink",
-                )}
-              >
-                All ({projects.data.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatusFilter("active")}
-                className={cn(
-                  "rounded-sm px-2.5 py-1 text-sm font-medium transition-[color,background-color]",
-                  statusFilter === "active" ? "bg-hover text-ink" : "text-ink-2 hover:text-ink",
-                )}
-              >
-                Active
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatusFilter("completed")}
-                className={cn(
-                  "rounded-sm px-2.5 py-1 text-sm font-medium transition-[color,background-color]",
-                  statusFilter === "completed" ? "bg-hover text-ink" : "text-ink-2 hover:text-ink",
-                )}
-              >
-                Completed
-              </button>
-            </div>
+            <Tabs
+              label="Project status"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              items={[
+                { value: "all", label: "All", count: projects.data.length },
+                { value: "active", label: "Active" },
+                { value: "completed", label: "Completed" },
+              ]}
+            />
 
             <ul className="flex flex-col gap-2">
               {filtered.map((proj) => {
@@ -127,7 +106,7 @@ export function ProjectsPage() {
 
                       {proj.description ? (
                         <p className="line-clamp-2 text-ui text-ink-2 text-pretty">
-                          {proj.description}
+                          {plainText(proj.description)}
                         </p>
                       ) : null}
 
@@ -155,6 +134,8 @@ export function ProjectsPage() {
           </div>
         ) : (
           <EmptyState
+            layout="page"
+            icon={<FolderKanban aria-hidden="true" />}
             title="No projects yet"
             body="Projects group issues from across teams toward high-level milestones and product launches."
             action={
@@ -202,6 +183,8 @@ export function ProjectDetailPage() {
     return (
       <PageBody className="pt-6">
         <EmptyState
+          layout="page"
+          icon={<FolderKanban aria-hidden="true" />}
           title="Project not found"
           body="It may have been deleted, moved, or the address is mistyped."
           action={
@@ -407,9 +390,9 @@ export function ProjectDetailPage() {
               </div>
             </div>
           ) : project.description ? (
-            <p className="rounded-md border border-line/60 bg-surface/50 p-3 text-ui text-ink-2 whitespace-pre-wrap text-pretty">
-              {project.description}
-            </p>
+            <div className="rounded-md border border-line/60 bg-surface/50 p-4">
+              <Markdown text={project.description} />
+            </div>
           ) : (
             <p className="text-sm text-ink-3 italic">No description provided.</p>
           )}
@@ -431,7 +414,7 @@ export function ProjectDetailPage() {
                 return (
                   <li key={issue.id}>
                     <Link
-                      to={`/${slug}/teams/${issue.teamId}?peek=${issue.identifier}`}
+                      to={`/${slug}/teams/${issue.teamId}?issue=${issue.identifier}`}
                       className={cn(rowClass, "grid grid-cols-[auto_16px_minmax(0,1fr)_auto_auto] items-center gap-3")}
                     >
                       <div className="flex items-center gap-2">

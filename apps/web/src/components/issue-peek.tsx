@@ -270,7 +270,14 @@ export function IssuePeek({
         <Attachments orgId={orgId} issue={issue} />
         <Discussion orgId={orgId} myId={myId} issue={issue} orgMembers={orgMembers} />
       </div>
-      <AgentLane orgId={orgId} slug={slug} issue={issue} agents={agents} members={orgMembers} />
+      <AgentLane
+        orgId={orgId}
+        slug={slug}
+        issue={issue}
+        agents={agents}
+        members={orgMembers}
+        onDelegate={(delegateId) => save({ delegateId })}
+      />
       </div>
       {merge ? (
         <MergeDialog

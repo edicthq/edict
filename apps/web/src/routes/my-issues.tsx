@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { Avatar, PriorityIcon, TeamKey, cn } from "@edicthq/ui";
-import { Bot } from "lucide-react";
+import { Avatar, PriorityIcon, Tabs, TeamKey, cn } from "@edicthq/ui";
+import { Bot, CircleCheck } from "lucide-react";
 import { EmptyState, Loading, PageBody, PageHeader, rowClass } from "../components/shell.js";
 import { useMembers, useMyWork, useTeams } from "../lib/queries.js";
 import { ago } from "../lib/issues.js";
@@ -32,64 +32,31 @@ export function MyIssuesPage() {
       <PageHeader
         title="My issues"
         actions={
-          <div className="flex items-center gap-1 rounded-sm border border-line bg-surface p-0.5 text-ui">
-            <button
-              type="button"
-              onClick={() => setInclude("open")}
-              className={cn(
-                "rounded-xs px-2.5 py-1 text-sm font-medium transition-[background-color,color]",
-                include === "open" ? "bg-hover text-ink" : "text-ink-2 hover:text-ink",
-              )}
-            >
-              Open
-            </button>
-            <button
-              type="button"
-              onClick={() => setInclude("all")}
-              className={cn(
-                "rounded-xs px-2.5 py-1 text-sm font-medium transition-[background-color,color]",
-                include === "all" ? "bg-hover text-ink" : "text-ink-2 hover:text-ink",
-              )}
-            >
-              All
-            </button>
-          </div>
+          <Tabs
+            label="Issue state"
+            variant="segmented"
+            value={include}
+            onChange={setInclude}
+            items={[
+              { value: "open", label: "Open" },
+              { value: "all", label: "All" },
+            ]}
+          />
         }
       />
 
       <PageBody>
-        <div className="flex items-center gap-1 border-b border-line px-3 pb-2 text-ui mb-3">
-          <button
-            type="button"
-            onClick={() => setTab("all")}
-            className={cn(
-              "rounded-sm px-2.5 py-1 text-sm font-medium transition-[color,background-color]",
-              tab === "all" ? "bg-hover text-ink" : "text-ink-2 hover:text-ink",
-            )}
-          >
-            All ({allIssues.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("assigned")}
-            className={cn(
-              "rounded-sm px-2.5 py-1 text-sm font-medium transition-[color,background-color]",
-              tab === "assigned" ? "bg-hover text-ink" : "text-ink-2 hover:text-ink",
-            )}
-          >
-            Assigned to me ({allIssues.filter((i) => i.assigneeId === myId).length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("delegated")}
-            className={cn(
-              "rounded-sm px-2.5 py-1 text-sm font-medium transition-[color,background-color]",
-              tab === "delegated" ? "bg-hover text-ink" : "text-ink-2 hover:text-ink",
-            )}
-          >
-            Delegated to me ({allIssues.filter((i) => i.delegateId === myId).length})
-          </button>
-        </div>
+        <Tabs
+          label="Which issues"
+          className="mb-3"
+          value={tab}
+          onChange={setTab}
+          items={[
+            { value: "all", label: "All", count: allIssues.length },
+            { value: "assigned", label: "Assigned to me", count: allIssues.filter((i) => i.assigneeId === myId).length },
+            { value: "delegated", label: "Delegated to me", count: allIssues.filter((i) => i.delegateId === myId).length },
+          ]}
+        />
 
         {myWork.isPending ? (
           <Loading label="Loading your work" />
@@ -101,7 +68,7 @@ export function MyIssuesPage() {
               return (
                 <li key={issue.id}>
                   <Link
-                    to={`/${slug}/teams/${issue.teamId}?peek=${issue.identifier}`}
+                    to={`/${slug}/teams/${issue.teamId}?issue=${issue.identifier}`}
                     className={cn(
                       rowClass,
                       "grid grid-cols-[auto_16px_minmax(0,1fr)_auto_auto] items-center gap-3",
@@ -145,11 +112,20 @@ export function MyIssuesPage() {
           </ul>
         ) : (
           <EmptyState
+            layout="page"
+            icon={<CircleCheck aria-hidden="true" />}
             title="All clear"
             body={
               include === "open"
                 ? "You have no open issues assigned or delegated to you."
                 : "No issues have been assigned or delegated to you."
+            }
+            action={
+              teams.data?.[0] ? (
+                <Link to={`/${slug}/teams/${teams.data[0].id}`} className="text-ui font-medium underline decoration-line-strong underline-offset-4 hover:decoration-ink">
+                  Browse {teams.data[0].name}
+                </Link>
+              ) : null
             }
           />
         )}

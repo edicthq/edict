@@ -64,12 +64,55 @@ export function SectionLabel({ children, id }: { children: ReactNode; id?: strin
   );
 }
 
-export function EmptyState({ title, body, action }: { title: string; body: ReactNode; action?: ReactNode }) {
+// An empty page or list. `page` centers the message in the space it has and
+// takes an icon; the default sits inline, as under a group heading.
+export function EmptyState({
+  icon,
+  title,
+  body,
+  action,
+  layout = "inline",
+}: {
+  icon?: ReactNode;
+  title: string;
+  body: ReactNode;
+  action?: ReactNode;
+  layout?: "inline" | "page";
+}) {
+  if (layout === "page") {
+    return (
+      <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 px-6 py-10 text-center">
+        {icon ? (
+          <div
+            aria-hidden="true"
+            className="flex size-10 items-center justify-center rounded-md bg-hover text-ink-3 [&_svg]:size-5"
+          >
+            {icon}
+          </div>
+        ) : null}
+        <div className="max-w-[44ch]">
+          <p className="text-body font-semibold">{title}</p>
+          <p className="mt-1 text-ui text-ink-2 text-pretty">{body}</p>
+        </div>
+        {action ? <div className="mt-1 flex items-center gap-2">{action}</div> : null}
+      </div>
+    );
+  }
   return (
     <div className="flex max-w-[480px] flex-col items-start gap-3 px-3 py-8">
-      <div>
-        <p className="text-body font-semibold">{title}</p>
-        <p className="mt-1 text-ui text-ink-2 text-pretty">{body}</p>
+      <div className="flex items-start gap-3">
+        {icon ? (
+          <div
+            aria-hidden="true"
+            className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-sm bg-hover text-ink-3 [&_svg]:size-4"
+          >
+            {icon}
+          </div>
+        ) : null}
+        <div>
+          <p className="text-body font-semibold">{title}</p>
+          <p className="mt-1 text-ui text-ink-2 text-pretty">{body}</p>
+        </div>
       </div>
       {action}
     </div>

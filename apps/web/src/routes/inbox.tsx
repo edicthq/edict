@@ -1,5 +1,6 @@
 import type { InboxItem } from "@edicthq/client";
-import { Avatar, TeamKey, cn } from "@edicthq/ui";
+import { Avatar, Tabs, TeamKey, cn } from "@edicthq/ui";
+import { Inbox } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import { Button } from "@edicthq/ui";
@@ -46,28 +47,16 @@ export function InboxPage() {
         title="Inbox"
         actions={
           <>
-            <div className="flex items-center gap-1 rounded-sm border border-line bg-surface p-0.5 text-ui">
-              <button
-                type="button"
-                onClick={() => setFilter("unread")}
-                className={cn(
-                  "rounded-xs px-2.5 py-1 text-sm font-medium transition-[background-color,color]",
-                  filter === "unread" ? "bg-hover text-ink" : "text-ink-2 hover:text-ink",
-                )}
-              >
-                Unread
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilter("all")}
-                className={cn(
-                  "rounded-xs px-2.5 py-1 text-sm font-medium transition-[background-color,color]",
-                  filter === "all" ? "bg-hover text-ink" : "text-ink-2 hover:text-ink",
-                )}
-              >
-                All
-              </button>
-            </div>
+            <Tabs
+              label="Notifications"
+              variant="segmented"
+              value={filter}
+              onChange={setFilter}
+              items={[
+                { value: "unread", label: "Unread" },
+                { value: "all", label: "All" },
+              ]}
+            />
             <Button
               variant="ghost"
               onClick={() => markAll.mutate()}
@@ -89,7 +78,7 @@ export function InboxPage() {
                 <Link
                   to={
                     item.issue
-                      ? `/${slug}/teams/${item.issue.teamId}?peek=${item.issue.identifier}`
+                      ? `/${slug}/teams/${item.issue.teamId}?issue=${item.issue.identifier}`
                       : `/${slug}/agents`
                   }
                   onClick={() => open(item)}
@@ -125,11 +114,13 @@ export function InboxPage() {
           </ul>
         ) : (
           <EmptyState
-            title="Nothing here"
+            layout="page"
+            icon={<Inbox aria-hidden="true" />}
+            title={filter === "unread" ? "You're all caught up" : "Nothing here yet"}
             body={
               filter === "unread"
-                ? "No unread notifications. Work that involves you shows up here."
-                : "You have no notifications about work yet."
+                ? "Mentions, assignments, delegations and agent progress land here."
+                : "Work that involves you shows up here once someone assigns, delegates or mentions you."
             }
           />
         )}

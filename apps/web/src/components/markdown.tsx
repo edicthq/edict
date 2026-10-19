@@ -21,6 +21,16 @@ export const markdownClass =
   "[&_img]:max-h-[24rem] [&_img]:max-w-full [&_img]:rounded-sm [&_img]:shadow-[0_0_0_1px_var(--line)] " +
   "[&_ul[data-type=taskList]]:list-none [&_ul[data-type=taskList]]:ps-0 [&_li[data-type=taskItem]]:flex [&_li[data-type=taskItem]]:gap-2 ";
 
+// A project card or a notification needs one line of a markdown description.
+export function plainText(markdown: string): string {
+  return markdown
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/[`*_>#~]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 // Descriptions and comments are markdown end to end (ADR 0009). The stored
 // text renders here, and the Tiptap editor edits it (markdown-editor.tsx).
 // Linked files point at /files paths, which images follow to show a preview
