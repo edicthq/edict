@@ -44,6 +44,9 @@ export interface ServerConfig {
   // an agent runner on the instance's own network. Off: public addresses only.
   privateWebhookTargets?: boolean;
   signIn?: SignInProviders;
+  // Where the update check asks for Edict's latest release (RELEASES_URL).
+  // GitHub's API by default; tests point it at a stand-in.
+  releasesUrl?: string;
 }
 
 // Sign-in methods beyond email and password, each on when configured.
@@ -103,6 +106,7 @@ export function readConfig(env: NodeJS.ProcessEnv): ServerConfig {
     jobs: env.JOBS !== "off",
     privateWebhookTargets: env.PRIVATE_WEBHOOK_TARGETS === "allow",
     signIn: readSignIn(env),
+    releasesUrl: env.RELEASES_URL || undefined,
     agentLimits: {
       requestsPerMinute: readLimit("AGENT_REQUESTS_PER_MINUTE", env.AGENT_REQUESTS_PER_MINUTE, DEFAULT_AGENT_LIMITS.requestsPerMinute),
       issuesPerHour: readLimit("AGENT_ISSUES_PER_HOUR", env.AGENT_ISSUES_PER_HOUR, DEFAULT_AGENT_LIMITS.issuesPerHour),

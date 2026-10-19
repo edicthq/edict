@@ -1,10 +1,11 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { asc, count, sql } from "drizzle-orm";
 import { user } from "@edicthq/db";
-import { InstanceSettings, InstanceStatus, InstanceUsers, UpdateInstanceSettings } from "@edicthq/schema";
+import { InstanceSettings, InstanceStatus, InstanceUsers, UpdateCheck, UpdateInstanceSettings } from "@edicthq/schema";
 import { VERSION } from "../version.js";
 import type { SignInProviders } from "../env.js";
-import { hasUsers, readInstanceSettings, setSignUp } from "../instance.js";
+import { changeInstanceSettings, hasUsers, readInstanceSettings } from "../instance.js";
+import { checkForUpdate, RELEASES_URL, updateCheckOf } from "../updates.js";
 import { body, errors, json, router, signedIn, type ApiDeps } from "./context.js";
 import { forbidden, invalid } from "./errors.js";
 
@@ -12,6 +13,8 @@ type InstanceDeps = ApiDeps & {
   signIn?: SignInProviders;
   // What the status page reports about email and storage.
   instanceInfo?: { emailFrom: string | null; storage: { kind: "disk" | "s3"; location: string } };
+  // Where the update check asks for the latest release. GitHub's by default.
+  releasesUrl?: string;
 };
 
 const getStatus = createRoute({
@@ -21,6 +24,18 @@ const getStatus = createRoute({
   summary: "How the instance is set up: email, storage and version",
   description: "Instance admins only.",
   responses: { 200: json(InstanceStatus, "The instance's setup"), ...errors("unauthorized", "forbidden") },
+});
+
+const runUpdateCheck = createRoute({
+  method: "post",
+  path: "/instance/update-check",
+  tags: ["Instance"],
+  summary: "Check for a newer release of Edict now",
+  description: "Instance admins only. Asks GitHub for the latest release, as the daily check does. Refused while the update check is off.",
+  responses: {
+    200: json(UpdateCheck, "What the check found"),
+    ...errors("invalid_request", "unauthorized", "forbidden"),
+  },
 });
 
 const listUsers = createRoute({
@@ -61,7 +76,7 @@ const updateInstance = createRoute({
   path: "/instance",
   tags: ["Instance"],
   summary: "Change instance settings",
-  description: "Instance admins only.",
+  description: "Instance admins only. Answers with the public settings; the update check shows in GET /instance/status.",
   request: body(UpdateInstanceSettings),
   responses: {
     200: json(InstanceSettings, "The settings after the change"),
@@ -83,9 +98,18 @@ export function instanceRoutes(deps: InstanceDeps) {
         email: { configured: Boolean(deps.mailer), from: deps.instanceInfo?.emailFrom ?? null },
         storage: deps.instanceInfo?.storage ?? { kind: "disk" as const, location: "" },
         version: VERSION,
+        updates: updateCheckOf(await readInstanceSettings(deps.db)),
       },
       200,
     );
+  });
+
+  app.openapi(runUpdateCheck, async (c) => {
+    requireInstanceAdmin(c);
+    if (!(await readInstanceSettings(deps.db)).updateCheck) {
+      throw invalid("The update check is off. Turn it on first.");
+    }
+    return c.json(await checkForUpdate(deps.db, deps.releasesUrl ?? RELEASES_URL), 200);
   });
 
   // Users are the instance's, not an organization's: an instance admin reads
@@ -137,7 +161,7 @@ export function instanceRoutes(deps: InstanceDeps) {
     if (input.signUpMode === "domain" && !(input.signUpDomains ?? (await readInstanceSettings(deps.db)).signUpDomains).length) {
       throw invalid("Name at least one domain for the domain sign-up mode.");
     }
-    await setSignUp(deps.db, user.id, input);
+    await changeInstanceSettings(deps.db, user.id, input);
     return c.json(await publicSettings(deps), 200);
   });
 

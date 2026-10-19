@@ -17,6 +17,7 @@ import { startRealtime } from "./realtime.js";
 import { DEFAULT_WEBHOOK_RETRY } from "./webhooks.js";
 import { archiveClosedIssues, purgeTrash, startJobs, type PurgeResult } from "./jobs.js";
 import { localDiskStorage, s3Storage } from "./storage.js";
+import { RELEASES_URL } from "./updates.js";
 
 export interface App {
   app: Hono;
@@ -63,6 +64,7 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
     requestLimiter: new RequestLimiter(agentLimits.requestsPerMinute),
     privateWebhookTargets: config.privateWebhookTargets ?? false,
     signIn: config.signIn ?? {},
+    releasesUrl: config.releasesUrl ?? RELEASES_URL,
     instanceInfo: {
       emailFrom: config.emailFrom ?? null,
       storage: config.s3
@@ -123,7 +125,7 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
         jobs = await startJobs(config.databaseUrl, db, pool, deps.storage, {
           retry: config.webhookRetry ?? DEFAULT_WEBHOOK_RETRY,
           allowPrivate: config.privateWebhookTargets ?? false,
-        });
+        }, { releasesUrl: deps.releasesUrl });
       }
 
       server = await listen(app, config.port);

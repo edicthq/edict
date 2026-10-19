@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Accent, Agent, AgentPower, Attachment, Comment, InboxItem, Issue, Label, paths, ProjectStatus, RelationType, Role, SavedView, SavedViewQuery, SignUpMode, Webhook, WebLink } from "@edicthq/client";
+import type { Accent, Agent, AgentPower, Attachment, Comment, InboxItem, InstanceStatus, Issue, Label, paths, ProjectStatus, RelationType, Role, SavedView, SavedViewQuery, SignUpMode, Webhook, WebLink } from "@edicthq/client";
 import { ApiFailure, api, unwrap } from "./api.js";
 
 export const keys = {
@@ -237,8 +237,26 @@ export function useInstanceUsers(page: number, enabled: boolean) {
 export function useUpdateInstance() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (body: { signUpMode?: SignUpMode; signUpDomains?: string[] }) => unwrap(api.PATCH("/instance", { body })),
+    mutationFn: (body: { signUpMode?: SignUpMode; signUpDomains?: string[]; updateCheck?: boolean }) =>
+      unwrap(api.PATCH("/instance", { body })),
+    // The update check's switch flips at once; the status refetches after.
+    onMutate: ({ updateCheck }) => {
+      if (updateCheck === undefined) return;
+      client.setQueryData<InstanceStatus>(["instance", "status"], (old) =>
+        old ? { ...old, updates: { ...old.updates, check: updateCheck } } : old,
+      );
+    },
     onSuccess: (data) => client.setQueryData(keys.instance, data),
+    onSettled: () => client.invalidateQueries({ queryKey: ["instance", "status"] }),
+  });
+}
+
+// Asks GitHub for the latest release now, as the daily check does.
+export function useCheckForUpdate() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => unwrap(api.POST("/instance/update-check")),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["instance", "status"] }),
   });
 }
 

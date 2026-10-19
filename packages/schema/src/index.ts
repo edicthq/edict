@@ -500,6 +500,25 @@ export const InstanceSettings = z
   })
   .meta({ id: "InstanceSettings" });
 
+// What the instance knows about newer releases of Edict. It asks GitHub for
+// the latest release once a day, unless an instance admin turns that off.
+export const UpdateCheck = z
+  .object({
+    // Whether the instance checks.
+    check: z.boolean(),
+    // The latest release the last successful check found.
+    latest: z
+      .object({ version: z.string(), url: z.string(), publishedAt: z.iso.datetime().nullable() })
+      .nullable(),
+    // Whether latest is newer than the running version.
+    available: z.boolean(),
+    // When the last check ran, and why it failed if it did.
+    checkedAt: z.iso.datetime().nullable(),
+    error: z.string().nullable(),
+  })
+  .meta({ id: "UpdateCheck" });
+export type UpdateCheck = z.infer<typeof UpdateCheck>;
+
 // How the instance is set up, for its admins.
 export const InstanceStatus = z
   .object({
@@ -510,6 +529,7 @@ export const InstanceStatus = z
       location: z.string(),
     }),
     version: z.string(),
+    updates: UpdateCheck,
   })
   .meta({ id: "InstanceStatus" });
 
@@ -531,7 +551,7 @@ export const InstanceUsers = z
   .meta({ id: "InstanceUsers" });
 
 export const UpdateInstanceSettings = z
-  .object({ signUpMode: SignUpMode, signUpDomains: z.array(EmailDomain).max(50) })
+  .object({ signUpMode: SignUpMode, signUpDomains: z.array(EmailDomain).max(50), updateCheck: z.boolean() })
   .partial()
   .meta({ id: "UpdateInstanceSettings" });
 

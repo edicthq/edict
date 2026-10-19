@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, integer, jsonb, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, integer, jsonb, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { user } from "./auth-schema.js";
 
 // Who can create a user on the instance: anyone, only people with an invite,
@@ -18,6 +18,13 @@ export const instanceSettings = pgTable(
     signUpMode: signUpMode("sign_up_mode").notNull().default("open"),
     // Lowercase domains whose verified addresses may sign up in "domain" mode.
     signUpDomains: text("sign_up_domains").array().notNull().default(sql`'{}'::text[]`),
+    // Whether the instance asks GitHub for Edict's latest release each day.
+    updateCheck: boolean("update_check").notNull().default(true),
+    // What the last successful check found, and when the last check ran.
+    // A failed check keeps the release and records its error.
+    latestRelease: jsonb("latest_release").$type<{ version: string; url: string; publishedAt: string | null }>(),
+    updateCheckedAt: timestamp("update_checked_at", { withTimezone: true }),
+    updateCheckError: text("update_check_error"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
   },
   (table) => [check("instance_settings_single_row", sql`${table.id} = 1`)],

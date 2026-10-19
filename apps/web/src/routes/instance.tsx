@@ -3,7 +3,7 @@ import { Button, Input, cn } from "@edicthq/ui";
 import { useState } from "react";
 import { FormError, GroupHeader, Loading, PageBody, PageHeader } from "../components/shell.js";
 import { ago } from "../lib/issues.js";
-import { useInstance, useInstanceStatus, useInstanceUsers, useUpdateInstance } from "../lib/queries.js";
+import { useCheckForUpdate, useInstance, useInstanceStatus, useInstanceUsers, useUpdateInstance } from "../lib/queries.js";
 
 const modes: { value: SignUpMode; label: string; description: string }[] = [
   { value: "open", label: "Open", description: "Anyone who can reach this instance can sign up." },
@@ -96,6 +96,7 @@ export function InstancePage() {
         )}
         <FormError message={setMode.error?.message} />
         <InstanceStatusSection />
+        <UpdatesSection />
         <InstanceUsersSection />
       </PageBody>
     </>
@@ -135,6 +136,77 @@ function InstanceStatusSection() {
           </div>
         ))}
       </dl>
+    </section>
+  );
+}
+
+function checkedAgo(iso: string): string {
+  const since = ago(iso);
+  return since === "now" ? "just now" : `${since} ago`;
+}
+
+// Whether a newer Edict is out, from the daily check of GitHub's releases.
+function UpdatesSection() {
+  const status = useInstanceStatus(true);
+  const update = useUpdateInstance();
+  const checkNow = useCheckForUpdate();
+  // The switch's new state until the change settles.
+  const [pendingCheck, setPendingCheck] = useState<boolean | null>(null);
+  if (!status.data) return null;
+  const { version } = status.data;
+  const updates = { ...status.data.updates, check: pendingCheck ?? status.data.updates.check };
+  let summary: string;
+  if (!updates.check) summary = "Off. Edict does not look for new releases.";
+  else if (updates.available && updates.latest) summary = `Edict ${updates.latest.version} is out. This instance runs ${version}.`;
+  else if (updates.latest) summary = `Up to date: ${version} is the latest release.`;
+  else summary = "Not checked yet.";
+  return (
+    <section aria-labelledby="updates-heading" className="flex flex-col gap-2">
+      <GroupHeader>
+        <span id="updates-heading">Updates</span>
+      </GroupHeader>
+      <div className="mx-3 flex flex-col gap-3 text-ui">
+        <label className="flex items-start gap-2">
+          <input
+            type="checkbox"
+            className="mt-0.5 size-4 accent-[var(--ink)]"
+            checked={updates.check}
+            disabled={update.isPending}
+            onChange={(event) => {
+              setPendingCheck(event.target.checked);
+              update.mutate({ updateCheck: event.target.checked }, { onSettled: () => setPendingCheck(null) });
+            }}
+          />
+          <span className="flex flex-col gap-1">
+            <span className="font-medium text-ink">Check for new releases</span>
+            <span className="text-ink-2 text-pretty">
+              Once a day, Edict asks GitHub for its latest release. The request carries nothing about this instance.
+            </span>
+          </span>
+        </label>
+        <p className="text-ink-2 text-pretty" aria-live="polite">
+          {summary}
+          {updates.check && updates.checkedAt ? ` Checked ${checkedAgo(updates.checkedAt)}.` : ""}
+          {updates.available && updates.latest ? (
+            <>
+              {" "}
+              <a href={updates.latest.url} target="_blank" rel="noreferrer" className="text-ink underline underline-offset-2">
+                Release notes
+              </a>
+              . Upgrade with <code className="font-mono text-sm">docker compose pull && docker compose up -d</code>.
+            </>
+          ) : null}
+        </p>
+        {updates.check && updates.error ? <p className="text-ink-2">The last check failed: {updates.error}</p> : null}
+        {updates.check ? (
+          <span>
+            <Button type="button" variant="ghost" disabled={checkNow.isPending} onClick={() => checkNow.mutate()}>
+              {checkNow.isPending ? "Checking…" : "Check now"}
+            </Button>
+          </span>
+        ) : null}
+        <FormError message={update.error?.message ?? checkNow.error?.message} />
+      </div>
     </section>
   );
 }

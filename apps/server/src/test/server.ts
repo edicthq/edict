@@ -63,6 +63,8 @@ export async function startTestServer(
     // Let webhooks reach private addresses, like the tests' 127.0.0.1 receivers.
     privateWebhookTargets?: boolean;
     signIn?: SignInProviders;
+    // Where the update check asks for the latest release. Nowhere real.
+    releasesUrl?: string;
   } = {},
 ): Promise<TestServer> {
   const database = options.database ?? (await createTestDatabase());
@@ -82,6 +84,7 @@ export async function startTestServer(
     webhookRetry: options.webhookRetry,
     privateWebhookTargets: options.privateWebhookTargets,
     signIn: options.signIn,
+    releasesUrl: options.releasesUrl ?? "http://127.0.0.1:9/releases/latest",
   }, { mailer: options.mailer });
   await app.start();
 

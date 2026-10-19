@@ -6938,7 +6938,7 @@ export interface paths {
         head?: never;
         /**
          * Change instance settings
-         * @description Instance admins only.
+         * @description Instance admins only. Answers with the public settings; the update check shows in GET /instance/status.
          */
         patch: {
             parameters: {
@@ -7044,6 +7044,72 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/instance/update-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check for a newer release of Edict now
+         * @description Instance admins only. Asks GitHub for the latest release, as the daily check does. Refused while the update check is off.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description What the check found */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["UpdateCheck"];
+                    };
+                };
+                /** @description The request does not match the schema */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The caller's role does not allow this */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -7935,6 +8001,20 @@ export interface components {
                 location: string;
             };
             version: string;
+            updates: components["schemas"]["UpdateCheck"];
+        };
+        UpdateCheck: {
+            check: boolean;
+            latest: {
+                version: string;
+                url: string;
+                /** Format: date-time */
+                publishedAt: string | null;
+            } | null;
+            available: boolean;
+            /** Format: date-time */
+            checkedAt: string | null;
+            error: string | null;
         };
         InstanceUsers: {
             users: components["schemas"]["InstanceUser"][];
@@ -7953,6 +8033,7 @@ export interface components {
         UpdateInstanceSettings: {
             signUpMode?: components["schemas"]["SignUpMode"];
             signUpDomains?: string[];
+            updateCheck?: boolean;
         };
     };
     responses: never;

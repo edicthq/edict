@@ -33,7 +33,7 @@ export { consentOrganization } from "./connections.js";
 
 // The public API, mounted at /api/v1. Its OpenAPI document is served at
 // /api/v1/openapi.json.
-export function createApi(deps: AttachmentDeps & WebhookDeps & { signIn?: SignInProviders }) {
+export function createApi(deps: AttachmentDeps & WebhookDeps & { signIn?: SignInProviders; releasesUrl?: string }) {
   const api = router();
 
   api.use(identify(deps));

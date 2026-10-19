@@ -2970,12 +2970,73 @@
           },
           "version": {
             "type": "string"
+          },
+          "updates": {
+            "$ref": "#/components/schemas/UpdateCheck"
           }
         },
         "required": [
           "email",
           "storage",
-          "version"
+          "version",
+          "updates"
+        ]
+      },
+      "UpdateCheck": {
+        "type": "object",
+        "properties": {
+          "check": {
+            "type": "boolean"
+          },
+          "latest": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "version": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "publishedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "version",
+              "url",
+              "publishedAt"
+            ]
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "checkedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "check",
+          "latest",
+          "available",
+          "checkedAt",
+          "error"
         ]
       },
       "InstanceUsers": {
@@ -3045,6 +3106,9 @@
               "pattern": "^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$"
             },
             "maxItems": 50
+          },
+          "updateCheck": {
+            "type": "boolean"
           }
         }
       }
@@ -11087,7 +11151,7 @@
           "Instance"
         ],
         "summary": "Change instance settings",
-        "description": "Instance admins only.",
+        "description": "Instance admins only. Answers with the public settings; the update check shows in GET /instance/status.",
         "requestBody": {
           "required": true,
           "content": {
@@ -11156,6 +11220,57 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InstanceStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller's role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/instance/update-check": {
+      "post": {
+        "tags": [
+          "Instance"
+        ],
+        "summary": "Check for a newer release of Edict now",
+        "description": "Instance admins only. Asks GitHub for the latest release, as the daily check does. Refused while the update check is off.",
+        "responses": {
+          "200": {
+            "description": "What the check found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateCheck"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the schema",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }

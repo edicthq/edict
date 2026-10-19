@@ -1,6 +1,7 @@
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
+import { createServer as createHttpServer } from "node:http";
 import { createServer } from "node:net";
 import { join } from "node:path";
 import { test as base } from "@playwright/test";
@@ -21,6 +22,14 @@ export const test = base.extend<{}, { instanceUrl: string }>({
       const root = join(import.meta.dirname, "../..");
       // Attachment bytes (ADR 0020) go under their own temp dir.
       const dataDir = await mkdtemp(join(tmpdir(), "edict-e2e-"));
+      // Stands in for GitHub's latest release, so the update check never
+      // leaves the machine and always finds 99.0.0.
+      const releases = createHttpServer((_req, res) => {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ tag_name: "v99.0.0", html_url: "https://github.com/edicthq/edict/releases/tag/v99.0.0" }));
+      });
+      await new Promise<void>((resolve) => releases.listen(0, "127.0.0.1", resolve));
+      const releasesPort = (releases.address() as { port: number }).port;
       const server = spawn("node", [join(root, "server/dist/index.js")], {
         env: {
           ...process.env,
@@ -35,6 +44,7 @@ export const test = base.extend<{}, { instanceUrl: string }>({
           AUTH_RATE_LIMIT: "off",
           SMTP_URL: "",
           DATA_DIR: dataDir,
+          RELEASES_URL: `http://127.0.0.1:${releasesPort}/releases/latest`,
         },
         stdio: ["ignore", "inherit", "inherit"],
       });
@@ -44,6 +54,7 @@ export const test = base.extend<{}, { instanceUrl: string }>({
         await use(url);
       } finally {
         server.kill();
+        releases.close();
         await postgres.stop();
       }
     },
