@@ -2,7 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { describe, expect, it } from "vitest";
 import { connect } from "./oauth-client.js";
-import { createTeam, orgWithOwner } from "./org.js";
+import { createTeam, join, orgWithOwner } from "./org.js";
 import { startTestServer, type ApiClient, type ApiResponse } from "./server.js";
 
 type Status = { id: string; name: string; category: string };
@@ -332,3 +332,44 @@ describe("projects", () => {
     expect(contentText).toContain("Modernize authentication flow");
   });
 });
+
+describe("project visibility", () => {
+  it("shows a guest only projects holding issues in their teams, and lets them change none", async () => {
+    const t = await startTestServer();
+    const { owner, org } = await orgWithOwner(t.baseUrl);
+    const eng = await createTeam(owner, org, "ENG");
+    const ops = await createTeam(owner, org, "OPS");
+    const gus = await join(t.baseUrl, owner, org, "Gus", "guest", [eng.id]);
+    const shared = (await owner.post(`${org}/projects`, { name: "Shared" })).body as Project;
+    const elsewhere = (await owner.post(`${org}/projects`, { name: "Elsewhere" })).body as Project;
+    await owner.post(`${org}/teams/${eng.id}/issues`, { title: "In ENG", projectId: shared.id });
+    await owner.post(`${org}/teams/${ops.id}/issues`, { title: "In OPS", projectId: shared.id });
+    await owner.post(`${org}/teams/${ops.id}/issues`, { title: "Only OPS", projectId: elsewhere.id });
+
+    const list = (await gus.client.get(`${org}/projects`)).body as Project[];
+    expect(list.map((p) => p.slug)).toEqual(["shared"]);
+    expect(list[0]!.progress.total).toBe(1);
+    expect((await gus.client.get(`${org}/projects/elsewhere`)).status).toBe(404);
+    expect((await gus.client.post(`${org}/projects`, { name: "Mine" })).status).toBe(403);
+    expect((await gus.client.patch(`${org}/projects/shared`, { version: 1, name: "Renamed" })).status).toBe(403);
+    expect((await gus.client.get(`${org}/trash/projects`)).status).toBe(403);
+    const attach = await gus.client.post(`${org}/teams/${eng.id}/issues`, { title: "Sneak", projectId: elsewhere.id });
+    expect(attach.status).toBe(400);
+  });
+
+  it("counts only the issues a member can see in a project's progress", async () => {
+    const t = await startTestServer();
+    const { owner, org } = await orgWithOwner(t.baseUrl);
+    const eng = await createTeam(owner, org, "ENG");
+    const sec = await createTeam(owner, org, "SEC", { private: true });
+    const mina = await join(t.baseUrl, owner, org, "Mina", "member");
+    const project = (await owner.post(`${org}/projects`, { name: "Launch" })).body as Project;
+    await owner.post(`${org}/teams/${eng.id}/issues`, { title: "Public", projectId: project.id });
+    await owner.post(`${org}/teams/${sec.id}/issues`, { title: "Private", projectId: project.id });
+
+    expect(((await owner.get(`${org}/projects/launch`)).body as Project).progress.total).toBe(2);
+    expect(((await mina.client.get(`${org}/projects/launch`)).body as Project).progress.total).toBe(1);
+    expect(((await mina.client.get(`${org}/projects`)).body as Project[])[0]!.progress.total).toBe(1);
+  });
+});
+

@@ -23,7 +23,7 @@ function formatDate(iso: string | null | undefined): string {
 }
 
 export function ProjectsPage() {
-  const { orgId, slug, canManage } = useOrg();
+  const { orgId, slug, canManage, membership } = useOrg();
   const projects = useProjects(orgId);
   const members = useMembers(orgId);
   const [createOpen, setCreateOpen] = useState(false);
@@ -42,10 +42,13 @@ export function ProjectsPage() {
       <PageHeader
         title="Projects"
         actions={
-          <Button variant="primary" onClick={() => setCreateOpen(true)}>
-            <Plus aria-hidden="true" className="size-3.5" strokeWidth={2} />
-            New project
-          </Button>
+          // Guests work only in their teams' issues, not on projects.
+          membership.member.role === "guest" ? null : (
+            <Button variant="primary" onClick={() => setCreateOpen(true)}>
+              <Plus aria-hidden="true" className="size-3.5" strokeWidth={2} />
+              New project
+            </Button>
+          )
         }
       />
 

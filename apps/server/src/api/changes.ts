@@ -209,7 +209,7 @@ async function setIssueBack(tx: Transaction, caller: Caller, event: EventRow, ma
   if (next.delegateId && (fields.includes("delegateId") || fields.includes("teamId"))) {
     await checkDelegate(tx, target, next.delegateId);
   }
-  if (fields.includes("projectId") && next.projectId) await checkProject(tx, caller.orgId, next.projectId);
+  if (fields.includes("projectId") && next.projectId) await checkProject(tx, caller, next.projectId);
   if (fields.includes("parentId") && next.parentId) await checkParent(tx, caller, next.parentId, row.id);
 
   const changes: Record<string, FieldChange> = Object.fromEntries(

@@ -8,6 +8,7 @@ import { toComment } from "./comments.js";
 import { body, errors, inOrg, json, noContent, OrgParams, router, type ApiDeps } from "./context.js";
 import { conflict, forbidden, notFound } from "./errors.js";
 import { loadIssue, visibleIssue } from "./issue-data.js";
+import { requireProjectEditor } from "./projects.js";
 
 type CommentRow = typeof comments.$inferSelect;
 
@@ -264,7 +265,8 @@ export function trashRoutes(deps: ApiDeps) {
 
   app.openapi(listTrashedProjects, async (c) => {
     const { orgId } = c.req.valid("param");
-    const list = await inOrg(deps, c, orgId, async (tx) => {
+    const list = await inOrg(deps, c, orgId, async (tx, caller) => {
+      requireProjectEditor(caller, "see trashed projects");
       const rows = await tx
         .select()
         .from(projects)

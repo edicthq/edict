@@ -15,6 +15,7 @@ import type { Issue, LinkedIssue, ProgressUpdate } from "@edicthq/schema";
 import type { Caller } from "./callers.js";
 import { activeMember, canSeeTeam, teamVisibility, type TeamRow } from "./access.js";
 import { gone, invalid, notFound } from "./errors.js";
+import { projectVisibility } from "./projects.js";
 
 export type IssueRow = typeof issues.$inferSelect;
 type StatusRow = typeof statuses.$inferSelect;
@@ -222,13 +223,14 @@ export async function checkLabels(tx: Transaction, team: TeamRow, labelIds: stri
 }
 
 // A project in the organization that is not in the trash.
-export async function checkProject(tx: Transaction, orgId: string, projectId: string): Promise<void> {
+// A project the caller can see and that is not in the trash.
+export async function checkProject(tx: Transaction, caller: Caller, projectId: string): Promise<void> {
   const [project] = await tx
     .select({ id: projects.id })
     .from(projects)
-    .where(and(eq(projects.orgId, orgId), eq(projects.id, projectId), isNull(projects.deletedAt)));
+    .where(and(eq(projects.orgId, caller.orgId), eq(projects.id, projectId), isNull(projects.deletedAt), projectVisibility(tx, caller)));
   if (!project) {
-    throw invalid("projectId is not a project in this organization.");
+    throw invalid("projectId is not a project you can see.");
   }
 }
 
