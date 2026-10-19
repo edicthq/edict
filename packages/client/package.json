@@ -3,6 +3,14 @@
   "version": "0.0.0",
   "description": "Typed client for the Edict API, generated from its OpenAPI document",
   "license": "MIT",
+  "homepage": "https://github.com/edicthq/edict/tree/main/packages/client#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/edicthq/edict.git",
+    "directory": "packages/client"
+  },
+  "bugs": "https://github.com/edicthq/edict/issues",
+  "keywords": ["edict", "issue-tracker", "openapi", "api-client", "agents"],
   "type": "module",
   "files": ["dist", "openapi.json"],
   "exports": {
