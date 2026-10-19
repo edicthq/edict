@@ -1,0 +1,28 @@
+{
+  "name": "@edicthq/telemetry",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Collector for Edict's opt-in telemetry pings (ADR 0026)",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.spec.json --noEmit",
+    "test": "vitest run",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@edicthq/schema": "workspace:*",
+    "@hono/node-server": "^1.19.0",
+    "hono": "^4.10.0",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@testcontainers/postgresql": "^12.2.1",
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vitest": "^5.0.5"
+  }
+}

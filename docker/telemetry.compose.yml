@@ -1,0 +1,34 @@
+# The telemetry collector at telemetry.edict.dev (ADR 0026), as Dokploy runs
+# it on the project's VPS. Self-hosters never need this.
+#
+# Turn off access logs in the proxy in front of it (Dokploy's Traefik): the
+# collector stores no IP addresses, and the proxy must not either.
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: telemetry
+      POSTGRES_PASSWORD: ${TELEMETRY_DB_PASSWORD:?set TELEMETRY_DB_PASSWORD}
+      POSTGRES_DB: telemetry
+    volumes:
+      - telemetry-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U telemetry -d telemetry"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  collector:
+    build:
+      context: ..
+      dockerfile: apps/telemetry/Dockerfile
+    environment:
+      DATABASE_URL: postgres://telemetry:${TELEMETRY_DB_PASSWORD}@db:5432/telemetry
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000"
+
+volumes:
+  telemetry-data:
