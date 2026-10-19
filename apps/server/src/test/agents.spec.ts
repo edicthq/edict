@@ -289,9 +289,9 @@ describe("agent powers", () => {
 
     expect((await ferro.get(`${org}/events`)).status).toBe(403);
     expect((await ferro.get(`${org}/export`)).status).toBe(403);
-    expect((await ferro.post(`${org}/webhooks`, { url: "https://example.com/all" })).status).toBe(403);
+    expect((await ferro.post(`${org}/webhooks`, { url: "https://1.1.1.1/all" })).status).toBe(403);
     // Its own webhook sees no more than it does.
-    expect((await ferro.post(`${org}/webhooks`, { url: "https://example.com/mine", agentId: agent.id })).status).toBe(201);
+    expect((await ferro.post(`${org}/webhooks`, { url: "https://1.1.1.1/mine", agentId: agent.id })).status).toBe(201);
   });
 });
 

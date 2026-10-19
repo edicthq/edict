@@ -5,7 +5,7 @@ import { describe, expect, it, onTestFinished } from "vitest";
 import { runner } from "./agent-client.js";
 import { createTeam, join, orgWithOwner } from "./org.js";
 import { startTestServer } from "./server.js";
-import { sendWebhook } from "../outbound.js";
+import { isPublicAddress, sendWebhook } from "../outbound.js";
 
 interface Received {
   headers: Record<string, string>;
@@ -174,9 +174,19 @@ describe("webhook targets", () => {
       expect(res.status, url).toBe(400);
       expect(res.body.error.message).toMatch(/private/);
     }
-    const { webhook } = (await owner.post(`${org}/webhooks`, { url: "https://example.com/hook" })).body;
+    // A public address as a literal: a name would depend on the runner's DNS.
+    const { webhook } = (await owner.post(`${org}/webhooks`, { url: "https://1.1.1.1/hook" })).body;
     const moved = await owner.patch(`${org}/webhooks/${webhook.id}`, { version: webhook.version, url: "http://127.0.0.1/hook" });
     expect(moved.status).toBe(400);
+  });
+
+  it("tells public addresses from private ones in both families", () => {
+    for (const address of ["1.1.1.1", "8.8.8.8", "93.184.215.14", "2606:4700:4700::1111", "::ffff:1.1.1.1"]) {
+      expect(isPublicAddress(address), address).toBe(true);
+    }
+    for (const address of ["127.0.0.1", "10.1.2.3", "::1", "fe80::1", "::ffff:127.0.0.1", "::ffff:7f00:1", "::ffff:a00:1"]) {
+      expect(isPublicAddress(address), address).toBe(false);
+    }
   });
 
   it("checks where a name resolves when it sends, not only when the webhook is saved", async () => {
