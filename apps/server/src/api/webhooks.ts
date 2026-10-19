@@ -3,7 +3,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { emit, events, members, webhookDeliveries, webhooks, type Transaction } from "@edicthq/db";
 import { CreatedWebhook, CreateWebhook, Id, UpdateWebhook, Webhook, WebhookDelivery } from "@edicthq/schema";
-import { requireRole } from "./access.js";
+import { requireEveryTeam, requireRole } from "./access.js";
 import type { Caller } from "./callers.js";
 import { body, errors, inOrg, json, noContent, OrgParams, router, type ApiDeps } from "./context.js";
 import { changesOf, invalid, notFound, requireVersion } from "./errors.js";
@@ -179,6 +179,8 @@ export function webhookRoutes(deps: WebhookDeps) {
     const secret = newSecret();
     const row = await inOrg(deps, c, orgId, async (tx, caller) => {
       requireAdmin(caller, "create webhooks");
+      // An organization webhook receives every event, whatever team it is in.
+      if (!input.agentId) requireEveryTeam(caller, "create organization webhooks");
       await checkUrl(deps, input.url);
       if (input.agentId) {
         const [agent] = await tx.select().from(members).where(and(eq(members.id, input.agentId), eq(members.kind, "agent")));

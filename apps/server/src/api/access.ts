@@ -2,7 +2,7 @@ import { and, eq, inArray, isNull, or, type SQL } from "drizzle-orm";
 import { members, teamMembers, teams, user, type Transaction } from "@edicthq/db";
 import type { AgentPower, Member, Role, Team } from "@edicthq/schema";
 import type { Caller } from "./callers.js";
-import { forbidden, notFound } from "./errors.js";
+import { forbidden, invalid, notFound } from "./errors.js";
 
 export type MemberRow = typeof members.$inferSelect;
 export type TeamRow = typeof teams.$inferSelect;
@@ -55,6 +55,54 @@ export function requireRole(caller: Caller, min: Role, action: string, power: Ag
 export function requireAgentPower(caller: Caller, power: AgentPower, action: string): void {
   if (caller.kind === "agent" && !caller.grants.includes(power)) {
     throw forbidden(`Agents cannot ${action} unless an admin grants them the "${power}" power.`);
+  }
+}
+
+// What an agent hands out never exceeds what it holds (ADR 0024): no power it
+// lacks, no role above its own, and never Admin or Owner. People are bounded
+// by their role alone.
+export function requireWithinCaller(caller: Caller, give: { grants?: AgentPower[]; role?: Role }): void {
+  if (caller.kind !== "agent") return;
+  const missing = (give.grants ?? []).filter((power) => !caller.grants.includes(power));
+  if (missing.length > 0) {
+    throw forbidden(`An agent can only give powers it holds itself, and this one lacks ${missing.map((p) => `"${p}"`).join(", ")}.`);
+  }
+  if (give.role && (atLeast(give.role, "admin") || !atLeast(caller.role, give.role))) {
+    throw forbidden(`An agent can only give a role up to its own, ${caller.role === "guest" ? "Guest" : "Member"}.`);
+  }
+}
+
+// For an agent acting on another member: only members whose role is not
+// above its own.
+export function requireNotAbove(caller: Caller, target: MemberRow, action: string): void {
+  if (caller.kind === "agent" && !atLeast(caller.role, target.role)) {
+    throw forbidden(`Agents cannot ${action} for someone whose role is above their own.`);
+  }
+}
+
+// Whether the caller sees every team: what reads the whole organization at
+// once, like the event log, the export and organization webhooks, needs it.
+// A power never widens an agent's team access, so an agent only sees every
+// team through a connected Admin or Owner (ADR 0024).
+export function seesEveryTeam(caller: Caller): boolean {
+  return atLeast(caller.access.role, "admin") && caller.keyTeamIds === null;
+}
+
+export function requireEveryTeam(caller: Caller, action: string): void {
+  if (!seesEveryTeam(caller)) {
+    throw forbidden(`Only callers who can see every team can ${action}. An agent's powers never widen what it sees.`);
+  }
+}
+
+// Refuses team ids the caller cannot see, as if they did not exist.
+export async function requireVisibleTeams(tx: Transaction, caller: Caller, teamIds: string[]): Promise<void> {
+  if (teamIds.length === 0) return;
+  const found = await tx
+    .select({ id: teams.id })
+    .from(teams)
+    .where(and(inArray(teams.id, teamIds), teamVisibility(tx, caller)));
+  if (found.length !== new Set(teamIds).size) {
+    throw invalid("Some of teamIds are not teams you can see.");
   }
 }
 

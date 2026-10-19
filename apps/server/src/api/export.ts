@@ -24,7 +24,7 @@ import {
   webhooks,
 } from "@edicthq/db";
 import type { AttachmentDeps } from "./attachments.js";
-import { requireRole } from "./access.js";
+import { requireEveryTeam, requireRole } from "./access.js";
 import { errors, inOrg, OrgParams, router } from "./context.js";
 
 // The glossary of tables, exported as one document: everything the members
@@ -65,6 +65,7 @@ export function exportRoutes(deps: AttachmentDeps) {
 
     const { document, attachmentRows, organization } = await inOrg(deps, c, orgId, async (tx, caller) => {
       requireRole(caller, "admin", "export the organization");
+      requireEveryTeam(caller, "export the organization");
       return collect(tx, orgId);
     });
 

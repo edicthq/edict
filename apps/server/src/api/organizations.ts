@@ -24,7 +24,9 @@ import {
   loadMember,
   memberColumns,
   memberWithUser,
+  requireNotAbove,
   requireRole,
+  requireWithinCaller,
   toMember,
 } from "./access.js";
 import { pauseConnectedAgents } from "./agents.js";
@@ -195,6 +197,11 @@ export function organizationRoutes(deps: ApiDeps) {
     const member = await inOrg(deps, c, orgId, async (tx, caller) => {
       requireRole(caller, "admin", "change roles", "members");
       const target = await activeMember(tx, orgId, memberId);
+      if (caller.kind === "agent" && target.id === caller.id) {
+        throw forbidden("An agent cannot change its own role. An admin can.");
+      }
+      requireNotAbove(caller, target, "change roles");
+      requireWithinCaller(caller, { role });
       if ((target.role === "owner" || role === "owner") && caller.role !== "owner") {
         throw forbidden("Only Owners can grant or take away the Owner role.");
       }
@@ -225,6 +232,7 @@ export function organizationRoutes(deps: ApiDeps) {
       const target = await activeMember(tx, orgId, memberId);
       if (target.id !== caller.id) {
         requireRole(caller, "admin", "remove members", "members");
+        requireNotAbove(caller, target, "remove members");
         if (target.role === "owner" && caller.role !== "owner") {
           throw forbidden("Only Owners can remove an Owner.");
         }
