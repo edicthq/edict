@@ -40,7 +40,7 @@ interface SocketMeta {
 }
 
 // Seen only by Admins and Owners, as their API reads are.
-const adminOnly = /^(invite|api_key|webhook)\./;
+const adminOnly = /^(invite\.|api_key\.|webhook\.|organization\.exported$)/;
 // About one person's own things: their inbox and saved views.
 const personal = /^(inbox|view)\./;
 
