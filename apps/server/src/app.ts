@@ -118,7 +118,7 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
 
       server = await listen(app, config.port);
       state.port = boundPort(server);
-      realtime = await startRealtime(server, { db, pool, getUser: deps.getUser });
+      realtime = await startRealtime(server, { db, pool, getUser: deps.getUser, publicUrl: config.baseUrl });
     },
     purgeTrash: (now) => purgeTrash(db, deps.storage, now),
     shutdown: async () => {
