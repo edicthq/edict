@@ -83,11 +83,6 @@ export const filterKeys = (view: IssueView): FilterKey[] => [
   ...view.labels.map((l) => `label:${l}` as FilterKey),
 ];
 
-const parseKey = (key: FilterKey): { dimension: string; value: string } => {
-  const at = key.indexOf(":");
-  return { dimension: key.slice(0, at), value: key.slice(at + 1) };
-};
-
 // Toggle one filter pill in the view: any dimension's OR-set grows or loses
 // one value. The sort direction stays.
 export function toggleFilter(view: IssueView, key: FilterKey): IssueView {
@@ -146,6 +141,8 @@ export function sortIssues(issues: Issue[], sortBy: SortBy, dir: SortDir): Issue
         const title = a.title.localeCompare(b.title) * factor;
         return title !== 0 ? title : a.number - b.number;
       }
+      default:
+        return 0;
     }
   });
 }

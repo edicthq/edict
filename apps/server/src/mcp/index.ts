@@ -7,6 +7,7 @@ import type { Context, Hono } from "hono";
 import { z } from "zod";
 import { createEdictClient } from "@edicthq/client";
 import type { OAuthDiscovery } from "../oauth.js";
+import { VERSION } from "../version.js";
 import { Session } from "./session.js";
 import { registerTools, renderIssue, renderProject } from "./tools.js";
 
@@ -69,7 +70,7 @@ function challenge(c: Context, origin: string, message: string, error?: string) 
 
 function createServer(session: Session, organizationName: string): McpServer {
   const server = new McpServer(
-    { name: "edict", title: `Edict (${organizationName})`, version: "0.1.0" },
+    { name: "edict", title: `Edict (${organizationName})`, version: VERSION },
     { instructions },
   );
   registerTools(server, session);
@@ -105,6 +106,45 @@ function createServer(session: Session, organizationName: string): McpServer {
           content: {
             type: "text",
             text: "Do my Edict work. Call my_work, then take each issue in order: get_issue, post_progress working, do the work, link any pull request, comment with what people should know, move it with update_issue, and post_progress done. If you get stuck, post_progress blocked or needs_input with what you need, and go on to the next issue.",
+          },
+        },
+      ],
+    }),
+  );
+
+  server.registerPrompt(
+    "triage_inbox",
+    {
+      title: "Triage my inbox",
+      description: "Go through your unread inbox and deal with each item.",
+    },
+    () => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: "Triage my Edict inbox. Call get_inbox, then for each item get_issue to read it. Answer what is asked of you with comment, pick up work delegated to you with post_progress working, and tell me in one line each what you did and what needs me.",
+          },
+        },
+      ],
+    }),
+  );
+
+  server.registerPrompt(
+    "plan_project",
+    {
+      title: "Plan this project into issues",
+      description: "Break a project into issues across the teams that will do the work.",
+      argsSchema: { project: z.string().describe("Project slug or name") },
+    },
+    ({ project }) => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `Plan project ${project} into issues.\n\nCall get_project for ${project} to read its goal and the issues it has, and list_teams then get_team_context for the teams that should do the work. Propose the missing issues as a list with a team, a title, a one-paragraph description and a priority each. Ask me before you create them, then create each with create_issue in its team with project ${project}, and relate the ones that block each other with relate_issues.`,
           },
         },
       ],

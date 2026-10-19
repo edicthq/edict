@@ -81,7 +81,7 @@ export function inviteEmail(invite: {
 }
 
 export function verificationEmail({ to, url }: { to: string; url: string }): EmailMessage {
-  const footnote = "If you didn't create an Edict account, ignore this email.";
+  const footnote = "If you didn't sign up for Edict, ignore this email.";
   return {
     to,
     subject: "Verify your email for Edict",
@@ -104,6 +104,21 @@ export function passwordResetEmail({ to, url }: { to: string; url: string }): Em
     html: layout({
       body: `Choose a new password for ${escapeHtml(to)}.`,
       action: "Choose a new password",
+      url,
+      footnote,
+    }),
+  };
+}
+
+export function magicLinkEmail({ to, url }: { to: string; url: string }): EmailMessage {
+  const footnote = "The link works once, for five minutes. If you didn't ask to sign in, ignore this email.";
+  return {
+    to,
+    subject: "Sign in to Edict",
+    text: [`Sign in to Edict as ${to}: ${url}`, "", footnote].join("\n"),
+    html: layout({
+      body: `Sign in to Edict as ${escapeHtml(to)}.`,
+      action: "Sign in",
       url,
       footnote,
     }),

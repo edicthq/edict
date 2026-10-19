@@ -15,6 +15,7 @@ import type { Issue, LinkedIssue, ProgressUpdate } from "@edicthq/schema";
 import type { Caller } from "./callers.js";
 import { activeMember, canSeeTeam, teamVisibility, type TeamRow } from "./access.js";
 import { gone, invalid, notFound } from "./errors.js";
+import { projectVisibility } from "./projects.js";
 
 export type IssueRow = typeof issues.$inferSelect;
 type StatusRow = typeof statuses.$inferSelect;
@@ -37,10 +38,37 @@ export function toIssue(row: IssueRow, teamKey: string, labelIds: string[], late
     labelIds,
     parentId: row.parentId,
     creatorId: row.creatorId,
+    closedAt: row.closedAt?.toISOString() ?? null,
+    archivedAt: row.archivedAt?.toISOString() ?? null,
     version: row.version,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+// Done and Canceled close an issue (ADR 0025).
+export const closedCategories: readonly string[] = ["done", "canceled"];
+
+// What moving an issue to another status does to when it closed, and to its
+// archive: closing records the time and who, reopening clears both and takes
+// the issue out of the archive.
+export async function closingFields(
+  tx: Transaction,
+  row: Pick<IssueRow, "statusId" | "archivedAt">,
+  nextStatusId: string,
+  actorId: string,
+): Promise<{ closedAt?: Date | null; closedBy?: string | null; archivedAt?: null }> {
+  if (nextStatusId === row.statusId) return {};
+  const rows = await tx
+    .select({ id: statuses.id, category: statuses.category })
+    .from(statuses)
+    .where(inArray(statuses.id, [row.statusId, nextStatusId]));
+  const closed = (id: string) => closedCategories.includes(rows.find((s) => s.id === id)?.category ?? "");
+  const was = closed(row.statusId);
+  const now = closed(nextStatusId);
+  if (now && !was) return { closedAt: new Date(), closedBy: actorId };
+  if (was && !now) return { closedAt: null, closedBy: null, ...(row.archivedAt ? { archivedAt: null } : {}) };
+  return {};
 }
 
 // Label ids per issue, each list sorted, so equal sets compare equal.
@@ -140,6 +168,17 @@ export async function visibleIssue(
     if (row) {
       return row;
     }
+    // An issue in a trashed team answers 410 too, to those who could see it.
+    const [held] = await tx
+      .select({ team: teams })
+      .from(issues)
+      .innerJoin(teams, eq(teams.id, issues.teamId))
+      .where(and(eq(issues.orgId, caller.orgId), eq(issues.id, issueId)));
+    if (held?.team.deletedAt && (await canSeeTeam(tx, caller.access, { ...held.team, deletedAt: null }))) {
+      throw gone(
+        `${held.team.key} is in the trash, with its issues. An Admin can restore it with POST /api/v1/organizations/${caller.orgId}/teams/${held.team.id}/restore within 30 days of deletion.`,
+      );
+    }
   }
   throw notFound("issue");
 }
@@ -188,7 +227,7 @@ export async function checkStatus(tx: Transaction, team: TeamRow, statusId: stri
 // The assignee answers for the issue, so it is a human who can see its team.
 export async function checkAssignee(tx: Transaction, team: TeamRow, assigneeId: string): Promise<void> {
   const assignee = await activeMember(tx, team.orgId, assigneeId).catch(() => undefined);
-  if (!assignee || assignee.kind !== "human" || !(await canSeeTeam(tx, assignee, team))) {
+  if (assignee?.kind !== "human" || !(await canSeeTeam(tx, assignee, team))) {
     throw invalid(`The assignee must be a human member who can see team ${team.key}.`);
   }
 }
@@ -222,13 +261,14 @@ export async function checkLabels(tx: Transaction, team: TeamRow, labelIds: stri
 }
 
 // A project in the organization that is not in the trash.
-export async function checkProject(tx: Transaction, orgId: string, projectId: string): Promise<void> {
+// A project the caller can see and that is not in the trash.
+export async function checkProject(tx: Transaction, caller: Caller, projectId: string): Promise<void> {
   const [project] = await tx
     .select({ id: projects.id })
     .from(projects)
-    .where(and(eq(projects.orgId, orgId), eq(projects.id, projectId), isNull(projects.deletedAt)));
+    .where(and(eq(projects.orgId, caller.orgId), eq(projects.id, projectId), isNull(projects.deletedAt), projectVisibility(tx, caller)));
   if (!project) {
-    throw invalid("projectId is not a project in this organization.");
+    throw invalid("projectId is not a project you can see.");
   }
 }
 

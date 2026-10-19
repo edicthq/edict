@@ -242,3 +242,22 @@ describe("event log", () => {
     expect((await mia.get(`${org}/events`)).status).toBe(403);
   });
 });
+
+describe("the organization's default accent", () => {
+  it("starts violet, and only Admins and Owners change it", async () => {
+    const t = await startTestServer();
+    const owner = await signUpAs(t.baseUrl, "Owner");
+    const { organization } = await createOrg(owner);
+    const { client: mina } = await join(t.baseUrl, owner, organization.id, "Mina", "member");
+
+    const mine = (await mina.get("/organizations")).body[0].organization;
+    expect(mine.defaultAccent).toBe("violet");
+    expect((await mina.patch(`/organizations/${organization.id}`, { defaultAccent: "teal" })).status).toBe(403);
+    const set = await owner.patch(`/organizations/${organization.id}`, { defaultAccent: "teal" });
+    expect(set.status).toBe(200);
+    expect(set.body.defaultAccent).toBe("teal");
+    expect((await mina.get("/organizations")).body[0].organization.defaultAccent).toBe("teal");
+    expect((await owner.patch(`/organizations/${organization.id}`, { defaultAccent: "orange" })).status).toBe(400);
+  });
+});
+

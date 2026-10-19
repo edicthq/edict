@@ -2,24 +2,29 @@ services:
   db:
     image: postgres:18-alpine
     environment:
-      POSTGRES_USER: edict
-      POSTGRES_PASSWORD: edict
+      # The superuser, for administering Postgres. Edict itself connects as
+      # the edict role that postgres-init.sh creates, which is not one.
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: edict
+      EDICT_DB_PASSWORD: ${EDICT_DB_PASSWORD:-edict}
       PGDATA: /var/lib/postgresql/data
     volumes:
       - db-data:/var/lib/postgresql/data
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/10-edict.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U edict -d edict"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d edict"]
       interval: 5s
       timeout: 3s
       retries: 10
 
   app:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
+    # Upgrading is `docker compose pull && docker compose up -d`. EDICT_VERSION
+    # picks the image tag: 1 follows every 1.x release, 1.4 only its patches,
+    # 1.4.2 stays put. To build from source instead, add compose.build.yml.
+    image: ghcr.io/edicthq/edict:${EDICT_VERSION:-1}
     environment:
-      DATABASE_URL: postgres://edict:edict@db:5432/edict
+      DATABASE_URL: postgres://edict:${EDICT_DB_PASSWORD:-edict}@db:5432/edict
       # Optional. Without it, Edict generates a secret on first boot and keeps it in Postgres.
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-}
       # The URL people reach Edict at. Set it to your public URL: sign-in only
@@ -44,6 +49,21 @@ services:
       S3_ENDPOINT: ${S3_ENDPOINT:-}
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      # Optional sign-in with Google, GitHub or any OpenID Connect provider
+      # (Authentik, Keycloak). Each turns on when its id and secret are set.
+      # Redirect URIs: <BETTER_AUTH_URL>/api/auth/callback/google, .../github,
+      # and .../callback/oidc. OIDC_NAME labels the sign-in button.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_NAME: ${OIDC_NAME:-}
+      # Webhooks go only to public addresses. Set to "allow" to let them reach
+      # private ones too, like an agent runner on this host's own network.
+      PRIVATE_WEBHOOK_TARGETS: ${PRIVATE_WEBHOOK_TARGETS:-}
     volumes:
       # Attached files, unless S3_BUCKET is set. Several app replicas need a
       # shared volume here, or S3.

@@ -129,8 +129,8 @@ describe("trash", () => {
     await owner.delete(`${org}/comments/${comment.id}`);
     await owner.delete(`${org}/issues/ENG-1`);
 
-    expect(await t.purgeTrash(new Date(Date.now() + 29 * 24 * 60 * 60 * 1000))).toEqual({ issues: 0, comments: 0, files: 0 });
-    expect(await t.purgeTrash(new Date(Date.now() + 31 * 24 * 60 * 60 * 1000))).toEqual({ issues: 2, comments: 1, files: 1 });
+    expect(await t.purgeTrash(new Date(Date.now() + 29 * 24 * 60 * 60 * 1000))).toEqual({ issues: 0, comments: 0, projects: 0, teams: 0, files: 0 });
+    expect(await t.purgeTrash(new Date(Date.now() + 31 * 24 * 60 * 60 * 1000))).toEqual({ issues: 2, comments: 1, projects: 0, teams: 0, files: 1 });
 
     expect((await owner.get(`${org}/issues/ENG-1`)).status).toBe(404);
     expect((await owner.get(`${org}/trash`)).body).toEqual([]);

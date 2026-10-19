@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Agent, AgentPower, Attachment, Comment, InboxItem, Issue, Label, paths, Project, ProjectProgress, ProjectStatus, RelationType, Role, SavedView, SavedViewQuery, SignUpMode, Webhook, WebLink } from "@edicthq/client";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { Accent, Agent, AgentPower, Attachment, Comment, InboxItem, InstanceStatus, Issue, Label, paths, ProjectStatus, RelationType, Role, SavedView, SavedViewQuery, SignUpMode, Webhook, WebLink } from "@edicthq/client";
 import { ApiFailure, api, unwrap } from "./api.js";
 
 export const keys = {
@@ -12,6 +12,8 @@ export const keys = {
   invite: (token: string) => ["invite", token] as const,
   statuses: (orgId: string, teamId: string) => ["org", orgId, "teams", teamId, "statuses"] as const,
   issues: (orgId: string, teamId: string) => ["org", orgId, "teams", teamId, "issues"] as const,
+  // Pages of a team's archived issues. Not under issues, whose data is a list.
+  archivedIssues: (orgId: string, teamId: string) => ["org", orgId, "teams", teamId, "archived-issues"] as const,
   issue: (orgId: string, issueRef: string) => ["org", orgId, "issue", issueRef] as const,
   teamLabels: (orgId: string, teamId: string) => ["org", orgId, "teams", teamId, "labels"] as const,
   subIssues: (orgId: string, issueId: string) => ["org", orgId, "issue", issueId, "sub-issues"] as const,
@@ -90,6 +92,35 @@ export function useCreateOrganization() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (body: { name: string; slug: string }) => unwrap(api.POST("/organizations", { body })),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.memberships }),
+  });
+}
+
+// Organizations whose domain rule matches the signed-in person's verified
+// address, which they may join as a Member.
+export function useJoinable() {
+  return useQuery({
+    queryKey: ["joinable"] as const,
+    queryFn: () => unwrap(api.GET("/organizations/joinable")),
+  });
+}
+
+export function useJoinOrganization() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (orgId: string) => unwrap(api.POST("/organizations/{orgId}/join", org(orgId))),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: keys.memberships });
+      void client.invalidateQueries({ queryKey: ["joinable"] });
+    },
+  });
+}
+
+export function useUpdateOrganization(orgId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { name?: string; joinDomain?: string | null; defaultAccent?: Accent }) =>
+      unwrap(api.PATCH("/organizations/{orgId}", { params: { path: { orgId } }, body })),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.memberships }),
   });
 }
@@ -189,11 +220,49 @@ export function useAcceptInvite(token: string) {
   });
 }
 
-export function useSetSignUpMode() {
+// Instance admins only.
+export function useInstanceStatus(enabled: boolean) {
+  return useQuery({ queryKey: ["instance", "status"] as const, queryFn: () => unwrap(api.GET("/instance/status")), enabled });
+}
+
+export function useInstanceUsers(page: number, enabled: boolean) {
+  return useQuery({
+    queryKey: ["instance", "users", page] as const,
+    queryFn: () => unwrap(api.GET("/instance/users", { params: { query: { limit: 50, offset: page * 50 } } })),
+    enabled,
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function useUpdateInstance() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (signUpMode: SignUpMode) => unwrap(api.PATCH("/instance", { body: { signUpMode } })),
+    mutationFn: (body: { signUpMode?: SignUpMode; signUpDomains?: string[]; updateCheck?: boolean; telemetry?: boolean }) =>
+      unwrap(api.PATCH("/instance", { body })),
+    // The update check's and telemetry's switches flip at once; the status
+    // refetches after.
+    onMutate: ({ updateCheck, telemetry }) => {
+      client.setQueryData<InstanceStatus>(["instance", "status"], (old) =>
+        old
+          ? {
+              ...old,
+              updates: { ...old.updates, check: updateCheck ?? old.updates.check },
+              telemetry: { ...old.telemetry, enabled: telemetry ?? old.telemetry.enabled },
+            }
+          : old,
+      );
+    },
     onSuccess: (data) => client.setQueryData(keys.instance, data),
+    onSettled: () => client.invalidateQueries({ queryKey: ["instance", "status"] }),
+  });
+}
+
+// Asks GitHub for the latest release now, as the daily check does.
+export function useCheckForUpdate() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => unwrap(api.POST("/instance/update-check")),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["instance", "status"] }),
   });
 }
 
@@ -522,6 +591,78 @@ export function useDeleteIssue(orgId: string) {
     onSuccess: (_, issue) => {
       client.setQueryData<Issue[]>(keys.issues(orgId, issue.teamId), (list) => list?.filter((item) => item.id !== issue.id));
       void client.invalidateQueries({ queryKey: ["org", orgId] });
+    },
+  });
+}
+
+export function useTrashedTeams(orgId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["org", orgId, "trash", "teams"] as const,
+    queryFn: () => unwrap(api.GET("/organizations/{orgId}/trash/teams", org(orgId))),
+    enabled,
+  });
+}
+
+// A team goes to the trash with everything in it, so every list refetches.
+export function useDeleteTeam(orgId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (teamId: string) =>
+      unwrap(api.DELETE("/organizations/{orgId}/teams/{teamId}", { params: { path: { orgId, teamId } } })),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["org", orgId] }),
+  });
+}
+
+export function useRestoreTeam(orgId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (teamId: string) =>
+      unwrap(api.POST("/organizations/{orgId}/teams/{teamId}/restore", { params: { path: { orgId, teamId } } })),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["org", orgId] }),
+  });
+}
+
+export function useUpdateTeam(orgId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ teamId, ...body }: { teamId: string; version: number; archiveAfterDays?: number | null; name?: string }) =>
+      unwrap(api.PATCH("/organizations/{orgId}/teams/{teamId}", { params: { path: { orgId, teamId } }, body })),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.teams(orgId) }),
+  });
+}
+
+// ---------- archive (ADR 0025) ----------
+
+// A team's archived issues, a page at a time, newest number first. Only
+// fetched when someone asks to see them.
+export function useArchivedIssues(orgId: string, teamId: string, enabled: boolean) {
+  return useInfiniteQuery({
+    queryKey: keys.archivedIssues(orgId, teamId),
+    initialPageParam: undefined as number | undefined,
+    queryFn: ({ pageParam }) =>
+      unwrap(
+        api.GET("/organizations/{orgId}/teams/{teamId}/issues", {
+          params: { path: { orgId, teamId }, query: { archived: "true", limit: 50, before: pageParam } },
+        }),
+      ),
+    getNextPageParam: (page) => (page.length === 50 ? page[page.length - 1]!.number : undefined),
+    enabled,
+  });
+}
+
+export function useArchiveIssue(orgId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ issue, archive }: { issue: Issue; archive: boolean }) =>
+      unwrap(
+        api.POST(archive ? "/organizations/{orgId}/issues/{issueRef}/archive" : "/organizations/{orgId}/issues/{issueRef}/unarchive", {
+          params: { path: { orgId, issueRef: issue.id } },
+        }),
+      ),
+    onSuccess: (issue) => {
+      client.setQueryData(keys.issue(orgId, issue.id), issue);
+      void client.invalidateQueries({ queryKey: keys.issues(orgId, issue.teamId) });
+      void client.invalidateQueries({ queryKey: keys.archivedIssues(orgId, issue.teamId) });
     },
   });
 }

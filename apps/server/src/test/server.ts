@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { onTestFinished } from "vitest";
 import { Pool } from "pg";
 import { createApp, type App } from "../app.js";
-import { DEFAULT_MAX_ATTACHMENT_BYTES } from "../env.js";
+import { DEFAULT_MAX_ATTACHMENT_BYTES, type SignInProviders } from "../env.js";
 import type { Mailer } from "../email.js";
 import type { AgentLimits } from "../api/rate-limit.js";
 import type { WebhookRetry } from "../webhooks.js";
@@ -19,6 +19,8 @@ export interface TestServer {
   baseUrl: string;
   close: () => Promise<void>;
   purgeTrash: App["purgeTrash"];
+  archiveIssues: App["archiveIssues"];
+  sendTelemetry: App["sendTelemetry"];
 }
 
 // A throwaway Postgres database, dropped when the current test finishes.
@@ -59,6 +61,13 @@ export async function startTestServer(
     agentLimits?: AgentLimits;
     // How webhook deliveries retry. Production's by default.
     webhookRetry?: WebhookRetry;
+    // Let webhooks reach private addresses, like the tests' 127.0.0.1 receivers.
+    privateWebhookTargets?: boolean;
+    signIn?: SignInProviders;
+    // Where the update check asks for the latest release. Nowhere real.
+    releasesUrl?: string;
+    // Where telemetry pings go. Nowhere real.
+    telemetryUrl?: string;
   } = {},
 ): Promise<TestServer> {
   const database = options.database ?? (await createTestDatabase());
@@ -76,6 +85,10 @@ export async function startTestServer(
     jobs: options.jobs ?? false,
     agentLimits: options.agentLimits,
     webhookRetry: options.webhookRetry,
+    privateWebhookTargets: options.privateWebhookTargets,
+    signIn: options.signIn,
+    releasesUrl: options.releasesUrl ?? "http://127.0.0.1:9/releases/latest",
+    telemetryUrl: options.telemetryUrl ?? "http://127.0.0.1:9/v1/ping",
   }, { mailer: options.mailer });
   await app.start();
 
@@ -88,7 +101,7 @@ export async function startTestServer(
   };
   onTestFinished(close);
 
-  return { baseUrl: `http://127.0.0.1:${app.port}`, close, purgeTrash: app.purgeTrash };
+  return { baseUrl: `http://127.0.0.1:${app.port}`, close, purgeTrash: app.purgeTrash, archiveIssues: app.archiveIssues, sendTelemetry: app.sendTelemetry };
 }
 
 async function adminQuery(adminUrl: string, sql: string): Promise<void> {

@@ -234,6 +234,67 @@ describe("agent guardrails", () => {
   });
 });
 
+describe("agent powers", () => {
+  it("never lets an agent raise its own powers or role", async () => {
+    const t = await startTestServer();
+    const { owner, org } = await orgWithOwner(t.baseUrl);
+    const agent = await createAgent(owner, org, { grants: ["agents", "members"], role: "guest" });
+    const ferro = keyClient(t.baseUrl, (await createKey(owner, org, agent.id)).secret);
+
+    const self = await ferro.patch(`${org}/agents/${agent.id}`, { version: 1, grants: ["agents", "delete", "members", "settings"] });
+    expect(self.status).toBe(403);
+    expect((await ferro.patch(`${org}/agents/${agent.id}`, { version: 1, role: "member" })).status).toBe(403);
+    expect((await ferro.patch(`${org}/members/${agent.id}`, { role: "member" })).status).toBe(403);
+    expect((await owner.get(`${org}/agents/${agent.id}`)).body).toMatchObject({ grants: ["agents", "members"], role: "guest" });
+  });
+
+  it("never lets an agent give out more than it holds", async () => {
+    const t = await startTestServer();
+    const { owner, org } = await orgWithOwner(t.baseUrl);
+    const agent = await createAgent(owner, org, { grants: ["agents", "members"] });
+    const ferro = keyClient(t.baseUrl, (await createKey(owner, org, agent.id)).secret);
+
+    // Powers it lacks, for a new agent or an existing one.
+    expect((await ferro.post(`${org}/agents`, { name: "Child", grants: ["delete"] })).status).toBe(403);
+    const child = await ferro.post(`${org}/agents`, { name: "Child", grants: ["members"] });
+    expect(child.status).toBe(201);
+    expect((await ferro.patch(`${org}/agents/${child.body.id}`, { version: 1, grants: ["settings"] })).status).toBe(403);
+    expect((await ferro.patch(`${org}/agents/${child.body.id}`, { version: 1, grants: ["agents"] })).status).toBe(200);
+
+    // Roles above its own.
+    const { memberId: mina } = await join(t.baseUrl, owner, org, "Mina", "member");
+    expect((await ferro.patch(`${org}/members/${mina}`, { role: "admin" })).status).toBe(403);
+    expect((await ferro.post(`${org}/invites`, { email: "a@example.com", role: "admin" })).status).toBe(403);
+    expect((await ferro.post(`${org}/invites`, { email: "m@example.com", role: "member" })).status).toBe(201);
+  });
+
+  it("never lets an agent reach a private team it cannot see", async () => {
+    const t = await startTestServer();
+    const { owner, org } = await orgWithOwner(t.baseUrl);
+    const secret = await createTeam(owner, org, "SEC", { private: true });
+    const agent = await createAgent(owner, org, { grants: ["agents", "members"] });
+    const ferro = keyClient(t.baseUrl, (await createKey(owner, org, agent.id)).secret);
+
+    expect((await ferro.post(`${org}/agents`, { name: "Spy", teamIds: [secret.id] })).status).toBe(400);
+    expect((await ferro.post(`${org}/invites`, { email: "s@example.com", teamIds: [secret.id] })).status).toBe(400);
+    const child = (await ferro.post(`${org}/agents`, { name: "Child" })).body;
+    expect((await ferro.post(`${org}/agents/${child.id}/api-keys`, { name: "k", teamIds: [secret.id] })).status).toBe(400);
+  });
+
+  it("keeps what covers every team, like the event log and export, from agents with the settings power", async () => {
+    const t = await startTestServer();
+    const { owner, org } = await orgWithOwner(t.baseUrl);
+    const agent = await createAgent(owner, org, { grants: ["settings"] });
+    const ferro = keyClient(t.baseUrl, (await createKey(owner, org, agent.id)).secret);
+
+    expect((await ferro.get(`${org}/events`)).status).toBe(403);
+    expect((await ferro.get(`${org}/export`)).status).toBe(403);
+    expect((await ferro.post(`${org}/webhooks`, { url: "https://example.com/all" })).status).toBe(403);
+    // Its own webhook sees no more than it does.
+    expect((await ferro.post(`${org}/webhooks`, { url: "https://example.com/mine", agentId: agent.id })).status).toBe(201);
+  });
+});
+
 describe("pause", () => {
   it("revokes every key, and a paused agent stays paused", async () => {
     const t = await startTestServer();

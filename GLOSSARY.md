@@ -13,7 +13,7 @@ The person who manages an instance's sign-up mode, email, storage and updates. I
 _Avoid_: Superuser, sysadmin
 
 **Sign-up mode**:
-Who can create a user on an instance: anyone, or only people with an invite.
+Who can create a user on an instance: anyone, only people with an invite, or also anyone who verifies an address at one of the instance's domains.
 _Avoid_: Registration mode, access mode
 
 **Organization**:
@@ -66,6 +66,10 @@ _Avoid_: External, viewer, collaborator
 An offer to join an organization with a role and teams, made to one email address and accepted through a link.
 _Avoid_: Invitation, join link, referral
 
+**Domain rule**:
+An organization's setting that lets anyone with a verified email address at one domain join it as a Member, without an invite.
+_Avoid_: Auto-join, allowed domain
+
 ## Work
 
 **Issue**:
@@ -116,6 +120,10 @@ _Avoid_: Upload, asset, document
 A team's prefilled starting point for a new issue.
 _Avoid_: Preset, blueprint
 
+**Saved view**:
+A member's own named arrangement of a team page: its filters, grouping and sort.
+_Avoid_: Filter, perspective, board
+
 **Cycle**:
 A timeboxed period of work for one team. Arrives after v1.
 _Avoid_: Sprint, iteration
@@ -138,6 +146,10 @@ _Avoid_: Status update, log, heartbeat
 The human whose OAuth approval let an agent take an action. Actions with an API key have no "on behalf of".
 _Avoid_: Impersonation, acting as
 
+**Power**:
+One of four things an agent may not do until an admin grants it: delete, change settings, manage members, manage agents. A power never lets an agent see a team it cannot see or give out more than it holds.
+_Avoid_: Permission, scope, capability
+
 **Pause**:
 An admin action that revokes every token an agent holds and stops its webhooks.
 _Avoid_: Disable, suspend, kill switch
@@ -155,6 +167,10 @@ _Avoid_: Transaction, batch, operation
 **Inbox**:
 A member's list of notifications about work that involves them.
 _Avoid_: Notifications page, feed
+
+**Inbox item**:
+One notification in an inbox, made from one event: an assignment, a delegation, a mention, a comment, an agent's progress, or a webhook that turned itself off.
+_Avoid_: Alert, message
 
 **Trash**:
 Where deleted issues, comments, projects and teams wait 30 days before permanent removal.

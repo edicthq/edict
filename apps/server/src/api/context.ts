@@ -6,6 +6,7 @@ import { ErrorResponse, Id, type ErrorCode } from "@edicthq/schema";
 import type { Mailer } from "../email.js";
 import { callerIn, credentialOf, scopeFor, type Caller, type Credential, type SessionUser } from "./callers.js";
 import { errorResponse, forbidden, onApiError, unauthorized } from "./errors.js";
+import { mayActUnverified } from "../instance.js";
 import type { AgentLimits, RequestLimiter } from "./rate-limit.js";
 
 export type { Caller, Credential, SessionUser } from "./callers.js";
@@ -27,10 +28,17 @@ export type ApiEnv = { Variables: { user: SessionUser | null; credential: Creden
 
 // Reads who is calling: an API key or OAuth token, else the session (ADR
 // 0021). Agents' tokens are rate-limited here.
-export function identify(deps: Pick<ApiDeps, "getUser" | "requestLimiter">) {
+export function identify(deps: Pick<ApiDeps, "getUser" | "requestLimiter"> & { db?: Database }) {
   return async (c: Context<ApiEnv>, next: () => Promise<void>) => {
     const user = await deps.getUser(c.req.raw.headers);
     const credential = credentialOf(c.req.raw.headers, user);
+    // The instance's public settings stay readable: the web app needs them
+    // to show what to do next.
+    if (credential?.kind === "session" && !credential.user.emailVerified && !c.req.path.endsWith("/instance") && deps.db) {
+      if (!(await mayActUnverified(deps.db, credential.user.id))) {
+        return errorResponse(c, "forbidden", "Verify your email first: open the link Edict sent you. Signing up by your domain needs a proven address.");
+      }
+    }
     if (credential && credential.kind !== "session" && deps.requestLimiter) {
       const wait = deps.requestLimiter.take(credential.hash);
       if (wait > 0) {

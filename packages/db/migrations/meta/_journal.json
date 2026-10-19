@@ -239,6 +239,48 @@
       "when": 1792357195775,
       "tag": "0034_templates_row_level_security",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1792390591201,
+      "tag": "0035_inbox_from_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792392231811,
+      "tag": "0036_archive_and_team_trash",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1792393416876,
+      "tag": "0037_sign_in_and_domains",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792394168053,
+      "tag": "0038_organization_default_accent",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1792398120128,
+      "tag": "0039_update_check",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1792398992849,
+      "tag": "0040_telemetry",
+      "breakpoints": true
     }
   ]
 }

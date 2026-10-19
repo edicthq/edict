@@ -1,9 +1,9 @@
 import { useSyncExternalStore } from "react";
 
-// Theme and accent, kept in this browser. Where they are stored for a person
-// or an organization is still open (docs/design/tokens.md); until then the
-// rail's Appearance section saves them here. index.html applies them before
-// the first paint.
+// Theme and accent. A person's choices are kept in this browser; the accent
+// they have not chosen comes from their organization's default, which the
+// server keeps (Organization.defaultAccent) and the org layout passes in.
+// index.html applies the last ones seen before the first paint.
 
 export const themes = ["system", "light", "dark"] as const;
 export type Theme = (typeof themes)[number];
@@ -21,25 +21,50 @@ export const accentNames: Record<Accent, string> = {
 
 interface Appearance {
   theme: Theme;
+  // The accent in use: the person's own, else the organization's default.
   accent: Accent;
+  // The one the person picked, if they did.
+  chosenAccent: Accent | null;
+}
+
+interface Saved {
+  theme?: Theme;
+  accent?: Accent | null;
+  // The last organization default seen, only so the first paint is right.
+  orgAccent?: Accent;
 }
 
 const KEY = "edict.appearance";
 const listeners = new Set<() => void>();
 
-function read(): Appearance {
+function read(): Saved {
   try {
-    const saved = JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<Appearance>;
+    const saved = JSON.parse(localStorage.getItem(KEY) ?? "{}") as Saved;
     return {
-      theme: themes.includes(saved.theme as Theme) ? (saved.theme as Theme) : "system",
-      accent: accents.includes(saved.accent as Accent) ? (saved.accent as Accent) : "violet",
+      theme: themes.includes(saved.theme as Theme) ? saved.theme : "system",
+      accent: accents.includes(saved.accent as Accent) ? saved.accent : null,
+      orgAccent: accents.includes(saved.orgAccent as Accent) ? saved.orgAccent : undefined,
     };
   } catch {
-    return { theme: "system", accent: "violet" };
+    return { theme: "system", accent: null };
   }
 }
 
-let current = read();
+let saved = read();
+let orgAccent: Accent = saved.orgAccent ?? "violet";
+let current = resolve();
+
+function resolve(): Appearance {
+  return { theme: saved.theme ?? "system", accent: saved.accent ?? orgAccent, chosenAccent: saved.accent ?? null };
+}
+
+function store() {
+  try {
+    localStorage.setItem(KEY, JSON.stringify({ ...saved, orgAccent }));
+  } catch {
+    // A browser that keeps nothing still shows the right colors now.
+  }
+}
 
 function apply({ theme, accent }: Appearance) {
   const root = document.documentElement;
@@ -48,9 +73,24 @@ function apply({ theme, accent }: Appearance) {
   root.dataset.accent = accent;
 }
 
-export function setAppearance(next: Partial<Appearance>) {
-  current = { ...current, ...next };
-  localStorage.setItem(KEY, JSON.stringify(current));
+// Sets the person's theme or accent; an accent of null goes back to the
+// organization's default.
+export function setAppearance(next: { theme?: Theme; accent?: Accent | null }) {
+  saved = { ...saved, ...next };
+  store();
+  update();
+}
+
+// The organization's default accent, from the server.
+export function setOrganizationAccent(accent: Accent) {
+  if (accent === orgAccent) return;
+  orgAccent = accent;
+  store();
+  update();
+}
+
+function update() {
+  current = resolve();
   // Switch without animating every color on the page.
   const root = document.documentElement;
   root.classList.add("no-transition");
@@ -79,20 +119,6 @@ export function cycleAccent() {
   const idx = accents.indexOf(current.accent);
   const nextAccent = accents[(idx + 1) % accents.length]!;
   setAppearance({ accent: nextAccent });
-}
-
-export function getOrgDefaultAccent(orgId: string): Accent {
-  try {
-    const val = localStorage.getItem(`edict.orgAccent.${orgId}`);
-    return accents.includes(val as Accent) ? (val as Accent) : "violet";
-  } catch {
-    return "violet";
-  }
-}
-
-export function setOrgDefaultAccent(orgId: string, accent: Accent) {
-  localStorage.setItem(`edict.orgAccent.${orgId}`, accent);
-  for (const listener of listeners) listener();
 }
 
 export function isTyping(event: KeyboardEvent): boolean {

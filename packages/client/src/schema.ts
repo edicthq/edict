@@ -100,6 +100,218 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/{orgId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Rename the organization, or set who may join by their email's domain
+         * @description Admins and Owners. With a joinDomain, anyone with a verified address at it may join as a Member.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateOrganization"];
+                };
+            };
+            responses: {
+                /** @description The organization */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Organization"];
+                    };
+                };
+                /** @description The request does not match the schema */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The caller's role does not allow this */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/organizations/joinable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Organizations the signed-in person may join by their verified email's domain */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Organizations open to the caller's domain */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Organization"][];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The caller's role does not allow this */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{orgId}/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Join an organization whose domain rule matches your verified email
+         * @description You join as a Member. Someone removed from the organization needs an invite to come back.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The organization and the caller's member in it */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Membership"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The caller's role does not allow this */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Conflicts with the current state */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{orgId}/members": {
         parameters: {
             query?: never;
@@ -488,7 +700,58 @@ export interface paths {
         };
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Move a team and everything in it to the trash
+         * @description Admins and Owners. The team, its issues and their identifiers leave every list and answer 410 until restored. Its keys stay reserved. The trash keeps it for 30 days.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                    teamId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Done */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The caller's role does not allow this */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
         options?: never;
         head?: never;
         /**
@@ -1432,10 +1695,17 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A team's issues, newest first */
+        /**
+         * A team's issues, newest first
+         * @description Without `archived`, every issue that is not archived: open ones and recently closed ones. With `archived=true`, archived issues a page at a time: pass the lowest number you got as `before` for the next page.
+         */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    archived?: "true" | "false";
+                    before?: number;
+                    limit?: number;
+                };
                 header?: never;
                 path: {
                     orgId: string;
@@ -1524,6 +1794,152 @@ export interface paths {
                 };
                 /** @description Not found, or not visible to the caller */
                 404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{orgId}/issues/{issueRef}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive a closed issue
+         * @description It leaves the team's list and stays findable by identifier and by search. Reopening it unarchives it.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                    /** @description The issue's id or any identifier it has had, like ENG-123 */
+                    issueRef: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The issue */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Issue"];
+                    };
+                };
+                /** @description The request does not match the schema */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No longer valid */
+                410: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{orgId}/issues/{issueRef}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bring an archived issue back to the team's list */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                    /** @description The issue's id or any identifier it has had, like ENG-123 */
+                    issueRef: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The issue */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Issue"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No longer valid */
+                410: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2784,6 +3200,140 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/organizations/{orgId}/teams/{teamId}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bring a team back from the trash, with everything in it */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                    teamId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The restored team */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Team"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The caller's role does not allow this */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{orgId}/trash/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Trashed teams, most recently deleted first
+         * @description Admins and Owners.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Trashed teams */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TrashedTeam"][];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The caller's role does not allow this */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/organizations/{orgId}/issues/bulk-delete": {
@@ -5414,7 +5964,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List inbox notifications for the current member */
+        /**
+         * The caller's inbox, newest first
+         * @description Items about issues the caller can no longer see, or that are in the trash, are left out. At most 100.
+         */
         get: {
             parameters: {
                 query?: {
@@ -5437,6 +5990,24 @@ export interface paths {
                         "application/json": components["schemas"]["InboxItem"][];
                     };
                 };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
             };
         };
         put?: never;
@@ -5454,7 +6025,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get unread count for current member */
+        /** How many of the caller's inbox items are unread */
         get: {
             parameters: {
                 query?: never;
@@ -5466,13 +6037,31 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Inbox unread summary */
+                /** @description The unread count */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": components["schemas"]["InboxSummary"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
                     };
                 };
             };
@@ -5509,19 +6098,46 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: {
+            requestBody: {
                 content: {
                     "application/json": components["schemas"]["UpdateInboxItem"];
                 };
             };
             responses: {
-                /** @description Updated inbox item */
+                /** @description The item */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": components["schemas"]["InboxItem"];
+                    };
+                };
+                /** @description The request does not match the schema */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
                     };
                 };
             };
@@ -5537,7 +6153,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Mark all inbox items as read */
+        /** Mark every unread inbox item read */
         post: {
             parameters: {
                 query?: never;
@@ -5549,7 +6165,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Marked items count */
+                /** @description How many items were marked */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5558,6 +6174,24 @@ export interface paths {
                         "application/json": {
                             count: number;
                         };
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
                     };
                 };
             };
@@ -6207,7 +6841,7 @@ export interface paths {
         };
         /**
          * A zip of the whole organization
-         * @description Owners and admins only. The zip holds one JSON document describing the organization — members, teams, statuses, labels, projects, templates, saved views, issues with their comments, relations, links, progress updates and attachment metadata — plus every attachment's bytes. Secrets are not included, so nothing in the zip can act on any other instance.
+         * @description Owners and admins only. The zip holds one JSON document describing the organization — members, teams, statuses, labels, projects, templates, saved views, issues with their comments, relations, links, progress updates, attachment metadata and the event log — plus every attachment's bytes at files/<attachment id>/<name>, the path markdown links to. Secrets are not included, so nothing in the zip can act on any other instance. The zip streams, so a large organization starts downloading at once.
          */
         get: {
             parameters: {
@@ -6220,7 +6854,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The export zip: edict-export.json and attachments/<attachment id>/<name> */
+                /** @description The export zip: edict-export.json and files/<attachment id>/<name> */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6304,7 +6938,7 @@ export interface paths {
         head?: never;
         /**
          * Change instance settings
-         * @description Instance admins only.
+         * @description Instance admins only. Answers with the public settings; the update check and telemetry show in GET /instance/status.
          */
         patch: {
             parameters: {
@@ -6359,6 +6993,189 @@ export interface paths {
         };
         trace?: never;
     };
+    "/instance/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How the instance is set up: email, storage, version, updates and telemetry
+         * @description Instance admins only.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The instance's setup */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["InstanceStatus"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The caller's role does not allow this */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/instance/update-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check for a newer release of Edict now
+         * @description Instance admins only. Asks GitHub for the latest release, as the daily check does. Refused while the update check is off.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description What the check found */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["UpdateCheck"];
+                    };
+                };
+                /** @description The request does not match the schema */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The caller's role does not allow this */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/instance/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every user on the instance, oldest first
+         * @description Instance admins only.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                    offset?: number | null;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description A page of users and how many there are */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["InstanceUsers"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The caller's role does not allow this */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6372,9 +7189,13 @@ export interface components {
             id: string;
             name: string;
             slug: string;
+            joinDomain: string | null;
+            defaultAccent: components["schemas"]["Accent"];
             /** Format: date-time */
             createdAt: string;
         };
+        /** @enum {string} */
+        Accent: "violet" | "blue" | "teal" | "pink" | "lime";
         Member: {
             /** Format: uuid */
             id: string;
@@ -6401,6 +7222,11 @@ export interface components {
             name: string;
             slug: string;
         };
+        UpdateOrganization: {
+            name?: string;
+            joinDomain?: string | null;
+            defaultAccent?: components["schemas"]["Accent"];
+        };
         UpdateMember: {
             role: components["schemas"]["Role"];
         };
@@ -6410,6 +7236,7 @@ export interface components {
             name: string;
             key: string;
             private: boolean;
+            archiveAfterDays: number | null;
             version: number;
             /** Format: date-time */
             createdAt: string;
@@ -6425,6 +7252,7 @@ export interface components {
             name?: string;
             key?: string;
             private?: boolean;
+            archiveAfterDays?: number | null;
         };
         AddTeamMember: {
             /** Format: uuid */
@@ -6566,6 +7394,10 @@ export interface components {
             parentId: string | null;
             /** Format: uuid */
             creatorId: string;
+            /** Format: date-time */
+            closedAt: string | null;
+            /** Format: date-time */
+            archivedAt: string | null;
             version: number;
             /** Format: date-time */
             createdAt: string;
@@ -6755,6 +7587,18 @@ export interface components {
         UpdateComment: {
             version: number;
             body: string;
+        };
+        TrashedTeam: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            key: string;
+            /** Format: date-time */
+            deletedAt: string;
+            /** Format: uuid */
+            deletedById: string;
+            /** Format: uuid */
+            changeId: string;
         };
         BulkDeleteIssues: {
             issueIds: string[];
@@ -7033,15 +7877,21 @@ export interface components {
             type: components["schemas"]["InboxItemType"];
             actor: components["schemas"]["Member"] & (Record<string, never> | null);
             issue: components["schemas"]["InboxIssue"];
+            webhook: {
+                /** Format: uuid */
+                id: string;
+                url: string;
+            } | null;
             /** Format: uuid */
             commentId: string | null;
+            progressState: components["schemas"]["ProgressState"] & (string | null);
             /** Format: date-time */
             readAt: string | null;
             /** Format: date-time */
             createdAt: string;
         };
         /** @enum {string} */
-        InboxItemType: "assigned" | "delegated" | "status_changed" | "comment_created" | "mentioned";
+        InboxItemType: "assigned" | "delegated" | "status_changed" | "comment_created" | "mentioned" | "progress_posted" | "webhook_disabled";
         InboxIssue: {
             /** Format: uuid */
             id: string;
@@ -7049,7 +7899,7 @@ export interface components {
             title: string;
             /** Format: uuid */
             teamId: string;
-        };
+        } | null;
         InboxSummary: {
             unreadCount: number;
         };
@@ -7128,11 +7978,77 @@ export interface components {
             signUpMode: components["schemas"]["SignUpMode"];
             setUp: boolean;
             sendsEmail: boolean;
+            signUpDomains: string[];
+            signInMethods: {
+                magicLink: boolean;
+                google: boolean;
+                github: boolean;
+                oidc: {
+                    name: string;
+                } | null;
+            };
         };
         /** @enum {string} */
-        SignUpMode: "open" | "invite_only";
+        SignUpMode: "open" | "invite_only" | "domain";
+        InstanceStatus: {
+            email: {
+                configured: boolean;
+                from: string | null;
+            };
+            storage: {
+                /** @enum {string} */
+                kind: "disk" | "s3";
+                location: string;
+            };
+            version: string;
+            updates: components["schemas"]["UpdateCheck"];
+            telemetry: components["schemas"]["Telemetry"];
+        };
+        UpdateCheck: {
+            check: boolean;
+            latest: {
+                version: string;
+                url: string;
+                /** Format: date-time */
+                publishedAt: string | null;
+            } | null;
+            available: boolean;
+            /** Format: date-time */
+            checkedAt: string | null;
+            error: string | null;
+        };
+        Telemetry: {
+            enabled: boolean;
+            payload: components["schemas"]["TelemetryPing"];
+            /** Format: date-time */
+            sentAt: string | null;
+            error: string | null;
+        };
+        TelemetryPing: {
+            version: string;
+            users: components["schemas"]["UserCountBucket"];
+        };
+        /** @enum {string} */
+        UserCountBucket: "1" | "2-10" | "11-50" | "51-200" | "201-1000" | "1001+";
+        InstanceUsers: {
+            users: components["schemas"]["InstanceUser"][];
+            total: number;
+        };
+        InstanceUser: {
+            id: string;
+            name: string;
+            email: string;
+            emailVerified: boolean;
+            instanceAdmin: boolean;
+            organizations: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
         UpdateInstanceSettings: {
             signUpMode?: components["schemas"]["SignUpMode"];
+            signUpDomains?: string[];
+            updateCheck?: boolean;
+            telemetry?: boolean;
         };
     };
     responses: never;

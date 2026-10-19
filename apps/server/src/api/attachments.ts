@@ -5,7 +5,7 @@ import { asc, eq } from "drizzle-orm";
 import { attachments, emit, enterOrg, inScope } from "@edicthq/db";
 import { Attachment, Id, IssueRef } from "@edicthq/schema";
 import { callerIn, scopeFor } from "./callers.js";
-import { body, credential, errors, identify, inOrg, json, OrgParams, router, type ApiEnv, type ApiDeps } from "./context.js";
+import { credential, errors, identify, inOrg, json, OrgParams, router, type ApiEnv, type ApiDeps } from "./context.js";
 import { invalid, notFound, onApiError, tooLarge } from "./errors.js";
 import { visibleIssue } from "./issue-data.js";
 import type { AttachmentStorage } from "../storage.js";
@@ -37,6 +37,7 @@ const storageKey = (row: AttachmentRow) => `${row.orgId}/${row.id}`;
 function nameOf(raw: string): string {
   const base = raw
     .replace(/[\\/]+/g, "-")
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: it removes control characters
     .replace(/[\u0000-\u001f\u007f]/g, "")
     .replace(/\.{2,}/g, ".")
     .trim();
@@ -115,7 +116,7 @@ export function attachmentRoutes(deps: AttachmentDeps) {
     const { orgId, issueRef } = c.req.valid("param");
     credential(c);
     const form = await c.req.parseBody();
-    const file = form["file"];
+    const file = form.file;
     if (!(file instanceof File) || file.size === 0) {
       throw invalid("Send the upload under the field `file`.");
     }

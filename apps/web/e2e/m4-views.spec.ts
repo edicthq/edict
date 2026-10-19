@@ -137,7 +137,7 @@ test("group by assignee and sort by last updated, all in the address", async ({ 
     ).json()) as IssueJson;
   const a = await made("Sketch the cover");
   const b = await made("Sew the spine");
-  const c = await made("Font the colophon");
+  await made("Font the colophon");
   // The endpoint returns the members array itself; the first row is whoever
   // created the organization.
   const me = await (await page.request.get(`/api/v1/organizations/${orgId}/members`, { headers })).json() as {

@@ -30,12 +30,19 @@ export const role = pgEnum("role", ["owner", "admin", "member", "guest"]);
 // What agents cannot do until an admin grants it (ADR 0021): deleting, changing
 // team and organization settings, managing members, and creating agents.
 export const agentPower = pgEnum("agent_power", ["delete", "settings", "members", "agents"]);
+// The agent color presets (docs/design/tokens.md).
+export const accent = pgEnum("accent", ["violet", "blue", "teal", "pink", "lime"]);
 
 // The tenant root.
 export const organizations = pgTable("organizations", {
   id: id(),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
+  // Anyone with a verified address at this lowercase domain may join as a
+  // Member (PLAN.md, Members and roles). Null: invites only.
+  joinDomain: text("join_domain"),
+  // The agent color new members start from, until they pick their own.
+  defaultAccent: accent("default_accent").notNull().default("violet"),
   createdAt: createdAt(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
 });
@@ -142,6 +149,14 @@ export const teams = pgTable(
     // The last issue number given out. Only goes up, so numbers are never
     // reused (ADR 0017).
     issueCounter: integer("issue_counter").notNull().default(0),
+    // Closed issues archive this many days after closing (ADR 0025). Null:
+    // they stay until archived by hand.
+    archiveAfterDays: integer("archive_after_days").default(30),
+    // The trash (ADR 0019): a trashed team and everything in it is hidden,
+    // and is purged 30 days after deletion.
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    deletedBy: uuid("deleted_by"),
+    deletedChangeId: uuid("deleted_change_id"),
     // ADR 0018.
     version: integer("version").notNull().default(1),
     createdAt: createdAt(),

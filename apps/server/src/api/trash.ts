@@ -1,13 +1,14 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { comments, emit, issues, projects, teams, type Transaction } from "@edicthq/db";
-import { BulkDeleteIssues, Comment, Id, Issue, IssueRef, TrashedIssue, TrashedProject } from "@edicthq/schema";
+import { BulkDeleteIssues, Comment, Id, Issue, IssueRef, Team, TrashedIssue, TrashedProject, TrashedTeam } from "@edicthq/schema";
 import type { Caller } from "./callers.js";
-import { atLeast, requireAgentPower, teamVisibility } from "./access.js";
+import { atLeast, requireAgentPower, requireRole, teamVisibility, toTeam } from "./access.js";
 import { toComment } from "./comments.js";
 import { body, errors, inOrg, json, noContent, OrgParams, router, type ApiDeps } from "./context.js";
 import { conflict, forbidden, notFound } from "./errors.js";
 import { loadIssue, visibleIssue } from "./issue-data.js";
+import { requireProjectEditor } from "./projects.js";
 
 type CommentRow = typeof comments.$inferSelect;
 
@@ -116,8 +117,70 @@ async function managedComment(tx: Transaction, caller: Caller, commentId: string
   return row;
 }
 
+// Teams go to the trash whole (ADR 0019): the team and everything in it is
+// hidden until it is restored, or purged 30 days after deletion.
+export async function trashTeam(tx: Transaction, caller: Caller, team: typeof teams.$inferSelect, extra: Extra = {}): Promise<void> {
+  await tx
+    .update(teams)
+    .set({ deletedAt: sql`now()`, deletedBy: caller.id, deletedChangeId: currentChange })
+    .where(eq(teams.id, team.id));
+  await emit(tx, caller.orgId, { type: "team.deleted", actorId: caller.id, subjectId: team.id, data: { key: team.key, name: team.name, ...extra } });
+}
+
+export async function restoreTeam(tx: Transaction, caller: Caller, team: typeof teams.$inferSelect, extra: Extra = {}): Promise<void> {
+  await tx.update(teams).set({ deletedAt: null, deletedBy: null, deletedChangeId: null }).where(eq(teams.id, team.id));
+  await emit(tx, caller.orgId, {
+    type: "team.restored",
+    actorId: caller.id,
+    subjectId: team.id,
+    data: { key: team.key, name: team.name, deletedChangeId: team.deletedChangeId, ...extra },
+  });
+}
+
+// A team an Admin may trash or restore, locked.
+export async function managedTeam(tx: Transaction, caller: Caller, teamId: string): Promise<typeof teams.$inferSelect> {
+  requireRole(caller, "admin", "delete or restore teams");
+  requireAgentPower(caller, "delete", "delete or restore teams");
+  const [team] = await tx.select().from(teams).where(eq(teams.id, teamId)).for("update");
+  if (!team || (caller.keyTeamIds && !caller.keyTeamIds.includes(teamId))) {
+    throw notFound("team");
+  }
+  return team;
+}
+
 const IssueParams = OrgParams.extend({ issueRef: IssueRef });
 const CommentParams = OrgParams.extend({ commentId: Id });
+const TeamParams = OrgParams.extend({ teamId: Id });
+
+const deleteTeam = createRoute({
+  method: "delete",
+  path: "/organizations/{orgId}/teams/{teamId}",
+  tags: ["Trash"],
+  summary: "Move a team and everything in it to the trash",
+  description:
+    "Admins and Owners. The team, its issues and their identifiers leave every list and answer 410 until restored. Its keys stay reserved. The trash keeps it for 30 days.",
+  request: { params: TeamParams },
+  responses: { ...noContent, ...errors("unauthorized", "forbidden", "not_found") },
+});
+
+const restoreTeamRoute = createRoute({
+  method: "post",
+  path: "/organizations/{orgId}/teams/{teamId}/restore",
+  tags: ["Trash"],
+  summary: "Bring a team back from the trash, with everything in it",
+  request: { params: TeamParams },
+  responses: { 200: json(Team, "The restored team"), ...errors("unauthorized", "forbidden", "not_found") },
+});
+
+const listTrashedTeams = createRoute({
+  method: "get",
+  path: "/organizations/{orgId}/trash/teams",
+  tags: ["Trash"],
+  summary: "Trashed teams, most recently deleted first",
+  description: "Admins and Owners.",
+  request: { params: OrgParams },
+  responses: { 200: json(z.array(TrashedTeam), "Trashed teams"), ...errors("unauthorized", "forbidden", "not_found") },
+});
 
 const deleteIssue = createRoute({
   method: "delete",
@@ -197,6 +260,42 @@ const restoreCommentRoute = createRoute({
 export function trashRoutes(deps: ApiDeps) {
   const app = router();
 
+  app.openapi(deleteTeam, async (c) => {
+    const { orgId, teamId } = c.req.valid("param");
+    await inOrg(deps, c, orgId, async (tx, caller) => {
+      const team = await managedTeam(tx, caller, teamId);
+      if (!team.deletedAt) await trashTeam(tx, caller, team);
+    });
+    return c.body(null, 204);
+  });
+
+  app.openapi(restoreTeamRoute, async (c) => {
+    const { orgId, teamId } = c.req.valid("param");
+    const team = await inOrg(deps, c, orgId, async (tx, caller) => {
+      const team = await managedTeam(tx, caller, teamId);
+      if (team.deletedAt) await restoreTeam(tx, caller, team);
+      return { ...team, deletedAt: null };
+    });
+    return c.json(toTeam(team), 200);
+  });
+
+  app.openapi(listTrashedTeams, async (c) => {
+    const { orgId } = c.req.valid("param");
+    const list = await inOrg(deps, c, orgId, async (tx, caller) => {
+      requireRole(caller, "admin", "see trashed teams");
+      const rows = await tx.select().from(teams).where(isNotNull(teams.deletedAt)).orderBy(desc(teams.deletedAt));
+      return rows.map((team) => ({
+        id: team.id,
+        name: team.name,
+        key: team.key,
+        deletedAt: team.deletedAt!.toISOString(),
+        deletedById: team.deletedBy!,
+        changeId: team.deletedChangeId!,
+      }));
+    });
+    return c.json(list, 200);
+  });
+
   app.openapi(deleteIssue, async (c) => {
     const { orgId, issueRef } = c.req.valid("param");
     await inOrg(deps, c, orgId, async (tx, caller) => {
@@ -264,7 +363,8 @@ export function trashRoutes(deps: ApiDeps) {
 
   app.openapi(listTrashedProjects, async (c) => {
     const { orgId } = c.req.valid("param");
-    const list = await inOrg(deps, c, orgId, async (tx) => {
+    const list = await inOrg(deps, c, orgId, async (tx, caller) => {
+      requireProjectEditor(caller, "see trashed projects");
       const rows = await tx
         .select()
         .from(projects)

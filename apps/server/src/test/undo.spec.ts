@@ -215,3 +215,59 @@ describe("undo", () => {
     expect((await owner.get(`${org}/issues/${two.identifier}`)).status).toBe(200);
   });
 });
+
+describe("undo beyond issues", () => {
+  it("sets back a project edit, a label rename and a status rename", async () => {
+    const t = await startTestServer();
+    const { owner, org } = await orgWithOwner(t.baseUrl);
+    const eng = await createTeam(owner, org, "ENG");
+    const project = (await owner.post(`${org}/projects`, { name: "Launch", description: "First" })).body;
+    const edit = await owner.patch(`${org}/projects/${project.id}`, { version: project.version, name: "Relaunch", description: "Second" });
+    expect((await undo(owner, org, changeOf(edit))).status).toBe(200);
+    expect((await owner.get(`${org}/projects/${project.id}`)).body).toMatchObject({ name: "Launch", description: "First" });
+
+    const label = (await owner.post(`${org}/labels`, { name: "bug" })).body;
+    const rename = await owner.patch(`${org}/labels/${label.id}`, { version: label.version, name: "defect" });
+    expect((await undo(owner, org, changeOf(rename))).status).toBe(200);
+    expect(((await owner.get(`${org}/labels`)).body as { name: string }[]).map((l) => l.name)).toEqual(["bug"]);
+
+    const statuses = (await owner.get(`${org}/teams/${eng.id}/statuses`)).body as { id: string; name: string; version: number }[];
+    const review = statuses.find((s) => s.name === "In Review")!;
+    const renamed = await owner.patch(`${org}/teams/${eng.id}/statuses/${review.id}`, { version: review.version, name: "Reviewing" });
+    expect((await undo(owner, org, changeOf(renamed))).status).toBe(200);
+    const after = (await owner.get(`${org}/teams/${eng.id}/statuses`)).body as { name: string }[];
+    expect(after.map((s) => s.name)).toContain("In Review");
+  });
+
+  it("brings a deleted label back onto its issues, and takes a created template away", async () => {
+    const t = await startTestServer();
+    const { owner, org } = await orgWithOwner(t.baseUrl);
+    const eng = await createTeam(owner, org, "ENG");
+    const label = (await owner.post(`${org}/labels`, { name: "bug" })).body;
+    await issue(owner, org, eng.id, { labelIds: [label.id] });
+    const removed = await owner.delete(`${org}/labels/${label.id}`);
+    expect((await owner.get(`${org}/issues/ENG-1`)).body.labelIds).toEqual([]);
+    expect((await undo(owner, org, changeOf(removed))).status).toBe(200);
+    expect((await owner.get(`${org}/issues/ENG-1`)).body.labelIds).toEqual([label.id]);
+
+    const made = await owner.post(`${org}/teams/${eng.id}/templates`, { name: "Bug report", title: "Bug: " });
+    expect((await undo(owner, org, changeOf(made))).status).toBe(200);
+    expect((await owner.get(`${org}/teams/${eng.id}/templates`)).body).toEqual([]);
+  });
+
+  it("restores a trashed team and unarchives an archived issue", async () => {
+    const t = await startTestServer();
+    const { owner, org } = await orgWithOwner(t.baseUrl);
+    const eng = await createTeam(owner, org, "ENG");
+    const statuses = (await owner.get(`${org}/teams/${eng.id}/statuses`)).body as { id: string; category: string }[];
+    await issue(owner, org, eng.id, { statusId: statuses.find((s) => s.category === "done")!.id });
+    const archived = await owner.post(`${org}/issues/ENG-1/archive`);
+    expect((await undo(owner, org, changeOf(archived))).status).toBe(200);
+    expect((await owner.get(`${org}/issues/ENG-1`)).body.archivedAt).toBeNull();
+
+    const trashed = await owner.delete(`${org}/teams/${eng.id}`);
+    expect((await undo(owner, org, changeOf(trashed))).status).toBe(200);
+    expect((await owner.get(`${org}/teams/${eng.id}`)).status).toBe(200);
+  });
+});
+

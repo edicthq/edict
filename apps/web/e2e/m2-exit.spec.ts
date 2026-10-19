@@ -38,7 +38,9 @@ test("an issue's whole lifecycle, through the UI, as the API sees it", async ({ 
   await expect(peek).toBeVisible();
   await peek.getByLabel("Title").fill("Export an organization as JSON");
   await peek.getByLabel("Title").press("Enter");
-  await peek.getByLabel("Description").fill("Issues, comments and **files**.");
+  // Typed, so the editor turns **files** into bold, which it stores as markdown.
+  await peek.getByLabel("Description").click();
+  await page.keyboard.type("Issues, comments and **files**.");
   await peek.getByLabel("Description").press("Escape");
   await expect.poll(async () => (await issue()).description).toBe("Issues, comments and **files**.");
 
@@ -80,7 +82,8 @@ test("an issue's whole lifecycle, through the UI, as the API sees it", async ({ 
   await expect(peek.getByRole("button", { name: /ENG-2 Zip the files/ })).toBeVisible();
 
   const discussion = peek.locator('section[aria-labelledby="peek-discussion"]');
-  await discussion.getByLabel("Add a comment").fill("Format agreed: **one** JSON file.");
+  await discussion.getByLabel("Add a comment").click();
+  await page.keyboard.type("Format agreed: **one** JSON file.");
   await discussion.getByLabel("Add a comment").press("ControlOrMeta+Enter");
   await expect(discussion.locator("article strong")).toHaveText("one");
   // Out of the composer, so the next keys are shortcuts.

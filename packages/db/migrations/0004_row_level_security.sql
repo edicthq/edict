@@ -17,9 +17,12 @@ CREATE FUNCTION edict_invite_token_hash() RETURNS text LANGUAGE sql STABLE
 --> statement-breakpoint
 
 -- Roles are cluster-wide, so another Edict database in the same cluster may
--- have created it already, possibly at this very moment.
+-- have created it already, possibly at this very moment. A role that may not
+-- create roles finds it made for it (docker/postgres-init.sh).
 DO $$ BEGIN
-  CREATE ROLE edict_app NOLOGIN;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'edict_app') THEN
+    CREATE ROLE edict_app NOLOGIN;
+  END IF;
 EXCEPTION WHEN duplicate_object OR unique_violation THEN NULL;
 END $$;
 --> statement-breakpoint

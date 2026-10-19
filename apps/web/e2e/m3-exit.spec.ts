@@ -172,7 +172,7 @@ test("an admin adds a runner agent with an API key and a webhook, then pauses it
 
   await card.getByRole("button", { name: "New API key" }).click();
   const secret = page.getByRole("dialog", { name: "Copy the API key" });
-  const key = (await secret.getByLabel("Secret").textContent())!;
+  const key = (await secret.locator("code").textContent())!;
   expect(key).toMatch(/^edict_ak_/);
   await secret.getByRole("button", { name: "Done" }).click();
   const teams = await page.request.get(`/api/v1/organizations/${orgId}/teams`, { headers: { authorization: `Bearer ${key}` } });

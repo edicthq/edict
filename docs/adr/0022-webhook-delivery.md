@@ -12,6 +12,8 @@ A webhook sends events to an outside URL. An organization-level webhook receives
 
 **Delivery.** A `POST` with a JSON body: the event's id, type, time, change, actor, "on behalf of", subject and data. Headers `Edict-Event`, `Edict-Delivery` and `Edict-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256 of "<t>.<body>">`, signed with the webhook's secret. Any 2xx response counts as delivered. Anything else, or no answer within 10 seconds, is retried with exponential backoff for about 24 hours. Receivers deduplicate on the event id, since delivery is at least once.
 
+**Targets.** A webhook URL must be a public address. Anyone who can create an organization can add a webhook, and the delivery log shows part of each response, so a URL on the instance's own network would let them read its metadata service or database port. The server refuses a private, loopback or link-local host when the webhook is saved, and checks again where the name resolves at the moment it sends. `PRIVATE_WEBHOOK_TARGETS=allow` lifts this for instances whose agent runners live on the same network.
+
 **Failure.** When a delivery runs out of retries, the webhook disables itself and writes a `webhook.disabled` event. Admins see it on the webhooks page, and the inbox picks it up in M5. Pausing an agent disables its webhooks too.
 
 **Log.** Each delivery keeps its request, its last response status and a truncated body, the attempt count and its timing, for 30 days. Redelivering queues the same payload again as a new delivery.

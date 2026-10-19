@@ -1,6 +1,7 @@
 // Contract tests for /mcp (ADR 0011): the real tools, through the MCP SDK's
 // own client over Streamable HTTP, against a seeded instance. Agents depend
 // on these tool names, inputs and messages.
+import { readFileSync } from "node:fs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { describe, expect, it } from "vitest";
@@ -80,7 +81,42 @@ describe("/mcp", () => {
     const templates = (await client.listResourceTemplates()).resourceTemplates.map((r) => r.uriTemplate);
     expect(templates).toEqual(["edict://issue/{identifier}", "edict://project/{slug}"]);
     const prompts = (await client.listPrompts()).prompts.map((p) => p.name).sort();
-    expect(prompts).toEqual(["plan_issues", "work_my_queue"]);
+    expect(prompts).toEqual(["plan_issues", "plan_project", "triage_inbox", "work_my_queue"]);
+  });
+
+  it("names itself edict at the version the server ships as", async () => {
+    const { t, owner, orgId } = await seed();
+    const { client } = await mcpClient(t.baseUrl, (await connect(t.baseUrl, owner, orgId)).accessToken);
+    const { version } = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
+    expect(client.getServerVersion()).toMatchObject({ name: "edict", version });
+  });
+
+  it("serves each prompt, naming the tools it steers to", async () => {
+    const { t, owner, orgId } = await seed();
+    const { client } = await mcpClient(t.baseUrl, (await connect(t.baseUrl, owner, orgId)).accessToken);
+    const text = async (name: string, args?: Record<string, string>) => {
+      const prompt = await client.getPrompt({ name, arguments: args });
+      return prompt.messages.map((m) => (m.content as { text: string }).text).join("\n");
+    };
+    expect(await text("work_my_queue")).toContain("my_work");
+    expect(await text("triage_inbox")).toContain("get_inbox");
+    expect(await text("plan_issues", { team: "ENG", goal: "Ship SSO" })).toContain("get_team_context");
+    const project = await text("plan_project", { project: "launch" });
+    expect(project).toContain("get_project");
+    expect(project).toContain("launch");
+  });
+
+  it("lists the caller's unread inbox", async () => {
+    const { t, owner, org, orgId, eng } = await seed();
+    const ferro = await runner(t.baseUrl, owner, org, [eng.id]);
+    const { call } = await mcpClient(t.baseUrl, ferro.secret);
+    expect((await call("get_inbox")).text).toContain("No unread notifications");
+    await owner.post(`${org}/teams/${eng.id}/issues`, { title: "For Ferro", delegateId: ferro.id });
+    const inbox = await call("get_inbox");
+    expect(inbox.error).toBe(false);
+    expect(inbox.text).toContain("ENG-2");
+    expect(inbox.text).toContain("delegated");
+    void orgId;
   });
 
   it("works a delegated issue from start to finish as a connected agent", async () => {

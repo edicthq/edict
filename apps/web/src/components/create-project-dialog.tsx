@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MarkdownEditor } from "./markdown-editor.js";
 import { useNavigate } from "react-router";
 import type { ProjectStatus } from "@edicthq/client";
 import { Button, Dialog, Field, Input, Select } from "@edicthq/ui";
@@ -179,16 +180,18 @@ function CreateProjectForm({
         </Field>
       </div>
 
-      <Field label="Description">
-        {() => (
-          <textarea
-            className="min-h-24 w-full rounded-sm border border-line bg-surface p-2 text-ui text-ink outline-none transition-[border-color] focus:border-ink placeholder:text-ink-3"
-            placeholder="What does this project deliver?"
+      <div className="flex flex-col gap-1.5">
+        <span className="text-ui font-medium text-ink">Description</span>
+        <div className="rounded-sm border border-line bg-surface p-2 focus-within:border-ink">
+          <MarkdownEditor
+            label="Description"
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={setDescription}
+            placeholder="What does this project deliver?"
+            className="min-h-24 text-ui"
           />
-        )}
-      </Field>
+        </div>
+      </div>
 
       <FormError message={failure} />
 

@@ -4,15 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Edict</title>
     <script>
       // Apply the saved theme and accent before the first paint (src/lib/appearance.ts).
       try {
-        var a = JSON.parse(localStorage.getItem("edict.appearance") || "{}");
+        const a = JSON.parse(localStorage.getItem("edict.appearance") || "{}");
         if (a.theme === "light" || a.theme === "dark") document.documentElement.dataset.theme = a.theme;
-        document.documentElement.dataset.accent = a.accent || "violet";
-      } catch (e) {}
+        document.documentElement.dataset.accent = a.accent || a.orgAccent || "violet";
+      } catch {}
     </script>
   </head>
   <body>

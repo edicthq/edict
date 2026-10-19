@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { foreignKey, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
-import { members, organizations, teams } from "./tenancy.js";
+import { organizations, teams } from "./tenancy.js";
 
 // ADR 0009 and the plan: a team's prefilled starting point for a new issue.
 // Templates hold a markdown description and the labels to start with; anyone

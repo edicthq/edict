@@ -2,11 +2,12 @@ import { createHash } from "node:crypto";
 import { oauthProvider } from "@better-auth/oauth-provider";
 import { betterAuth } from "better-auth";
 import { APIError } from "better-auth/api";
-import { admin } from "better-auth/plugins";
+import { admin, genericOAuth, magicLink } from "better-auth/plugins";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { count, eq } from "drizzle-orm";
 import { schema, type Database } from "@edicthq/db";
-import { passwordResetEmail, verificationEmail, type Mailer } from "./email.js";
+import { magicLinkEmail, passwordResetEmail, verificationEmail, type Mailer } from "./email.js";
+import type { SignInProviders } from "./env.js";
 import { maySignUp } from "./instance.js";
 
 export interface AuthConfig {
@@ -18,6 +19,8 @@ export interface AuthConfig {
   // On by default; tests that sign several people up from one address turn it
   // off.
   rateLimit?: boolean;
+  // Google, GitHub and OpenID Connect sign-in, each when configured.
+  signIn?: SignInProviders;
 }
 
 export type EdictAuth = ReturnType<typeof createAuth>;
@@ -54,6 +57,13 @@ export function createAuth(
         ? async ({ user, url }) => mailer.send(passwordResetEmail({ to: user.email, url }))
         : undefined,
     },
+    socialProviders: {
+      ...(config.signIn?.google ? { google: config.signIn.google } : {}),
+      ...(config.signIn?.github ? { github: config.signIn.github } : {}),
+    },
+    // Google and GitHub vouch for the addresses they report, so signing in
+    // with one joins the user who already has that address.
+    account: { accountLinking: { enabled: true, trustedProviders: ["google", "github"] } },
     emailVerification: mailer
       ? {
           sendOnSignUp: true,
@@ -73,6 +83,27 @@ export function createAuth(
     },
     plugins: [
       admin(),
+      // A link by email, which also verifies the address. Without email, off.
+      ...(mailer
+        ? [magicLink({ sendMagicLink: async ({ email, url }) => mailer.send(magicLinkEmail({ to: email, url })) })]
+        : []),
+      ...(config.signIn?.oidc
+        ? [
+            genericOAuth({
+              config: [
+                {
+                  providerId: "oidc",
+                  name: config.signIn.oidc.name,
+                  discoveryUrl: `${config.signIn.oidc.issuer.replace(/\/$/, "")}/.well-known/openid-configuration`,
+                  clientId: config.signIn.oidc.clientId,
+                  clientSecret: config.signIn.oidc.clientSecret,
+                  scopes: ["openid", "email", "profile"],
+                  pkce: true,
+                },
+              ],
+            }),
+          ]
+        : []),
       oauthProvider({
         loginPage: "/sign-in",
         consentPage: "/oauth/consent",

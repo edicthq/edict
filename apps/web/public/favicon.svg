@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-  <!-- Placeholder until Edict has a real icon (docs/PLAN.md, "Logo and app icon"). -->
-  <path d="M10 1.5l7.4 4.25v8.5L10 18.5l-7.4-4.25v-8.5z" fill="#7f4ce6"/>
-  <path d="M6.5 6.5h7M6.5 10h5M6.5 13.5h6" stroke="#fdfcff" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+  <style>path { fill: #161b22 } @media (prefers-color-scheme: dark) { path { fill: #edeff1 } }</style>
+  <path d="M5 2h7a1 1 0 0 1 0 2H5v8h7a1 1 0 0 1 0 2H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"/>
+  <path d="M8.1 6h1.8A1.1 1.1 0 0 1 11 7.1v1.8A1.1 1.1 0 0 1 9.9 10H8.1A1.1 1.1 0 0 1 7 8.9V7.1A1.1 1.1 0 0 1 8.1 6Z"/>
 </svg>

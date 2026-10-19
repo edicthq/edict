@@ -1,10 +1,21 @@
 import { Lock } from "lucide-react";
 import { useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
+import type { Team } from "@edicthq/client";
 import { Avatar, Badge, Button, Select, TeamKey } from "@edicthq/ui";
 import { EmptyState, FormError, GroupHeader, Loading, PageBody, PageHeader, rowClass } from "../components/shell.js";
 import { roleLabel } from "../lib/labels.js";
-import { useAddTeamMember, useMembers, useRemoveTeamMember, useTeamMembers, useTeams } from "../lib/queries.js";
+import { useToast } from "../components/toast.js";
+import { useOfferUndo } from "../components/undo.js";
+import {
+  useAddTeamMember,
+  useDeleteTeam,
+  useMembers,
+  useRemoveTeamMember,
+  useTeamMembers,
+  useTeams,
+  useUpdateTeam,
+} from "../lib/queries.js";
 import { useOrg } from "./org.js";
 
 export function TeamsPage() {
@@ -164,8 +175,81 @@ export function TeamMembersPage() {
             </Button>
           </form>
         ) : null}
+        {canManage ? <TeamSettings team={team} /> : null}
       </PageBody>
     </>
+  );
+}
+
+const archiveChoices: { value: string; label: string }[] = [
+  { value: "7", label: "After 1 week" },
+  { value: "30", label: "After 1 month" },
+  { value: "90", label: "After 3 months" },
+  { value: "180", label: "After 6 months" },
+  { value: "never", label: "Never" },
+];
+
+// What an Admin changes about a team itself: when its closed issues archive
+// (ADR 0025), and sending it to the trash (ADR 0019).
+function TeamSettings({ team }: { team: Team }) {
+  const { orgId, slug } = useOrg();
+  const update = useUpdateTeam(orgId);
+  const remove = useDeleteTeam(orgId);
+  const offerUndo = useOfferUndo();
+  const toast = useToast();
+  const navigate = useNavigate();
+  const current = team.archiveAfterDays === null ? "never" : String(team.archiveAfterDays);
+  const choices = archiveChoices.some((c) => c.value === current)
+    ? archiveChoices
+    : [{ value: current, label: `After ${current} days` }, ...archiveChoices];
+
+  return (
+    <section aria-labelledby="team-settings" className="mt-8 flex flex-col gap-4">
+      <GroupHeader>
+        <span id="team-settings">Settings</span>
+      </GroupHeader>
+      <label className="flex flex-wrap items-center gap-3 px-3 text-ui">
+        <span className="min-w-56 text-ink">Archive closed issues</span>
+        <Select
+          className="max-w-[200px] sm:h-[30px]"
+          value={current}
+          disabled={update.isPending}
+          onChange={(event) =>
+            update.mutate(
+              { teamId: team.id, version: team.version, archiveAfterDays: event.target.value === "never" ? null : Number(event.target.value) },
+              { onError: (error) => toast(error.message) },
+            )
+          }
+        >
+          {choices.map((choice) => (
+            <option key={choice.value} value={choice.value}>
+              {choice.label}
+            </option>
+          ))}
+        </Select>
+      </label>
+      <div className="flex flex-wrap items-center gap-3 px-3 text-ui">
+        <span className="min-w-56 text-ink-2">
+          Deleting the team sends it to the trash with all its issues for 30 days. Its key stays reserved until then.
+        </span>
+        <Button
+          variant="ghost"
+          disabled={remove.isPending}
+          onClick={() => {
+            if (!window.confirm(`Move ${team.key} ${team.name} and all its issues to the trash?`)) return;
+            remove.mutate(team.id, {
+              onSuccess: () => {
+                offerUndo(`Moved ${team.key} to the trash`);
+                navigate(`/${slug}/teams`);
+              },
+              onError: (error) => toast(error.message),
+            });
+          }}
+        >
+          Delete team
+        </Button>
+      </div>
+    </section>
   );
 }
 

@@ -15,8 +15,10 @@ import { mcpRoutes } from "./mcp/index.js";
 import { oauthDiscovery, oauthRoutes } from "./oauth.js";
 import { startRealtime } from "./realtime.js";
 import { DEFAULT_WEBHOOK_RETRY } from "./webhooks.js";
-import { purgeTrash, startJobs, type PurgeResult } from "./jobs.js";
+import { archiveClosedIssues, purgeTrash, startJobs, type PurgeResult } from "./jobs.js";
 import { localDiskStorage, s3Storage } from "./storage.js";
+import { sendTelemetry, TELEMETRY_URL } from "./telemetry.js";
+import { RELEASES_URL } from "./updates.js";
 
 export interface App {
   app: Hono;
@@ -28,6 +30,10 @@ export interface App {
   shutdown: () => Promise<void>;
   // The daily trash purge, run now as if at `now`. Tests use it.
   purgeTrash: (now?: Date) => Promise<PurgeResult>;
+  // The daily archive of closed issues, run now as if at `now`.
+  archiveIssues: (now?: Date) => Promise<number>;
+  // The daily telemetry ping, sent now if telemetry is on.
+  sendTelemetry: (now?: Date) => Promise<void>;
 }
 
 export interface AppOptions {
@@ -41,6 +47,8 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
   const mailer =
     options.mailer ??
     (config.smtpUrl && config.emailFrom ? createSmtpMailer(config.smtpUrl, config.emailFrom) : undefined);
+
+  const telemetryUrl = config.telemetryUrl ?? TELEMETRY_URL;
 
   // Built in start(): the auth secret may live in the database.
   let auth: EdictAuth | undefined;
@@ -59,6 +67,15 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
     maxAttachmentBytes: config.maxAttachmentBytes,
     agentLimits,
     requestLimiter: new RequestLimiter(agentLimits.requestsPerMinute),
+    privateWebhookTargets: config.privateWebhookTargets ?? false,
+    signIn: config.signIn ?? {},
+    releasesUrl: config.releasesUrl ?? RELEASES_URL,
+    instanceInfo: {
+      emailFrom: config.emailFrom ?? null,
+      storage: config.s3
+        ? { kind: "s3" as const, location: `${config.s3.bucket}${config.s3.endpoint ? ` at ${config.s3.endpoint}` : ""}` }
+        : { kind: "disk" as const, location: config.dataDir },
+    },
     queueDelivery: async (job: { orgId: string; deliveryId: string }) => {
       await jobs?.queueDelivery(job);
     },
@@ -102,6 +119,7 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
           baseURL: config.baseUrl,
           trustedProxies: config.trustedProxies,
           rateLimit: config.authRateLimit === false ? false : undefined,
+          signIn: config.signIn,
         },
         db,
         mailer,
@@ -109,14 +127,19 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
       );
 
       if (config.jobs !== false) {
-        jobs = await startJobs(config.databaseUrl, db, pool, deps.storage, config.webhookRetry ?? DEFAULT_WEBHOOK_RETRY);
+        jobs = await startJobs(config.databaseUrl, db, pool, deps.storage, {
+          retry: config.webhookRetry ?? DEFAULT_WEBHOOK_RETRY,
+          allowPrivate: config.privateWebhookTargets ?? false,
+        }, { releasesUrl: deps.releasesUrl, telemetryUrl });
       }
 
       server = await listen(app, config.port);
       state.port = boundPort(server);
-      realtime = await startRealtime(server, { db, pool, getUser: deps.getUser });
+      realtime = await startRealtime(server, { db, pool, getUser: deps.getUser, publicUrl: config.baseUrl });
     },
     purgeTrash: (now) => purgeTrash(db, deps.storage, now),
+    archiveIssues: (now) => archiveClosedIssues(db, now),
+    sendTelemetry: (now) => sendTelemetry(db, telemetryUrl, now),
     shutdown: async () => {
       // Before server.close(): open sockets would hold it open, and only
       // stopping realtime ends them.

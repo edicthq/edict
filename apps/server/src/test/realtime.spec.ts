@@ -135,3 +135,76 @@ describe("realtime", () => {
     expect(await nextMessage(socket, 1_000)).toBeUndefined();
   });
 });
+
+describe("realtime audiences", () => {
+  // Every message a socket gets from now on.
+  function collect(socket: WebSocket): Received[] {
+    const got: Received[] = [];
+    socket.on("message", (body) => got.push(JSON.parse(String(body))));
+    return got;
+  }
+
+  it("stops sending to someone removed from the organization", async () => {
+    const t = await startTestServer();
+    const { owner, orgId } = await orgWithOwner(t.baseUrl);
+    const org = `/organizations/${orgId}`;
+    const maya = await join(t.baseUrl, owner, org, "Maya", "member");
+    const socket = await connect(t.baseUrl, maya.client.cookie);
+    await subscribeAndAwait(socket, orgId);
+    const got = collect(socket);
+
+    await owner.delete(`${org}/members/${maya.memberId}`);
+    // A project belongs to no team, so only membership decides.
+    await owner.post(`${org}/projects`, { name: "After she left" });
+    const ownerSocket = await connect(t.baseUrl, owner.cookie);
+    await subscribeAndAwait(ownerSocket, orgId);
+    await owner.post(`${org}/projects`, { name: "Later still" });
+    expect(await nextMessage(ownerSocket)).toMatchObject({ type: "project.created" });
+    expect(got.map((m) => m.type).filter((type) => type === "project.created")).toEqual([]);
+  });
+
+  it("sends Admin-only events to Admins, and a person's own events only to them", async () => {
+    const t = await startTestServer();
+    const { owner, orgId } = await orgWithOwner(t.baseUrl);
+    const org = `/organizations/${orgId}`;
+    const eng = await createTeam(owner, org, "ENG");
+    const gus = await join(t.baseUrl, owner, org, "Gus", "member", [eng.id]);
+    const guestSocket = await connect(t.baseUrl, gus.client.cookie);
+    const ownerSocket = await connect(t.baseUrl, owner.cookie);
+    await subscribeAndAwait(guestSocket, orgId);
+    await subscribeAndAwait(ownerSocket, orgId);
+    const theirs = collect(guestSocket);
+    const mine = collect(ownerSocket);
+
+    await owner.post(`${org}/invites`, { email: "secret@example.com", role: "member" });
+    await owner.post(`${org}/teams/${eng.id}/saved-views`, { name: "Mine", query: {} });
+    await owner.post(`${org}/teams/${eng.id}/issues`, { title: "Everyone sees this" });
+    // The member's one event comes after the owner's three, which are all in.
+    const until = Date.now() + 10_000;
+    while ((mine.length < 3 || theirs.length === 0) && Date.now() < until) await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(mine.map((m) => m.type)).toEqual(["invite.created", "view.saved", "issue.created"]);
+    expect(theirs.map((m) => m.type)).toEqual(["issue.created"]);
+  });
+
+  it("refuses an upgrade from another site's page", async () => {
+    const t = await startTestServer();
+    const { owner } = await orgWithOwner(t.baseUrl);
+    const refused = new Promise<number>((resolve, reject) => {
+      const socket = new WebSocket(`${t.baseUrl.replace("http", "ws")}/ws`, {
+        headers: { cookie: owner.cookie!, origin: "https://evil.example" },
+      });
+      socket.on("unexpected-response", (_req, res) => resolve(res.statusCode ?? 0));
+      socket.on("open", () => reject(new Error("opened")));
+      socket.on("error", () => undefined);
+    });
+    expect(await refused).toBe(403);
+    const same = new WebSocket(`${t.baseUrl.replace("http", "ws")}/ws`, { headers: { cookie: owner.cookie!, origin: t.baseUrl } });
+    await new Promise<void>((resolve, reject) => {
+      same.on("open", () => resolve());
+      same.on("unexpected-response", (_req, res) => reject(new Error(`upgrade answered ${res.statusCode}`)));
+    });
+    same.close();
+  });
+});
+

@@ -477,7 +477,9 @@ export function registerTools(server: McpServer, session: Session): void {
         "",
         ...items.map((item) => {
           const actor = item.actor ? item.actor.name : "Someone";
-          return `- **${item.issue.identifier}** (${item.issue.title}): ${actor} ${item.type.replace(/_/g, " ")}`;
+          if (!item.issue) return `- A webhook to ${item.webhook?.url ?? "an outside URL"} turned itself off`;
+          const what = item.progressState ? `posted progress (${item.progressState})` : item.type.replace(/_/g, " ");
+          return `- **${item.issue.identifier}** (${item.issue.title}): ${actor} ${what}`;
         }),
       ].join("\n");
     }),

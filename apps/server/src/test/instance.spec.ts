@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Pool } from "pg";
 import { apiClient, cookieHeader, createTestDatabase, signUpAs, startTestServer } from "./server.js";
@@ -20,10 +21,10 @@ describe("instance settings", () => {
     const t = await startTestServer();
     const res = await apiClient(t.baseUrl).get("/instance");
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ signUpMode: "open", setUp: false, sendsEmail: false });
+    expect(res.body).toEqual({ signUpMode: "open", setUp: false, sendsEmail: false, signUpDomains: [], signInMethods: { magicLink: false, google: false, github: false, oidc: null } });
 
     await signUpAs(t.baseUrl, "Admin");
-    expect((await apiClient(t.baseUrl).get("/instance")).body).toEqual({ signUpMode: "open", setUp: true, sendsEmail: false });
+    expect((await apiClient(t.baseUrl).get("/instance")).body).toEqual({ signUpMode: "open", setUp: true, sendsEmail: false, signUpDomains: [], signInMethods: { magicLink: false, google: false, github: false, oidc: null } });
   });
 
   it("only the instance admin changes it", async () => {
@@ -36,7 +37,7 @@ describe("instance settings", () => {
 
     const res = await admin.patch("/instance", { signUpMode: "invite_only" });
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ signUpMode: "invite_only", setUp: true, sendsEmail: false });
+    expect(res.body).toEqual({ signUpMode: "invite_only", setUp: true, sendsEmail: false, signUpDomains: [], signInMethods: { magicLink: false, google: false, github: false, oidc: null } });
     expect((await apiClient(t.baseUrl).get("/instance")).body.signUpMode).toBe("invite_only");
   });
 
@@ -108,3 +109,30 @@ describe("client IP", () => {
     expect(await sessionIp(t.baseUrl, res)).toBe("203.0.113.7");
   });
 });
+
+describe("the instance admin's view", () => {
+  it("shows how email and storage are set up, the version, and every user, to instance admins only", async () => {
+    const { recordingMailer } = await import("./mail.js");
+    const { mailer } = recordingMailer();
+    const t = await startTestServer({ mailer });
+    const admin = await signUpAs(t.baseUrl, "Admin");
+    const mia = await signUpAs(t.baseUrl, "Mia");
+    await mia.post("/organizations", { name: "Mia's", slug: "mias" });
+
+    expect((await mia.get("/instance/status")).status).toBe(403);
+    expect((await mia.get("/instance/users")).status).toBe(403);
+
+    const status = (await admin.get("/instance/status")).body;
+    const { version } = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
+    expect(status).toMatchObject({ email: { configured: true }, storage: { kind: "disk" }, version });
+    const users = (await admin.get("/instance/users")).body;
+    expect(users.total).toBe(2);
+    expect(users.users).toEqual([
+      expect.objectContaining({ name: "Admin", email: "admin@example.com", instanceAdmin: true, organizations: 0 }),
+      expect.objectContaining({ name: "Mia", email: "mia@example.com", instanceAdmin: false, organizations: 1 }),
+    ]);
+    const page = (await admin.get("/instance/users?limit=1&offset=1")).body;
+    expect(page.users.map((u: { name: string }) => u.name)).toEqual(["Mia"]);
+  });
+});
+

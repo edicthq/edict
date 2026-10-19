@@ -1,8 +1,9 @@
 import { useState } from "react";
+import { MarkdownEditor } from "../components/markdown-editor.js";
 import { Link, useNavigate, useParams } from "react-router";
-import type { Issue, Project, ProjectStatus } from "@edicthq/client";
-import { Avatar, Button, Kbd, ProgressBar, ProjectStatusBadge, StatusIcon, PriorityIcon, TeamKey, cn } from "@edicthq/ui";
-import { ArrowLeft, Calendar, CheckCircle2, ChevronRight, FolderKanban, Plus, Trash2, User } from "lucide-react";
+import type { ProjectStatus } from "@edicthq/client";
+import { Avatar, Button, ProgressBar, ProjectStatusBadge, PriorityIcon, TeamKey, cn } from "@edicthq/ui";
+import { ArrowLeft, Calendar, Plus, Trash2, } from "lucide-react";
 import { CreateProjectDialog } from "../components/create-project-dialog.js";
 import { EmptyState, GroupHeader, Loading, PageBody, PageHeader, rowClass } from "../components/shell.js";
 import {
@@ -23,7 +24,7 @@ function formatDate(iso: string | null | undefined): string {
 }
 
 export function ProjectsPage() {
-  const { orgId, slug, canManage } = useOrg();
+  const { orgId, slug, membership } = useOrg();
   const projects = useProjects(orgId);
   const members = useMembers(orgId);
   const [createOpen, setCreateOpen] = useState(false);
@@ -42,10 +43,13 @@ export function ProjectsPage() {
       <PageHeader
         title="Projects"
         actions={
-          <Button variant="primary" onClick={() => setCreateOpen(true)}>
-            <Plus aria-hidden="true" className="size-3.5" strokeWidth={2} />
-            New project
-          </Button>
+          // Guests work only in their teams' issues, not on projects.
+          membership.member.role === "guest" ? null : (
+            <Button variant="primary" onClick={() => setCreateOpen(true)}>
+              <Plus aria-hidden="true" className="size-3.5" strokeWidth={2} />
+              New project
+            </Button>
+          )
         }
       />
 
@@ -245,7 +249,6 @@ export function ProjectDetailPage() {
     navigate(`/${slug}/projects`);
   };
 
-  const lead = project.leadId ? memberMap.get(project.leadId) : null;
   const { total, completed, percentage, byCategory, estimate } = project.progress;
 
   return (
@@ -382,12 +385,18 @@ export function ProjectDetailPage() {
 
           {isEditingDesc ? (
             <div className="flex flex-col gap-2">
-              <textarea
-                value={descDraft}
-                onChange={(e) => setDescDraft(e.target.value)}
-                placeholder="What is this project aiming to accomplish?"
-                className="min-h-24 w-full rounded-md border border-line bg-surface p-3 text-ui text-ink outline-none focus:border-ink placeholder:text-ink-3"
-              />
+              <div className="rounded-md border border-line bg-surface p-3 focus-within:border-ink">
+                <MarkdownEditor
+                  label="Project description"
+                  autoFocus
+                  value={descDraft}
+                  onChange={setDescDraft}
+                  onSubmit={() => void handleSaveDescription()}
+                  onEscape={() => setIsEditingDesc(false)}
+                  placeholder="What is this project aiming to accomplish?"
+                  className="min-h-24 text-ui"
+                />
+              </div>
               <div className="flex justify-end gap-2">
                 <Button variant="ghost" onClick={() => setIsEditingDesc(false)}>
                   Cancel

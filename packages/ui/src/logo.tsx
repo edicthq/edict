@@ -1,18 +1,15 @@
 import { cn } from "./cn.js";
 
-// Placeholder mark from the M0 prototype: a hexagon in the agent color with
-// three lines of an edict on it. Edict still needs a real logo and app icon
-// (docs/PLAN.md, "Logo and app icon"); replace this when it exists.
-export function LogoMark({ size = 20, className }: { size?: number; className?: string }) {
+// The Edict mark: an E whose middle arm is an agent's rounded square. It is
+// drawn on a 16px grid in the current text color, never the accent, so it is
+// crisp at 16 and 32. The SVG sources and app icons live in assets/brand.
+export function LogoMark({ size = 16, className }: { size?: number; className?: string }) {
   return (
-    <svg viewBox="0 0 20 20" width={size} height={size} aria-hidden="true" className={cn("shrink-0", className)}>
-      <path d="M10 1.5l7.4 4.25v8.5L10 18.5l-7.4-4.25v-8.5z" fill="var(--agent)" />
+    <svg viewBox="0 0 16 16" width={size} height={size} aria-hidden="true" className={cn("shrink-0 text-ink", className)}>
+      <path d="M5 2h7a1 1 0 0 1 0 2H5v8h7a1 1 0 0 1 0 2H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z" fill="currentColor" />
       <path
-        d="M6.5 6.5h7M6.5 10h5M6.5 13.5h6"
-        stroke="var(--on-agent)"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        fill="none"
+        d="M8.1 6h1.8A1.1 1.1 0 0 1 11 7.1v1.8A1.1 1.1 0 0 1 9.9 10H8.1A1.1 1.1 0 0 1 7 8.9V7.1A1.1 1.1 0 0 1 8.1 6Z"
+        fill="currentColor"
       />
     </svg>
   );

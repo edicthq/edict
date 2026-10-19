@@ -22,4 +22,5 @@ The plan promises undo (⌘Z and the toast button) for any action you just took,
 
 - Every event must record enough to invert it: an update stores the old and new value of each field it changed.
 - The scheduled purge is the first background job. It runs on pg-boss, which M3's webhook deliveries need anyway.
-- Projects and teams use the same trash when they arrive.
+- Projects and teams use the same trash. A trashed team hides with everything in it: its issues answer `410 Gone` saying the team is in the trash, and its keys stay reserved until the purge, which releases them ([ADR 0017](./0017-identifiers-keep-resolving.md)).
+- Undo covers what members change by hand: issues, comments, links, relations, projects, labels, statuses, templates, teams going to the trash and archiving. What it does not cover answers `400` naming the event types.

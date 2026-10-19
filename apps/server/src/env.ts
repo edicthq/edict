@@ -40,6 +40,24 @@ export interface ServerConfig {
   // How webhook deliveries retry. DEFAULT_WEBHOOK_RETRY otherwise; tests
   // shorten it.
   webhookRetry?: WebhookRetry;
+  // Lets webhooks point at loopback, private and link-local addresses, like
+  // an agent runner on the instance's own network. Off: public addresses only.
+  privateWebhookTargets?: boolean;
+  signIn?: SignInProviders;
+  // Where the update check asks for Edict's latest release (RELEASES_URL).
+  // GitHub's API by default; tests point it at a stand-in.
+  releasesUrl?: string;
+  // Where opt-in telemetry pings go (TELEMETRY_URL, ADR 0026). Edict's
+  // collector by default.
+  telemetryUrl?: string;
+}
+
+// Sign-in methods beyond email and password, each on when configured.
+export interface SignInProviders {
+  google?: { clientId: string; clientSecret: string };
+  github?: { clientId: string; clientSecret: string };
+  // Any OpenID Connect provider (Authentik, Keycloak), found from its issuer.
+  oidc?: { issuer: string; clientId: string; clientSecret: string; name: string };
 }
 
 export class ConfigError extends Error {}
@@ -56,6 +74,12 @@ export function readConfig(env: NodeJS.ProcessEnv): ServerConfig {
   const port = readPort(env.PORT);
   if (port === undefined) {
     throw new ConfigError(`PORT is not a valid port number: ${env.PORT}`);
+  }
+
+  // Links, cookies and the OAuth issuer follow this URL. Without it they
+  // follow each request's Host header, which is fine only in development.
+  if (env.NODE_ENV === "production" && !env.BETTER_AUTH_URL) {
+    throw new ConfigError("BETTER_AUTH_URL is not set. Set it to the URL people reach Edict at, like https://edict.example.com.");
   }
 
   const smtpUrl = env.SMTP_URL || undefined;
@@ -83,11 +107,42 @@ export function readConfig(env: NodeJS.ProcessEnv): ServerConfig {
     emailFrom,
     authRateLimit: env.AUTH_RATE_LIMIT !== "off",
     jobs: env.JOBS !== "off",
+    privateWebhookTargets: env.PRIVATE_WEBHOOK_TARGETS === "allow",
+    signIn: readSignIn(env),
+    releasesUrl: env.RELEASES_URL || undefined,
+    telemetryUrl: env.TELEMETRY_URL || undefined,
     agentLimits: {
       requestsPerMinute: readLimit("AGENT_REQUESTS_PER_MINUTE", env.AGENT_REQUESTS_PER_MINUTE, DEFAULT_AGENT_LIMITS.requestsPerMinute),
       issuesPerHour: readLimit("AGENT_ISSUES_PER_HOUR", env.AGENT_ISSUES_PER_HOUR, DEFAULT_AGENT_LIMITS.issuesPerHour),
     },
   };
+}
+
+// A provider is on when both its id and its secret are set.
+function readSignIn(env: NodeJS.ProcessEnv): SignInProviders {
+  const pair = (name: string) => {
+    const clientId = env[`${name}_CLIENT_ID`] || undefined;
+    const clientSecret = env[`${name}_CLIENT_SECRET`] || undefined;
+    if (!clientId && !clientSecret) return undefined;
+    if (!clientId || !clientSecret) {
+      throw new ConfigError(`${name}_CLIENT_ID and ${name}_CLIENT_SECRET go together: set both, or neither.`);
+    }
+    return { clientId, clientSecret };
+  };
+  const signIn: SignInProviders = {};
+  const google = pair("GOOGLE");
+  const github = pair("GITHUB");
+  const oidc = pair("OIDC");
+  if (google) signIn.google = google;
+  if (github) signIn.github = github;
+  if (oidc) {
+    const issuer = env.OIDC_ISSUER || undefined;
+    if (!issuer || !/^https?:\/\//.test(issuer)) {
+      throw new ConfigError("OIDC_CLIENT_ID is set, so OIDC_ISSUER must be the provider's URL, like https://auth.example.com/application/o/edict/.");
+    }
+    signIn.oidc = { ...oidc, issuer, name: env.OIDC_NAME || "SSO" };
+  }
+  return signIn;
 }
 
 // S3_BUCKET turns on S3 storage, and then the credentials must be there too.

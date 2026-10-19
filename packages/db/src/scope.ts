@@ -24,6 +24,9 @@ export interface Scope {
   // Lets the OAuth access token with this hash be read before its
   // organization is known (ADR 0021).
   oauthTokenHash?: string;
+  // Lets organizations whose join domain is this verified address's domain
+  // be read, so a user can find the ones open to them.
+  joinDomain?: string;
 }
 
 // The data-access layer's entry point for tenant data (ADR 0006). Runs fn in
@@ -41,6 +44,7 @@ export function inScope<T>(db: Database, scope: Scope, fn: (tx: Transaction) => 
       set_config('edict.attachment_id', ${scope.attachmentId ?? ""}, true),
       set_config('edict.api_key_hash', ${scope.apiKeyHash ?? ""}, true),
       set_config('edict.oauth_token_hash', ${scope.oauthTokenHash ?? ""}, true),
+      set_config('edict.join_domain', ${scope.joinDomain ?? ""}, true),
       set_config('edict.on_behalf_of', '', true),
       set_config('edict.change_id', uuidv7()::text, true)`);
     return fn(tx);
@@ -57,6 +61,18 @@ export async function enterOrg(tx: Transaction, orgId: string): Promise<void> {
 // approval lets the acting agent act (ADR 0021).
 export async function onBehalfOf(tx: Transaction, memberId: string): Promise<void> {
   await tx.execute(sql`SELECT set_config('edict.on_behalf_of', ${memberId}, true)`);
+}
+
+export type EventRow = typeof events.$inferSelect;
+
+// Reads every event as it is written, in its transaction, so what it makes
+// commits with the change or not at all. The inbox is one (ADR 0005).
+export type EventConsumer = (tx: Transaction, event: EventRow) => Promise<void>;
+
+const consumers: EventConsumer[] = [];
+
+export function consumeEvents(consumer: EventConsumer): void {
+  if (!consumers.includes(consumer)) consumers.push(consumer);
 }
 
 export interface NewEvent {
@@ -81,7 +97,10 @@ export async function emit(tx: Transaction, orgId: string, event: NewEvent): Pro
     onBehalfOfId: event.onBehalfOfId ?? undefined,
     subjectId: event.subjectId,
     data: event.data ?? {},
-  }).returning({ id: events.id });
+  }).returning();
+  for (const consumer of consumers) {
+    await consumer(tx, row!);
+  }
   await tx.execute(sql`
     WITH queued AS (
       INSERT INTO webhook_outbox (event_id, org_id)

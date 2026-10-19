@@ -15,9 +15,9 @@ import {
 } from "@edicthq/db";
 import { CreateInvite, CreatedInvite, Id, Invite, InvitePreview, Membership } from "@edicthq/schema";
 import { inviteEmail } from "../email.js";
-import { loadMember, requireRole } from "./access.js";
+import { loadMember, requireRole, requireVisibleTeams, requireWithinCaller } from "./access.js";
 import { OrgParams, body, errors, inOrg, json, noContent, router, signedIn, type ApiDeps } from "./context.js";
-import { conflict, forbidden, gone, invalid, notFound } from "./errors.js";
+import { conflict, forbidden, gone, notFound } from "./errors.js";
 import { toOrganization } from "./organizations.js";
 
 const INVITE_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
@@ -143,13 +143,9 @@ export function inviteRoutes(deps: ApiDeps) {
         throw conflict(`${email} is already a member.`);
       }
 
+      requireWithinCaller(caller, { role: input.role });
       const teamIds = [...new Set(input.teamIds)];
-      if (teamIds.length > 0) {
-        const found = await tx.select({ id: teams.id }).from(teams).where(inArray(teams.id, teamIds));
-        if (found.length !== teamIds.length) {
-          throw invalid("Some of teamIds are not teams in this organization.");
-        }
-      }
+      await requireVisibleTeams(tx, caller, teamIds);
 
       const replaced = await tx
         .update(invites)

@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-r
 import type { Agent, Issue, Label, Member, Priority, SavedViewQuery, Status, Team } from "@edicthq/client";
 import { Avatar, Button, Kbd, LabelPill, Menu, PriorityIcon, ProgressBadge, StatusIcon, TeamKey, cn } from "@edicthq/ui";
 import type { MenuItem } from "@edicthq/ui";
-import { ArrowDown, ArrowUp, Bookmark, CheckSquare, ListFilter, Search, Square, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Bookmark, ListFilter, Search, Trash2, X } from "lucide-react";
 import { CreateIssueDialog } from "../components/create-issue-dialog.js";
 import { AssigneePicker, DelegatePicker, NoAssignee, PriorityPicker, StatusPicker } from "../components/issue-fields.js";
 import { IssuePeek, type PeekMenu } from "../components/issue-peek.js";
@@ -19,6 +19,7 @@ import {
   type BulkUpdateChanges,
   useCreateSavedView,
   useDeleteSavedView,
+  useArchivedIssues,
   useIssue,
   useMembers,
   useSavedViews,
@@ -53,19 +54,6 @@ import { isTyping } from "../lib/appearance.js";
 import { useOrg } from "./org.js";
 
 type View = "list" | "board";
-
-// Keys that act on the page only when no field, menu or dialog has focus.
-function typing(event: KeyboardEvent): boolean {
-  const target = event.target as HTMLElement;
-  return (
-    event.metaKey ||
-    event.ctrlKey ||
-    event.altKey ||
-    target.isContentEditable ||
-    ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) ||
-    document.querySelector("dialog[open]") !== null
-  );
-}
 
 export function TeamIssuesPage() {
   const { teamId = "" } = useParams();
@@ -103,6 +91,20 @@ function TeamIssues({ team }: { team: Team }) {
   const issueView = useMemo(() => parseView(params), [params]);
   // The create dialog, and the issue it makes a sub-issue of.
   const [creating, setCreating] = useState<{ parent?: Issue } | null>(null);
+  // ?create=1 opens the new-issue dialog: the desktop app's quick-create
+  // hotkey lands here.
+  useEffect(() => {
+    if (params.get("create") !== "1") return;
+    setCreating({});
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("create");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [params, setParams]);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [menu, setMenu] = useState<PeekMenu>(null);
   const bulkUpdate = useBulkUpdateIssues(orgId);
@@ -198,10 +200,14 @@ function TeamIssues({ team }: { team: Team }) {
     const upper = ref.toUpperCase();
     return issues.data?.find((i) => i.identifier === upper || i.id === ref);
   };
-  const peeked = peekRef ? byRef(peekRef) : undefined;
-  // Not in this team's list under that name: an old identifier, or an issue
-  // in another team. The API knows every identifier an issue has had.
-  const lookup = useIssue(orgId, peekRef && issues.data && !peeked ? peekRef : null);
+  const listed = peekRef ? byRef(peekRef) : undefined;
+  // Not in this team's list under that name: an old identifier, an issue in
+  // another team, or an archived one. The API knows every identifier an
+  // issue has had.
+  const lookup = useIssue(orgId, peekRef && issues.data && !listed ? peekRef : null);
+  // An archived issue of this team opens in the peek too, from the lookup.
+  const peeked =
+    listed ?? (lookup.data?.archivedAt && lookup.data.teamId === team.id && peekRef === lookup.data.identifier ? lookup.data : undefined);
 
   const setParam = (name: string, value: string | null, replace = false) =>
     setParams(
@@ -290,6 +296,8 @@ function TeamIssues({ team }: { team: Team }) {
     setParam("issue", null);
   };
 
+  // Runs when the lookup settles, not on every render's new callbacks.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: see above
   useEffect(() => {
     if (!peekRef || !lookup.data && !lookup.error) return;
     if (lookup.data) {
@@ -300,8 +308,6 @@ function TeamIssues({ team }: { team: Team }) {
       toast(`There's no issue ${peekRef.toUpperCase()} you can see.`);
       setParam("issue", null, true);
     }
-    // Runs when the lookup settles.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lookup.data, lookup.error]);
 
   // The listener stays registered once and always runs this render's handler,
@@ -732,6 +738,7 @@ function TeamIssues({ team }: { team: Team }) {
             }
           />
         )}
+        {loading ? null : <ArchivedIssues orgId={orgId} team={team} onOpen={openIssue} />}
       </div>
 
       {selectedIds.size > 0 && statuses.data ? (
@@ -1023,7 +1030,6 @@ function IssueList({
                     }}
                     onFocus={() => onFocus(issue.id)}
                     aria-current={openId === issue.id ? "true" : undefined}
-                    aria-selected={isSelected || undefined}
                     data-focused={focusId === issue.id || undefined}
                     data-selected={isSelected || undefined}
                     className={cn(
@@ -1163,7 +1169,6 @@ function IssueBoard({
                     }
                   }}
                   onFocus={() => onFocus(issue.id)}
-                  aria-selected={isSelected || undefined}
                   data-focused={focusId === issue.id || undefined}
                   data-selected={isSelected || undefined}
                   className={cn(
@@ -1246,4 +1251,55 @@ export function IssueLink() {
     );
   }
   return <Navigate to={`/${slug}/teams/${issue.data.teamId}?issue=${issue.data.identifier}`} replace />;
+}
+
+// Archived issues stay out of the team's collection (ADR 0025). They load
+// from the server a page at a time, only when asked for.
+function ArchivedIssues({ orgId, team, onOpen }: { orgId: string; team: Team; onOpen: (issue: Issue) => void }) {
+  const [shown, setShown] = useState(false);
+  const archived = useArchivedIssues(orgId, team.id, shown);
+  const list = archived.data?.pages.flat() ?? [];
+  return (
+    <section aria-label="Archived issues" className="px-6 pt-4 pb-10">
+      {shown ? (
+        <>
+          <h2 className="px-4 pb-1 text-sm font-semibold text-ink-2">Archived</h2>
+          {archived.isPending ? (
+            <Loading label="Loading archived issues" />
+          ) : list.length === 0 ? (
+            <p className="px-4 text-ui text-ink-2">Nothing is archived in {team.key} yet.</p>
+          ) : (
+            <ul className="flex flex-col gap-px">
+              {list.map((issue) => (
+                <li key={issue.id}>
+                  <button
+                    type="button"
+                    onClick={() => onOpen(issue)}
+                    className="flex min-h-9 w-full items-center gap-3 rounded-sm px-4 text-start text-ink-2 hover:bg-hover hover:text-ink"
+                  >
+                    <span className="w-[58px] shrink-0 font-mono text-sm tabular-nums">{issue.identifier}</span>
+                    <span className="min-w-0 flex-1 truncate text-body">{issue.title}</span>
+                    {issue.archivedAt ? (
+                      <time dateTime={issue.archivedAt} className="shrink-0 text-sm">
+                        archived {ago(issue.archivedAt)}
+                      </time>
+                    ) : null}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {archived.hasNextPage ? (
+            <Button variant="ghost" className="mt-2" disabled={archived.isFetchingNextPage} onClick={() => void archived.fetchNextPage()}>
+              Show more
+            </Button>
+          ) : null}
+        </>
+      ) : (
+        <Button variant="ghost" onClick={() => setShown(true)}>
+          Show archived issues
+        </Button>
+      )}
+    </section>
+  );
 }

@@ -4,7 +4,6 @@ import { emit, members, teamKeys, teamMembers, teams, type Transaction } from "@
 import { AddTeamMember, CreateTeam, Id, Member, Team, UpdateTeam } from "@edicthq/schema";
 import {
   activeMember,
-  atLeast,
   loadMember,
   memberWithUser,
   requireRole,
@@ -14,7 +13,7 @@ import {
   visibleTeam,
 } from "./access.js";
 import { OrgParams, body, errors, inOrg, json, noContent, router, type ApiDeps } from "./context.js";
-import { changesOf, conflict, forbidden, isUniqueViolation, notFound, requireVersion } from "./errors.js";
+import { changesOf, conflict, isUniqueViolation, notFound, requireVersion } from "./errors.js";
 import { seedStatuses } from "./statuses.js";
 
 const TeamParams = OrgParams.extend({ teamId: Id });

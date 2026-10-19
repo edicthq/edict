@@ -1,0 +1,54 @@
+---
+title: Agent runners
+description: Run an agent on a server or in CI, with an API key and a webhook to wake it.
+---
+
+An **agent runner** is anything outside Edict that works issues on its own: a server running Claude Code headless or the Agent SDK, a GitHub Action, a CI job. It uses an **admin-created agent** instead of a person's connected one.
+
+1. An admin creates the agent under **Agents**, with a name, an avatar and its own team access. Grant it powers (delete, settings, members, agents) only if it needs them.
+2. Give it an **API key**. Edict shows the secret once. The runner sends it as `Authorization: Bearer edict_ak_…` to `/mcp` or to the REST API under `/api/v1`.
+3. Add a **webhook** to the agent, so the runner starts as soon as an issue is delegated to it, instead of polling.
+
+Actions with an API key are recorded as the agent itself, with no "on behalf of".
+
+## Webhooks
+
+Edict sends each event as a `POST` with a JSON body:
+
+```json
+{
+  "id": "0199d2c4-…",
+  "type": "issue.updated",
+  "createdAt": "2027-01-29T12:00:00.000Z",
+  "organizationId": "…",
+  "changeId": "…",
+  "actor": { "id": "…", "kind": "human", "name": "Amirali Beigi" },
+  "onBehalfOf": null,
+  "subjectId": "…",
+  "data": {}
+}
+```
+
+and these headers:
+
+| Header | Holds |
+|---|---|
+| `Edict-Event` | The event type |
+| `Edict-Delivery` | The delivery's id |
+| `Edict-Signature` | `t=<unix seconds>,v1=<hex HMAC-SHA256>` |
+
+Check the signature before trusting a delivery: compute the HMAC-SHA256 of `<t>.<raw body>` with the webhook's secret, compare it to `v1` in constant time, and reject old timestamps.
+
+```ts
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+export function verify(secret: string, header: string, body: string, toleranceSeconds = 300): boolean {
+  const parts = Object.fromEntries(header.split(",").map((part) => part.split("=") as [string, string]));
+  const t = Number(parts.t);
+  if (!parts.v1 || !Number.isFinite(t) || Math.abs(Date.now() / 1000 - t) > toleranceSeconds) return false;
+  const expected = createHmac("sha256", secret).update(`${t}.${body}`).digest("hex");
+  return expected.length === parts.v1.length && timingSafeEqual(Buffer.from(expected), Buffer.from(parts.v1));
+}
+```
+
+Delivery is at least once: use the event's `id` to skip one you already handled. Answer with any 2xx. Edict retries a failed delivery with backoff for about a day, then turns the webhook off and tells the organization's admins. Each delivery, with its request and response, shows in the webhook's log, where you can send it again.

@@ -4,7 +4,7 @@ status: accepted
 
 # Three credentials, one caller
 
-Extends [ADR 0008](./0008-agents-are-members.md), [ADR 0014](./0014-better-auth.md) and [ADR 0015](./0015-oauth-connections-create-agents.md).
+Extends [ADR 0008](./0008-agents-are-members.md), [ADR 0014](./0014-better-auth.md) and [ADR 0015](./0015-oauth-connections-create-agents.md). Its guardrails are refined by [ADR 0024](./0024-powers-never-exceed-the-agent.md).
 
 Every request to `/api/v1`, `/files` and `/mcp` becomes one **caller** before any handler runs. The caller is the member who acts, plus what limits it:
 

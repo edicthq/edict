@@ -4,10 +4,10 @@ import { patchIssues } from "./collections.js";
 import { keys } from "./queries.js";
 
 // Realtime: one socket to the server's /ws, subscribed to the organization
-// the person is looking at. Every event the server sends invalidates the
-// queries it touches, so another person's (or an agent's) change shows up
-// without waiting for a refetch. Once issue data moves into TanStack DB
-// collections this patches them instead.
+// the person is looking at. Issue events patch the team's TanStack DB
+// collections (collections.ts), and every event invalidates the queries it
+// touches, so another person's (or an agent's) change shows up without a
+// refetch of the whole list.
 
 interface RealtimeEvent {
   type: string;
@@ -29,14 +29,22 @@ function send(message: unknown): void {
 
 function connect(): void {
   socket = new WebSocket("/ws");
+  const reconnecting = attempts > 0;
   socket.onopen = () => {
     attempts = 0;
     for (const orgId of subs) send({ type: "subscribe", orgId });
+    // Events sent while the socket was down are gone: refetch what is shown.
+    if (reconnecting) void client?.invalidateQueries({ queryKey: ["org"] });
   };
   socket.onmessage = (message) => {
     const event = JSON.parse(String(message.data)) as RealtimeEvent;
     // Control answers (subscribed, error) name their kind by their type; real
-    // events carry event types like "issue.created".
+    // events carry event types like "issue.created". A resync means the
+    // server missed events.
+    if (event.type === "resync") {
+      void client?.invalidateQueries({ queryKey: ["org"] });
+      return;
+    }
     if (event.type === "subscribed" || event.type === "error") return;
     onEvent(event);
   };
@@ -60,7 +68,7 @@ function onEvent(event: RealtimeEvent): void {
   if (!client) return;
   const orgId = event.organizationId;
   const issueId = event.type.startsWith("issue.") ? event.subjectId : event.data.issueId;
-  if (event.type.startsWith("issue.")) {
+  if (event.type.startsWith("issue.") || event.type === "progress.posted") {
     void patchIssues(event);
     void client.invalidateQueries({ queryKey: ["org", orgId, "issue"] });
     void client.invalidateQueries({ queryKey: keys.agents(orgId) });

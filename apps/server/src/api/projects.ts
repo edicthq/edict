@@ -1,20 +1,19 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne, sql, type SQL } from "drizzle-orm";
 import { emit, issues, projects, statuses, teams, type Transaction } from "@edicthq/db";
 import {
   CreateProject,
-  Id,
   Issue,
   Project,
   ProjectConflict,
-  ProjectProgress,
+  type ProjectProgress,
   ProjectRef,
   UpdateProject,
 } from "@edicthq/schema";
 import type { Caller } from "./callers.js";
 import { activeMember, requireAgentPower, teamVisibility } from "./access.js";
 import { body, errors, inOrg, json, noContent, OrgParams, router, type ApiDeps } from "./context.js";
-import { conflict, gone, isUniqueViolation, notFound } from "./errors.js";
+import { conflict, forbidden, gone, isUniqueViolation, notFound } from "./errors.js";
 import { toIssues } from "./issue-data.js";
 
 type ProjectRow = typeof projects.$inferSelect;
@@ -47,6 +46,32 @@ export async function projectIdOf(tx: Transaction, orgId: string, ref: string): 
   return row?.id;
 }
 
+// Projects span teams, so Members see every one. A guest, or an API key
+// narrowed to some teams, sees only projects that hold an issue in a team it
+// can see. A project's progress counts only issues the caller can see.
+function seesEveryProject(caller: Caller): boolean {
+  return caller.access.role !== "guest" && caller.keyTeamIds === null;
+}
+
+export function projectVisibility(tx: Transaction, caller: Caller): SQL | undefined {
+  if (seesEveryProject(caller)) return undefined;
+  return inArray(
+    projects.id,
+    tx
+      .select({ id: sql`${issues.projectId}` })
+      .from(issues)
+      .innerJoin(teams, eq(teams.id, issues.teamId))
+      .where(and(isNull(issues.deletedAt), teamVisibility(tx, caller))),
+  );
+}
+
+// Guests work only in their teams' issues: projects are for Members.
+export function requireProjectEditor(caller: Caller, action: string): void {
+  if (caller.access.role === "guest") {
+    throw forbidden(`Guests cannot ${action}. They work only in the issues of their teams.`);
+  }
+}
+
 export async function visibleProject(
   tx: Transaction,
   caller: Caller,
@@ -60,8 +85,8 @@ export async function visibleProject(
   const query = tx
     .select()
     .from(projects)
-    .where(and(eq(projects.orgId, caller.orgId), eq(projects.id, projectId)));
-  const [row] = await (options.forUpdate ? query.for("update") : query);
+    .where(and(eq(projects.orgId, caller.orgId), eq(projects.id, projectId), projectVisibility(tx, caller)));
+  const [row] = await (options.forUpdate ? query.for("update", { of: projects }) : query);
   if (!row) {
     throw notFound("project");
   }
@@ -73,6 +98,7 @@ export async function visibleProject(
 
 export async function calculateProjectsProgress(
   tx: Transaction,
+  caller: Caller,
   projectIds: string[],
 ): Promise<Map<string, ProjectProgress>> {
   const progressMap = new Map<string, ProjectProgress>();
@@ -95,7 +121,8 @@ export async function calculateProjectsProgress(
     })
     .from(issues)
     .innerJoin(statuses, eq(statuses.id, issues.statusId))
-    .where(and(inArray(issues.projectId, projectIds), isNull(issues.deletedAt)));
+    .innerJoin(teams, eq(teams.id, issues.teamId))
+    .where(and(inArray(issues.projectId, projectIds), isNull(issues.deletedAt), teamVisibility(tx, caller)));
 
   for (const row of rows) {
     if (!row.projectId) continue;
@@ -230,15 +257,16 @@ export function projectRoutes(deps: ApiDeps) {
 
   app.openapi(listProjects, async (c) => {
     const { orgId } = c.req.valid("param");
-    const list = await inOrg(deps, c, orgId, async (tx) => {
+    const list = await inOrg(deps, c, orgId, async (tx, caller) => {
       const rows = await tx
         .select()
         .from(projects)
-        .where(and(eq(projects.orgId, orgId), isNull(projects.deletedAt)))
+        .where(and(eq(projects.orgId, orgId), isNull(projects.deletedAt), projectVisibility(tx, caller)))
         .orderBy(desc(projects.createdAt));
 
       const progressMap = await calculateProjectsProgress(
         tx,
+        caller,
         rows.map((r) => r.id),
       );
 
@@ -262,6 +290,7 @@ export function projectRoutes(deps: ApiDeps) {
     const { orgId } = c.req.valid("param");
     const input = c.req.valid("json");
     const project = await inOrg(deps, c, orgId, async (tx, caller) => {
+      requireProjectEditor(caller, "create projects");
       if (input.leadId) {
         await activeMember(tx, orgId, input.leadId);
       }
@@ -341,7 +370,7 @@ export function projectRoutes(deps: ApiDeps) {
     const { orgId, projectRef } = c.req.valid("param");
     const result = await inOrg(deps, c, orgId, async (tx, caller) => {
       const row = await visibleProject(tx, caller, projectRef);
-      const progressMap = await calculateProjectsProgress(tx, [row.id]);
+      const progressMap = await calculateProjectsProgress(tx, caller, [row.id]);
       return toProject(
         row,
         progressMap.get(row.id) ?? {
@@ -360,8 +389,9 @@ export function projectRoutes(deps: ApiDeps) {
     const { orgId, projectRef } = c.req.valid("param");
     const input = c.req.valid("json");
     const result = await inOrg(deps, c, orgId, async (tx, caller) => {
+      requireProjectEditor(caller, "change projects");
       const row = await visibleProject(tx, caller, projectRef, { forUpdate: true });
-      const progressMap = await calculateProjectsProgress(tx, [row.id]);
+      const progressMap = await calculateProjectsProgress(tx, caller, [row.id]);
       const current = toProject(
         row,
         progressMap.get(row.id) ?? {
@@ -417,11 +447,18 @@ export function projectRoutes(deps: ApiDeps) {
           .returning();
 
         const updatedProject = toProject(updated!, current.progress);
+        // Each field's old and new value, as the API shows them, for history and undo.
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
+        for (const field of ["name", "slug", "description", "status", "leadId", "startDate", "targetDate"] as const) {
+          if (JSON.stringify(current[field]) !== JSON.stringify(updatedProject[field])) {
+            changes[field] = { from: current[field], to: updatedProject[field] };
+          }
+        }
         await emit(tx, orgId, {
           type: "project.updated",
           actorId: caller.id,
           subjectId: row.id,
-          data: { version: nextVersion },
+          data: { version: nextVersion, changes },
         });
         return updatedProject;
       } catch (error) {
@@ -438,6 +475,7 @@ export function projectRoutes(deps: ApiDeps) {
     const { orgId, projectRef } = c.req.valid("param");
     await inOrg(deps, c, orgId, async (tx, caller) => {
       requireAgentPower(caller, "delete", "move a project to the trash");
+      requireProjectEditor(caller, "move projects to the trash");
       const row = await visibleProject(tx, caller, projectRef, { forUpdate: true });
 
       await tx
@@ -462,9 +500,10 @@ export function projectRoutes(deps: ApiDeps) {
   app.openapi(restoreProject, async (c) => {
     const { orgId, projectRef } = c.req.valid("param");
     const restored = await inOrg(deps, c, orgId, async (tx, caller) => {
+      requireProjectEditor(caller, "restore projects");
       const row = await visibleProject(tx, caller, projectRef, { forUpdate: true, trashed: true });
       if (!row.deletedAt) {
-        const progressMap = await calculateProjectsProgress(tx, [row.id]);
+        const progressMap = await calculateProjectsProgress(tx, caller, [row.id]);
         return toProject(row, progressMap.get(row.id)!);
       }
 
@@ -485,7 +524,7 @@ export function projectRoutes(deps: ApiDeps) {
       });
 
       const [updated] = await tx.select().from(projects).where(eq(projects.id, row.id));
-      const progressMap = await calculateProjectsProgress(tx, [row.id]);
+      const progressMap = await calculateProjectsProgress(tx, caller, [row.id]);
       return toProject(updated!, progressMap.get(row.id)!);
     });
     return c.json(restored, 200);

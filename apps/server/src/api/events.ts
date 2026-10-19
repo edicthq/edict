@@ -2,7 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { and, desc, eq, lt } from "drizzle-orm";
 import { events } from "@edicthq/db";
 import { Event, Id } from "@edicthq/schema";
-import { requireRole } from "./access.js";
+import { requireEveryTeam, requireRole } from "./access.js";
 import { OrgParams, errors, inOrg, json, router, type ApiDeps } from "./context.js";
 
 const listEvents = createRoute({
@@ -33,6 +33,7 @@ export function eventRoutes(deps: ApiDeps) {
     const { before, limit } = c.req.valid("query");
     const rows = await inOrg(deps, c, orgId, (tx, caller) => {
       requireRole(caller, "admin", "read the event log");
+      requireEveryTeam(caller, "read the event log");
       return tx
         .select()
         .from(events)

@@ -1,9 +1,10 @@
-import { cn } from "@edicthq/ui";
+import { Button, Input, cn } from "@edicthq/ui";
 import { GroupHeader, PageBody, PageHeader } from "../components/shell.js";
 import { useToast } from "../components/toast.js";
 import { useState } from "react";
-import { accentNames, accents, getOrgDefaultAccent, setAppearance, setOrgDefaultAccent, themes, useAppearance, type Accent, type Theme } from "../lib/appearance.js";
+import { accentNames, accents, setAppearance, themes, useAppearance, type Accent, type Theme } from "../lib/appearance.js";
 import { ApiFailure, api } from "../lib/api.js";
+import { useUpdateOrganization } from "../lib/queries.js";
 import { useOrg } from "./org.js";
 
 const themeOptions: Record<Theme, { label: string; hint: string }> = {
@@ -12,12 +13,15 @@ const themeOptions: Record<Theme, { label: string; hint: string }> = {
   dark: { label: "Dark", hint: "Always dark." },
 };
 
-// Personal settings. Appearance is saved in this browser for now; where it is
-// stored for a person or an organization is still open (docs/design/tokens.md).
+// Personal settings, kept in this browser, and for Admins the organization's.
+// An agent color the person has not picked is the organization's default,
+// which the server keeps.
 export function SettingsPage() {
-  const { theme, accent } = useAppearance();
-  const { canManage, orgId } = useOrg();
-  const [orgDefaultAccent, setOrgDefaultAccentState] = useState<Accent>(() => getOrgDefaultAccent(orgId));
+  const { theme, accent, chosenAccent } = useAppearance();
+  const { canManage, orgId, membership } = useOrg();
+  const updateOrganization = useUpdateOrganization(orgId);
+  const toast = useToast();
+  const orgDefaultAccent: Accent = membership.organization.defaultAccent;
 
   return (
     <>
@@ -55,7 +59,14 @@ export function SettingsPage() {
           </GroupHeader>
           <p className="max-w-[60ch] px-3 text-ui text-ink-2 text-pretty">
             Agents, and only agents, wear this color: their avatars, their names and their live work. Humans stay in
-            ink.
+            ink.{" "}
+            {chosenAccent ? (
+              <button type="button" className="underline underline-offset-4 hover:text-ink" onClick={() => setAppearance({ accent: null })}>
+                Use the organization's, {accentNames[orgDefaultAccent]}
+              </button>
+            ) : (
+              `You're using the organization's, ${accentNames[orgDefaultAccent]}.`
+            )}
           </p>
           <div role="radiogroup" aria-labelledby="accent-heading" className="flex flex-wrap gap-2 px-3 pt-1">
             {accents.map((value) => (
@@ -85,7 +96,7 @@ export function SettingsPage() {
               <span id="org-accent-heading">Organization default agent color</span>
             </GroupHeader>
             <p className="max-w-[60ch] px-3 text-ui text-ink-2 text-pretty">
-              The default accent color for new members joining this organization.
+              The agent color everyone here sees until they pick their own.
             </p>
             <div role="radiogroup" aria-labelledby="org-accent-heading" className="flex flex-wrap gap-2 px-3 pt-1">
               {accents.map((value) => (
@@ -95,10 +106,10 @@ export function SettingsPage() {
                   role="radio"
                   aria-checked={orgDefaultAccent === value}
                   data-accent={value}
-                  onClick={() => {
-                    setOrgDefaultAccent(orgId, value);
-                    setOrgDefaultAccentState(value);
-                  }}
+                  disabled={updateOrganization.isPending}
+                  onClick={() =>
+                    updateOrganization.mutate({ defaultAccent: value }, { onError: (error) => toast(error.message) })
+                  }
                   className={cn(
                     "flex h-9 items-center gap-2 rounded-sm px-3 text-ui transition-[background-color,box-shadow] duration-[140ms] ease-standard",
                     orgDefaultAccent === value
@@ -113,6 +124,7 @@ export function SettingsPage() {
             </div>
           </section>
         ) : null}
+        {canManage ? <JoinDomainSection /> : null}
         {canManage ? <OrganizationExportSection orgId={orgId} /> : null}
       </PageBody>
     </>
@@ -122,6 +134,44 @@ export function SettingsPage() {
 // Owners and admins can download the organization as a zip: one JSON document
 // plus every attachment. The web cannot open the zip itself, so it hands the
 // browser the response's own file name.
+// The domain rule: anyone who verifies an address at this domain may join
+// as a Member, without an invite.
+function JoinDomainSection() {
+  const { orgId, membership } = useOrg();
+  const update = useUpdateOrganization(orgId);
+  const toast = useToast();
+  const [value, setValue] = useState<string | null>(null);
+  const current = membership.organization.joinDomain ?? "";
+  const text = value ?? current;
+
+  return (
+    <section aria-labelledby="join-heading" className="flex flex-col gap-2">
+      <GroupHeader>
+        <span id="join-heading">Joining by domain</span>
+      </GroupHeader>
+      <p className="max-w-[60ch] px-3 text-ui text-ink-2 text-pretty">
+        Anyone who verifies an email address at this domain can join as a Member, without an invite. Leave it empty
+        to let people in by invite only.
+      </p>
+      <form
+        className="flex flex-wrap items-center gap-2 px-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          update.mutate(
+            { joinDomain: text.trim() || null },
+            { onSuccess: () => toast(text.trim() ? `People at ${text.trim()} can join` : "Joining by domain is off"), onError: (error) => toast(error.message) },
+          );
+        }}
+      >
+        <Input aria-label="Domain" placeholder="acme.com" value={text} onChange={(event) => setValue(event.target.value)} className="max-w-[280px]" />
+        <Button type="submit" disabled={update.isPending || text.trim() === current}>
+          Save
+        </Button>
+      </form>
+    </section>
+  );
+}
+
 function OrganizationExportSection({ orgId }: { orgId: string }) {
   const [busy, setBusy] = useState(false);
   const toast = useToast();

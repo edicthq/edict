@@ -286,7 +286,12 @@ function AgentWebhook({ agent, webhook }: { agent: Agent; webhook?: Webhook }) {
             event.preventDefault();
             create.mutate(
               { url: url.trim(), agentId: agent.id, eventTypes: [] },
-              { onSuccess: (created) => (setSecret(created.secret), setUrl("")), onError: (error) => toast(error.message) },
+              {
+                onSuccess: (created) => {
+                  setSecret(created.secret);
+                  setUrl("");
+                },
+                onError: (error) => toast(error.message) },
             );
           }}
         >
@@ -478,7 +483,7 @@ function SecretDialog({ title, body, secret, onClose }: { title: string; body: s
     <Dialog open={secret !== null} onClose={onClose} title={title}>
       <div className="flex flex-col gap-3 p-5">
         <p className="text-ui text-ink-2 text-pretty">{body}</p>
-        <code className="break-all rounded-sm bg-bg px-3 py-2 font-code text-code" aria-label="Secret">
+        <code className="break-all rounded-sm bg-bg px-3 py-2 font-code text-code">
           {secret}
         </code>
         <div className="flex justify-end gap-2">

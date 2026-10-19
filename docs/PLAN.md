@@ -137,8 +137,11 @@ Tools are shaped around tasks, not endpoints. They accept human values ("In Prog
 | `get_project` | Project with its issues and progress |
 | `link` | Attach a pull request or URL |
 | `relate_issues` | Add a blocks, related or duplicate relation |
+| `get_inbox` | The caller's unread inbox: assignments, delegations, mentions, comments and progress on their issues |
 
-Resources: `edict://issue/ENG-123`, `edict://project/<slug>`. Prompts: "triage my inbox", "plan this project into issues".
+`get_inbox` joined the original twelve in M5, so an agent can answer what its inbox asks of it; it is the thirteenth tool.
+
+Resources: `edict://issue/ENG-123`, `edict://project/<slug>`. Prompts: "do my Edict work" (`work_my_queue`), "triage my inbox" (`triage_inbox`), "plan this project into issues" (`plan_project`), and "plan a goal into a team's issues" (`plan_issues`).
 
 ### Webhooks
 
@@ -174,6 +177,7 @@ apps/server      Hono API, /mcp, WebSocket, serves the web build
 apps/web         Vite + React SPA
 apps/desktop     Tauri 2 shell
 apps/docs        Fumadocs site
+apps/telemetry   Collector for opt-in telemetry pings
 packages/schema  Zod schemas, the source of truth for the API
 packages/client  Typed API client generated from OpenAPI, published to npm
 packages/ui      Design system
@@ -213,7 +217,7 @@ Sign-up mode (open, invite-only, domain), SMTP, storage, the user list, the upda
 
 ### Telemetry
 
-Opt-in and off by default. The instance admin page shows the exact payload: version and a user-count bucket.
+Opt-in and off by default. The instance admin page shows the exact payload: version and a user-count bucket. It goes once a day to Edict's own collector (`apps/telemetry`), which keeps daily counts and no IP addresses. See [ADR 0026](./adr/0026-telemetry-counts-not-instances.md).
 
 ## Self-hosting
 
@@ -248,7 +252,7 @@ The chosen direction becomes design tokens in `packages/ui` before any product U
 
 ### Logo and app icon
 
-Edict has no real logo yet. The hexagon mark in the app and the favicon is the M0 prototype's placeholder, drawn in the agent color, so it changes with the accent. Edict needs a designed logo and app icon before v1.0. The icon has to work in one color and at 16px, without depending on the accent: favicon, desktop app and tray icons for macOS, Windows and Linux, and the avatars for the GitHub org, GHCR and npm. The desktop app in M6 cannot ship without it.
+The mark is an E whose middle arm is an agent's rounded square, picked in M6 on 2026-10-19. It works in one color and at 16px, without depending on the accent: favicon, desktop app and tray icons for macOS, Windows and Linux, and the avatars for the GitHub org, GHCR and npm. Its rules are in [`docs/design/tokens.md`](./design/tokens.md#logo) and its files in [`assets/brand`](../assets/brand).
 
 ## Quality
 

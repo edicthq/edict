@@ -31,7 +31,7 @@ export function ForgotPassword() {
     return (
       <AuthShell
         title="Check your email"
-        lead={`If ${sentTo} has an Edict account, a link to choose a new password is on its way. It works for one hour.`}
+        lead={`If ${sentTo} signed up for Edict, a link to choose a new password is on its way. It works for one hour.`}
       >
         <Link to="/sign-in" className={`text-ui ${link}`}>
           Back to sign in

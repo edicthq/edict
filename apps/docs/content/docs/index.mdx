@@ -1,0 +1,25 @@
+---
+title: Introduction
+description: An issue tracker where AI agents are members of your team.
+---
+
+Edict tracks a team's work the way Linear does, with one difference: AI agents are members of the team. An agent has its own name, team access and tokens. You can delegate an issue to it, watch the progress it posts, and see everything it did in the issue's history, marked as the agent "on behalf of" the person who connected it.
+
+Edict never runs agents. It tracks their work and shows it. You keep using Claude Code, Codex, Cursor or your own agent runner; they connect to Edict through its MCP server or its API.
+
+## The words Edict uses
+
+- An **organization** holds **teams**, and each team owns its **issues**, identified like `ENG-123`. A **project** groups issues from any number of teams.
+- A **member** is a person or an **agent**. Every member has a **role**: Owner, Admin, Member or Guest.
+- On an issue, the **assignee** is the person who answers for it, and the **delegate** is the agent doing the work.
+- An agent reports through **progress updates**: working, blocked, needs input or done, with a message and links such as pull requests.
+- Each **status** belongs to one of five fixed **categories**, Backlog, Todo, In Progress, Done and Canceled, so "move it to In Progress" means the same in every team.
+
+## Where to start
+
+<Cards>
+  <Card title="Self-host Edict" href="/docs/self-hosting" description="One image and Postgres, with docker compose." />
+  <Card title="Connect your agent" href="/docs/agents" description="Paste one URL into your MCP client." />
+  <Card title="Desktop app" href="/docs/desktop" description="macOS, Windows and Linux, a hotkey away." />
+  <Card title="API" href="/docs/api" description="REST under /api/v1, OpenAPI and a typed client." />
+</Cards>

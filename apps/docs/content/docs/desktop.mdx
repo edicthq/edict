@@ -1,0 +1,27 @@
+---
+title: Desktop app
+description: Edict for macOS, Windows and Linux. A beta, not yet signed for the operating systems.
+---
+
+The desktop app opens your Edict server's web app in its own window, so it always matches your server's version. It adds a global hotkey for new issues, notifications, `edict://` links and a tray icon, and it updates itself.
+
+The first time it starts, it asks for your server's address, such as `edict.example.com`.
+
+## Install
+
+Download it from the [latest release](https://github.com/edicthq/edict/releases/latest). The app is not yet signed by Apple or Microsoft, so each system asks once before opening it.
+
+- **macOS.** With Homebrew, `brew install --cask amiralibg/tap/edict`, which opens without a warning. Or open the `.dmg` and drag Edict to Applications; the first time, macOS says it cannot check the app: open **System Settings → Privacy & Security** and choose **Open Anyway**.
+- **Windows.** Run the `-setup.exe` (or the `.msi`). If SmartScreen warns about an unrecognized app, choose **More info → Run anyway**.
+- **Linux.** Use the `.AppImage`, or install the `.deb` or `.rpm`.
+
+## Use it
+
+- **New issue from anywhere:** <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>E</kbd> on macOS, <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>E</kbd> elsewhere. It opens the new-issue dialog on the team you are looking at.
+- **Notifications:** when something lands in your inbox while Edict is in the background.
+- **Links:** `edict://issue/ENG-123` and `edict://project/launch`, the links agents get from Edict's MCP server, open in the app.
+- **Tray:** open Edict, make an issue, change the server, check for updates or quit. Closing the window keeps Edict in the tray.
+
+## Updates
+
+The app checks for a new version when it starts and installs it when you agree to restart. Every update is signed, and the app refuses one whose signature does not match, even though the operating systems do not check it yet.

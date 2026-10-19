@@ -20,7 +20,7 @@ describe("export", () => {
     const project = (await owner.post(`${org}/projects`, { name: "Launch" })).body;
     const template = (await owner.post(`${org}/teams/${eng.id}/templates`, { name: "Bug report", title: "Bug: " })).body;
     const view = (await owner.post(`${org}/teams/${eng.id}/saved-views`, { name: "Mine", query: { priorities: ["urgent"] } })).body;
-    const one = (await owner.post(`${org}/teams/${eng.id}/issues`, { title: "First", labelIds: [label.id], projectId: project.id })).body as { id: string };
+    await owner.post(`${org}/teams/${eng.id}/issues`, { title: "First", labelIds: [label.id], projectId: project.id });
     await owner.post(`${org}/issues/ENG-1/comments`, { body: "Hello" });
     const two = (await owner.post(`${org}/teams/${eng.id}/issues`, { title: "Second" })).body;
     await owner.post(`${org}/issues/ENG-1/relations`, { type: "blocks", issue: two.identifier });
@@ -62,9 +62,15 @@ describe("export", () => {
     // The signing secret is not serialized, so the zip cannot read it.
     expect(document.webhooks).toEqual([expect.objectContaining({ url: "https://example.com/hook" })]);
     expect(JSON.stringify(document.webhooks)).not.toContain("secret");
+    // The history goes with it, and the export itself is recorded.
+    expect(document.events.map((e: { type: string }) => e.type)).toEqual(
+      expect.arrayContaining(["organization.created", "issue.created", "comment.created"]),
+    );
+    const log = (await owner.get(`${org}/events?limit=1`)).body;
+    expect(log[0]).toMatchObject({ type: "organization.exported" });
   });
 
-  it("carries attachment bytes under the attachment's id", async () => {
+  it("carries attachment bytes at the /files path markdown links to", async () => {
     const t = await startTestServer();
     const { owner, org } = await orgWithOwner(t.baseUrl);
     const eng = await createTeam(owner, org, "ENG");
@@ -73,7 +79,9 @@ describe("export", () => {
 
     const res = await fetch(`${t.baseUrl}/api/v1${org}/export`, { headers: { cookie: owner.cookie } });
     const zip = await JSZip.loadAsync(await res.arrayBuffer());
-    expect(await zip.file(`attachments/${created.id}/spec.md`)!.async("text")).toBe("# The spec");
+    // ADR 0020: the stored path, relative to the zip's root, finds the file.
+    expect(created.path).toBe(`/files/${created.id}/spec.md`);
+    expect(await zip.file(created.path.slice(1))!.async("text")).toBe("# The spec");
   });
 
   it("is for owners and admins", async () => {
@@ -92,7 +100,7 @@ describe("export", () => {
 
   it("an anonymous caller gets 401, not a copy", async () => {
     const t = await startTestServer();
-    const { owner, org } = await orgWithOwner(t.baseUrl);
+    const { org } = await orgWithOwner(t.baseUrl);
     const res = await fetch(`${t.baseUrl}/api/v1${org}/export`);
     expect(res.status).toBe(401);
   });

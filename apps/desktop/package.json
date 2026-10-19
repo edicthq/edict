@@ -1,0 +1,15 @@
+{
+  "name": "@edicthq/desktop",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Edict's desktop app: a Tauri shell around the server's web UI (ADR 0004)",
+  "type": "module",
+  "scripts": {
+    "tauri": "tauri",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.3"
+  }
+}

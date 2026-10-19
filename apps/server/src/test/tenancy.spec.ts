@@ -12,7 +12,8 @@ import {
   organizations,
   teams,
 } from "@edicthq/db";
-import { createTestDatabase } from "./server.js";
+import { Pool } from "pg";
+import { createTestDatabase, signUpAs, startTestServer } from "./server.js";
 
 // Drizzle wraps the Postgres error and keeps it as the cause.
 function pgError(message: RegExp) {
@@ -132,5 +133,39 @@ describe("row-level security", () => {
       sql`SELECT edict_org_id() AS org, current_user AS role`,
     ).then((r) => r.rows);
     expect(row).toEqual({ org: null, role: expect.not.stringMatching(/^edict_app$/) });
+  });
+});
+
+describe("the database role", () => {
+  // As docker/postgres-init.sh sets it up: Edict's role owns the database
+  // and is a member of edict_app, but is no superuser, and everything works.
+  it("migrates and serves as a role that owns the database but is not a superuser", async () => {
+    const adminUrl = process.env.DATABASE_URL!;
+    const name = `edict_${Math.random().toString(36).slice(2, 10)}`;
+    const admin = new Pool({ connectionString: adminUrl });
+    await admin.query(`CREATE ROLE ${name} LOGIN PASSWORD 'secret'`);
+    await admin.query(`DO $$ BEGIN CREATE ROLE edict_app NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    await admin.query(`GRANT edict_app TO ${name}`);
+    await admin.query(`CREATE DATABASE ${name} OWNER ${name}`);
+    const inDb = new URL(adminUrl);
+    inDb.pathname = `/${name}`;
+    const owner = new Pool({ connectionString: inDb.toString() });
+    await owner.query(`ALTER SCHEMA public OWNER TO ${name}`);
+    await owner.end();
+    onTestFinished(async () => {
+      await admin.query(`DROP DATABASE ${name} WITH (FORCE)`);
+      await admin.end();
+    });
+
+    const url = new URL(inDb);
+    url.username = name;
+    url.password = "secret";
+    const t = await startTestServer({ database: { url: url.toString() } });
+    const person = await signUpAs(t.baseUrl, "Owner");
+    expect((await person.post("/organizations", { name: "Acme", slug: "acme" })).status).toBe(201);
+    const check = new Pool({ connectionString: url.toString() });
+    const { rows } = await check.query<{ rolsuper: boolean }>("SELECT rolsuper FROM pg_roles WHERE rolname = current_user");
+    await check.end();
+    expect(rows[0]!.rolsuper).toBe(false);
   });
 });

@@ -43,15 +43,39 @@ export const OrganizationSlug = z
   .string()
   .regex(/^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?$/, "1-48 lowercase letters, digits and dashes");
 
+// The agent color presets (docs/design/tokens.md). A member picks one; an
+// organization sets the one new members start from.
+export const Accent = z.enum(["violet", "blue", "teal", "pink", "lime"]).meta({ id: "Accent" });
+export type Accent = z.infer<typeof Accent>;
+
 export const Organization = z
   .object({
     id: Id,
     name: z.string(),
     slug: OrganizationSlug,
+    // Anyone with a verified address at this domain may join as a Member.
+    // Null: people join by invite only.
+    joinDomain: z.string().nullable(),
+    defaultAccent: Accent,
     createdAt: z.iso.datetime(),
   })
   .meta({ id: "Organization" });
 export type Organization = z.infer<typeof Organization>;
+
+// A domain like acme.com, stored lowercase.
+export const EmailDomain = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/, "A domain like acme.com");
+
+export const UpdateOrganization = z
+  .object({
+    name: z.string().trim().min(1).max(80).optional(),
+    joinDomain: EmailDomain.nullable().optional(),
+    defaultAccent: Accent.optional(),
+  })
+  .meta({ id: "UpdateOrganization" });
 
 export const CreateOrganization = z
   .object({
@@ -348,6 +372,9 @@ export const Team = z
     name: z.string(),
     key: TeamKey,
     private: z.boolean(),
+    // Closed issues archive this many days after closing; null keeps them
+    // until someone archives them by hand.
+    archiveAfterDays: z.number().int().nullable(),
     version: Version,
     createdAt: z.iso.datetime(),
   })
@@ -370,8 +397,22 @@ export const UpdateTeam = z
     name: z.string().trim().min(1).max(80).optional(),
     key: TeamKey.optional(),
     private: z.boolean().optional(),
+    archiveAfterDays: z.number().int().min(1).max(3650).nullable().optional(),
   })
   .meta({ id: "UpdateTeam" });
+
+// A team in the trash, with everything in it.
+export const TrashedTeam = z
+  .object({
+    id: Id,
+    name: z.string(),
+    key: TeamKey,
+    deletedAt: z.iso.datetime(),
+    deletedById: Id,
+    changeId: Id,
+  })
+  .meta({ id: "TrashedTeam" });
+export type TrashedTeam = z.infer<typeof TrashedTeam>;
 
 export const AddTeamMember = z.object({ memberId: Id }).meta({ id: "AddTeamMember" });
 
@@ -431,7 +472,9 @@ export type Event = z.infer<typeof Event>;
 
 // Who can create a user on this instance: anyone, or only people with an open
 // invite. The first user can always sign up.
-export const SignUpMode = z.enum(["open", "invite_only"]).meta({ id: "SignUpMode" });
+// open: anyone. invite_only: people with an invite. domain: people with an
+// invite, or a verified address at one of the instance's sign-up domains.
+export const SignUpMode = z.enum(["open", "invite_only", "domain"]).meta({ id: "SignUpMode" });
 export type SignUpMode = z.infer<typeof SignUpMode>;
 
 export const InstanceSettings = z
@@ -442,11 +485,103 @@ export const InstanceSettings = z
     // Whether the instance has email set up. Without it there is no email
     // verification or password reset, and invites are links to share by hand.
     sendsEmail: z.boolean(),
+    // Domains the "domain" sign-up mode lets in, lowercase.
+    signUpDomains: z.array(z.string()),
+    // How people can sign in besides email and password, which is always on.
+    signInMethods: z.object({
+      // A link by email; on when the instance sends email.
+      magicLink: z.boolean(),
+      google: z.boolean(),
+      github: z.boolean(),
+      // A generic OpenID Connect provider, like Authentik or Keycloak, by the
+      // name its sign-in button shows.
+      oidc: z.object({ name: z.string() }).nullable(),
+    }),
   })
   .meta({ id: "InstanceSettings" });
 
+// What the instance knows about newer releases of Edict. It asks GitHub for
+// the latest release once a day, unless an instance admin turns that off.
+export const UpdateCheck = z
+  .object({
+    // Whether the instance checks.
+    check: z.boolean(),
+    // The latest release the last successful check found.
+    latest: z
+      .object({ version: z.string(), url: z.string(), publishedAt: z.iso.datetime().nullable() })
+      .nullable(),
+    // Whether latest is newer than the running version.
+    available: z.boolean(),
+    // When the last check ran, and why it failed if it did.
+    checkedAt: z.iso.datetime().nullable(),
+    error: z.string().nullable(),
+  })
+  .meta({ id: "UpdateCheck" });
+export type UpdateCheck = z.infer<typeof UpdateCheck>;
+
+// How many users an instance has, as telemetry reports it (ADR 0026).
+export const UserCountBucket = z
+  .enum(["1", "2-10", "11-50", "51-200", "201-1000", "1001+"])
+  .meta({ id: "UserCountBucket" });
+export type UserCountBucket = z.infer<typeof UserCountBucket>;
+
+// The whole of a telemetry ping: no instance id, no URL (ADR 0026).
+export const TelemetryPing = z
+  .object({
+    version: z.string().regex(/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/).max(64),
+    users: UserCountBucket,
+  })
+  .strict()
+  .meta({ id: "TelemetryPing" });
+export type TelemetryPing = z.infer<typeof TelemetryPing>;
+
+// Opt-in telemetry, off by default. When on, the instance sends payload once
+// a day, exactly as shown.
+export const Telemetry = z
+  .object({
+    enabled: z.boolean(),
+    payload: TelemetryPing,
+    // When the last ping went, and why it failed if it did.
+    sentAt: z.iso.datetime().nullable(),
+    error: z.string().nullable(),
+  })
+  .meta({ id: "Telemetry" });
+export type Telemetry = z.infer<typeof Telemetry>;
+
+// How the instance is set up, for its admins.
+export const InstanceStatus = z
+  .object({
+    email: z.object({ configured: z.boolean(), from: z.string().nullable() }),
+    storage: z.object({
+      kind: z.enum(["disk", "s3"]),
+      // The directory, or the bucket and its endpoint.
+      location: z.string(),
+    }),
+    version: z.string(),
+    updates: UpdateCheck,
+    telemetry: Telemetry,
+  })
+  .meta({ id: "InstanceStatus" });
+
+export const InstanceUser = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    email: z.string(),
+    emailVerified: z.boolean(),
+    instanceAdmin: z.boolean(),
+    // How many organizations they are a member of.
+    organizations: z.number().int(),
+    createdAt: z.iso.datetime(),
+  })
+  .meta({ id: "InstanceUser" });
+
+export const InstanceUsers = z
+  .object({ users: z.array(InstanceUser), total: z.number().int() })
+  .meta({ id: "InstanceUsers" });
+
 export const UpdateInstanceSettings = z
-  .object({ signUpMode: SignUpMode })
+  .object({ signUpMode: SignUpMode, signUpDomains: z.array(EmailDomain).max(50), updateCheck: z.boolean(), telemetry: z.boolean() })
   .partial()
   .meta({ id: "UpdateInstanceSettings" });
 
@@ -584,6 +719,11 @@ export const Issue = z
     // Set on a sub-issue. The parent can be in any team.
     parentId: Id.nullable(),
     creatorId: Id,
+    // When the issue last moved into Done or Canceled; null while open.
+    closedAt: z.iso.datetime().nullable(),
+    // Set while the issue is archived: out of active views, still found by
+    // its identifier and by search.
+    archivedAt: z.iso.datetime().nullable(),
     version: Version,
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
@@ -868,8 +1008,11 @@ export const UpdateSavedView = z
   })
   .meta({ id: "UpdateSavedView" });
 
+// What an inbox item tells its recipient: an issue was assigned or delegated
+// to them, moved by someone else, commented on, they were mentioned, an agent
+// posted progress on their issue, or a webhook turned itself off (Admins).
 export const InboxItemType = z
-  .enum(["assigned", "delegated", "status_changed", "comment_created", "mentioned"])
+  .enum(["assigned", "delegated", "status_changed", "comment_created", "mentioned", "progress_posted", "webhook_disabled"])
   .meta({ id: "InboxItemType" });
 export type InboxItemType = z.infer<typeof InboxItemType>;
 
@@ -888,8 +1031,13 @@ export const InboxItem = z
     id: Id,
     type: InboxItemType,
     actor: Member.nullable(),
-    issue: InboxIssue,
+    // The issue it is about. Null only for webhook_disabled.
+    issue: InboxIssue.nullable(),
+    // The webhook that turned itself off, for webhook_disabled.
+    webhook: z.object({ id: Id, url: z.string() }).nullable(),
     commentId: Id.nullable(),
+    // For progress_posted: the state the agent reported.
+    progressState: ProgressState.nullable(),
     readAt: z.iso.datetime().nullable(),
     createdAt: z.iso.datetime(),
   })

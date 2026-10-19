@@ -9,7 +9,6 @@ import {
   oauthConsent,
   oauthRefreshToken,
   teamMembers,
-  teams,
   webhooks,
   type Transaction,
 } from "@edicthq/db";
@@ -22,7 +21,7 @@ import {
   Id,
   UpdateAgent,
 } from "@edicthq/schema";
-import { requireRole, type MemberRow } from "./access.js";
+import { requireRole, requireVisibleTeams, requireWithinCaller, type MemberRow } from "./access.js";
 import { newApiKey, type Caller } from "./callers.js";
 import { OrgParams, body, errors, inOrg, json, noContent, router, type ApiDeps } from "./context.js";
 import { disableAgentWebhooks } from "./webhooks.js";
@@ -203,13 +202,9 @@ export function agentRoutes(deps: ApiDeps) {
     const row = await inOrg(deps, c, orgId, async (tx, caller) => {
       requireRole(caller, "admin", "create agents", "agents");
       const teamIds = [...new Set(input.teamIds)];
-      if (teamIds.length > 0) {
-        const found = await tx.select({ id: teams.id }).from(teams).where(inArray(teams.id, teamIds));
-        if (found.length !== teamIds.length) {
-          throw invalid("Some of teamIds are not teams in this organization.");
-        }
-      }
+      await requireVisibleTeams(tx, caller, teamIds);
       const grants = [...new Set(input.grants)].sort();
+      requireWithinCaller(caller, { grants, role: input.role });
       const [agent] = await tx
         .insert(members)
         .values({ orgId, kind: "agent", role: input.role, name: input.name, description: input.description, grants })
@@ -234,8 +229,12 @@ export function agentRoutes(deps: ApiDeps) {
     const row = await inOrg(deps, c, orgId, async (tx, caller) => {
       const agent = await agentRow(tx, orgId, agentId, { forUpdate: true });
       requireRole(caller, "admin", "change agents", "agents");
+      if (caller.id === agent.id) {
+        throw forbidden("An agent cannot change itself. An admin can.");
+      }
       requireVersion(agent.version, version, "agent");
       const next = { ...input, grants: input.grants ? [...new Set(input.grants)].sort() : undefined };
+      requireWithinCaller(caller, { grants: next.grants, role: next.role });
       const changes = changesOf({ ...agent, grants: [...agent.grants].sort() }, next);
       if (Object.keys(changes).length === 0) {
         return agent;
@@ -314,12 +313,7 @@ export function agentRoutes(deps: ApiDeps) {
         throw invalid("A connected agent acts through its MCP client's OAuth connection, not API keys.");
       }
       const teamIds = input.teamIds ? [...new Set(input.teamIds)] : null;
-      if (teamIds && teamIds.length > 0) {
-        const found = await tx.select({ id: teams.id }).from(teams).where(inArray(teams.id, teamIds));
-        if (found.length !== teamIds.length) {
-          throw invalid("Some of teamIds are not teams in this organization.");
-        }
-      }
+      await requireVisibleTeams(tx, caller, teamIds ?? []);
       const [created] = await tx
         .insert(apiKeys)
         .values({ orgId, agentId, name: input.name, prefix: key.prefix, tokenHash: key.hash, teamIds, createdBy: caller.id })
