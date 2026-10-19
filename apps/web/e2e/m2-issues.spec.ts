@@ -72,8 +72,11 @@ test("label an issue, add a sub-issue and a relation, and move it to another tea
     peek.getByRole("button", { name: "Add", exact: true }).click(),
   ]);
   expect(created.status(), await created.text()).toBe(201);
-  await expect(relations.getByText("Blocks")).toBeVisible();
-  await expect(relations.getByRole("button", { name: /OPS-1 Restart the relay/ })).toBeVisible();
+  // The rendered relation, not the add form's "Blocks" option, which can still
+  // be on screen while the list updates.
+  const relationList = relations.getByRole("list", { name: "Relations" });
+  await expect(relationList.getByText("Blocks", { exact: true })).toBeVisible();
+  await expect(relationList.getByRole("button", { name: /OPS-1 Restart the relay/ })).toBeVisible();
 
   // Moving the issue to Ops numbers it there; the old identifier still resolves.
   await peek.getByRole("button", { name: "Move", exact: true }).click();

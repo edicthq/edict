@@ -523,7 +523,7 @@ function Relations({
         Relations
       </SectionHeading>
       {list.length ? (
-        <ul className="flex flex-col">
+        <ul className="flex flex-col" aria-labelledby="peek-relations">
           {list.map((relation) => (
             <li key={relation.id} className="group grid grid-cols-[96px_minmax(0,1fr)_26px] items-center">
               <span className="text-sm text-ink-2">{relationLabel[relation.type]}</span>
