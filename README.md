@@ -28,7 +28,7 @@ docker compose up -d
 
 That runs the `ghcr.io/edicthq/edict` image (amd64 or arm64) with Postgres on http://localhost:3000. The first person to sign up becomes the instance admin. Set `BETTER_AUTH_URL` to the URL people use to reach it, and optionally `SMTP_URL` and `EMAIL_FROM` for invites, verification, sign-in links and password resets. Google, GitHub and any OpenID Connect provider turn on with their client ids. Edict connects to Postgres as its own role, which owns the database but is not a superuser; `postgres-init.sh` creates it on the first start. `compose.yml` describes each setting.
 
-Upgrade with `docker compose pull && docker compose up -d`; migrations run on boot. The image tag follows `EDICT_VERSION`: `1` (the default) takes every 1.x release, `1.4` only its patches, and `1.4.2` stays put. Until 1.0 is out, set it to a 0.x release such as `0.1`. To run your own changes, build from a checkout with `docker compose -f docker/compose.yml -f docker/compose.build.yml up --build`.
+Upgrade with `docker compose pull && docker compose up -d`; migrations run on boot. The image tag follows `EDICT_VERSION`: `1` (the default) takes every 1.x release, `1.4` only its patches, and `1.4.2` stays put. Until 1.0 is out there is no `1` yet, so set `EDICT_VERSION=latest`. To run your own changes, build from a checkout with `docker compose -f docker/compose.yml -f docker/compose.build.yml up --build`.
 
 **Development.** Node 22 and pnpm. Start a Postgres, copy `apps/server/.env.example` to `apps/server/.env`, then:
 

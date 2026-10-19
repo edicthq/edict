@@ -156,6 +156,8 @@ jobs:
   npm:
     needs: [plan, image-tags]
     runs-on: ubuntu-latest
+    # The npm environment holds NPM_TOKEN and only admits v* tags.
+    environment: npm
     timeout-minutes: 10
     permissions:
       contents: read

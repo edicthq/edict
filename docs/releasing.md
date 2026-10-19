@@ -46,6 +46,10 @@ Never move or delete a pushed tag. If a release is broken, ship the next patch.
 
 These are one-time settings outside the repository:
 
-- **npm.** The `@edicthq` organization must exist on npm. npm's trusted publishing can only be configured for a package that exists, so the first publish uses a token: add a granular access token that can publish to `@edicthq` as the `NPM_TOKEN` repository secret. Once `@edicthq/client` is on npm, add a trusted publisher in its settings (repository `edicthq/edict`, workflow `release.yml`), then delete the secret and the token.
+- **npm.** The `@edicthq` organization must exist on npm. Trusted publishing is configured on a package that exists, so the first publish uses a short-lived token:
+  1. On npmjs.com, under Access Tokens, generate a granular access token: read and write on the `@edicthq` scope only, no organization access, no IP ranges (GitHub's runners have none fixed), "bypass two-factor authentication" on (the workflow cannot answer a 2FA prompt), and the shortest expiry that covers the first release, such as 7 days.
+  2. In the GitHub repository's settings, under Environments, create an environment named `npm`. Limit its deployment branches and tags to the tag rule `v*`, and add the token as its `NPM_TOKEN` secret. Only the release's npm job runs in that environment, and only for a release tag.
+  3. Once `@edicthq/client` is on npm, add a trusted publisher in the package's settings: GitHub Actions, organization `edicthq`, repository `edict`, workflow `release.yml`, environment `npm`. Its first publish has to happen within two days of adding it.
+  4. Delete the `NPM_TOKEN` secret and revoke the token. npm ends direct publishing with tokens in January 2027 anyway.
 - **GHCR.** The first push creates the `edict` package in the `edicthq` organization as private. Make it public in the package's settings, or nobody can pull it.
 - **Runners.** The arm64 image builds on `ubuntu-24.04-arm`, which is free for public repositories.
