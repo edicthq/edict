@@ -58,3 +58,8 @@ These are one-time settings outside the repository:
   1. On your own machine, run `pnpm --filter @edicthq/desktop tauri signer generate -w ~/.tauri/edict-updater.key` and give it a password. Keep the key file and the password in your password manager.
   2. In the repository's settings, create an environment named `desktop`, limited to the tag rule `v*` like `npm`. Add the contents of `~/.tauri/edict-updater.key` as its `TAURI_SIGNING_PRIVATE_KEY` secret and the password as `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
   3. Add the contents of `~/.tauri/edict-updater.key.pub` as the repository variable `TAURI_UPDATER_PUBKEY`. The next release builds the apps, puts the key in them and publishes `latest.json`, which installed apps read to update.
+- **Homebrew and Scoop.** Once the desktop app ships, a release can update the Homebrew cask and the Scoop manifest itself (`scripts/distribution.mjs` writes them). The tap is `amiralibg/tap`, which Homebrew reads from the repository `amiralibg/homebrew-tap`.
+  1. Create that repository, and a Scoop bucket repository if you want one, such as `amiralibg/scoop-bucket`.
+  2. Create a fine-grained GitHub token with read and write access to the contents of only those repositories. In a `distribution` environment limited to `v*` tags, add it as the `DISTRIBUTION_TOKEN` secret.
+  3. Set the repository variables `HOMEBREW_TAP_REPO` (`amiralibg/homebrew-tap`) and, for Scoop, `SCOOP_BUCKET_REPO`.
+- **winget.** Submitting to `microsoft/winget-pkgs` is a pull request reviewed by Microsoft, so it stays by hand: after a release, run `wingetcreate update Edict.Edict --version <x.y.z> --urls <the -setup.exe URL> --submit` (the first time, `wingetcreate new` with the same URL).

@@ -340,3 +340,52 @@ jobs:
           VERSION: ${{ needs.plan.outputs.version }}
           LATEST: ${{ needs.plan.outputs.latest }}
           PRERELEASE: ${{ needs.plan.outputs.prerelease }}
+
+  # The Homebrew cask (amiralibg/tap) and the Scoop manifest, for the newest
+  # release once its installers are out. Off until their repositories are
+  # named in HOMEBREW_TAP_REPO and SCOOP_BUCKET_REPO and the distribution
+  # environment holds a token that can push to them (docs/releasing.md).
+  distribution:
+    needs: [plan, desktop, github-release]
+    if: needs.desktop.result == 'success' && needs.plan.outputs.latest == 'true' && needs.plan.outputs.prerelease == 'false' && vars.HOMEBREW_TAP_REPO != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: distribution
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: desktop-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/desktop
+      - name: Publish the cask and the Scoop manifest
+        run: |
+          dmg_sha=$(sha256sum "$RUNNER_TEMP/desktop/Edict_${VERSION}_universal.dmg" | cut -d' ' -f1)
+          exe_sha=$(sha256sum "$RUNNER_TEMP/desktop/Edict_${VERSION}_x64-setup.exe" | cut -d' ' -f1)
+          publish() {
+            local repo="$1" path="$2" kind="$3" sha="$4" dir
+            dir=$(mktemp -d)
+            git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/${repo}.git" "$dir"
+            mkdir -p "$dir/$(dirname "$path")"
+            node scripts/distribution.mjs "$kind" "$VERSION" "$sha" > "$dir/$path"
+            git -C "$dir" add "$path"
+            if git -C "$dir" diff --cached --quiet; then return; fi
+            git -C "$dir" -c user.name="Edict release" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -m "Edict ${VERSION}"
+            git -C "$dir" push
+          }
+          publish "$TAP_REPO" Casks/edict.rb cask "$dmg_sha"
+          if [ -n "$SCOOP_REPO" ]; then publish "$SCOOP_REPO" bucket/edict.json scoop "$exe_sha"; fi
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+          TOKEN: ${{ secrets.DISTRIBUTION_TOKEN }}
+          TAP_REPO: ${{ vars.HOMEBREW_TAP_REPO }}
+          SCOOP_REPO: ${{ vars.SCOOP_BUCKET_REPO }}
