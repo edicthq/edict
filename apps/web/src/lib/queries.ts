@@ -12,6 +12,8 @@ export const keys = {
   invite: (token: string) => ["invite", token] as const,
   statuses: (orgId: string, teamId: string) => ["org", orgId, "teams", teamId, "statuses"] as const,
   issues: (orgId: string, teamId: string) => ["org", orgId, "teams", teamId, "issues"] as const,
+  // Pages of a team's archived issues. Not under issues, whose data is a list.
+  archivedIssues: (orgId: string, teamId: string) => ["org", orgId, "teams", teamId, "archived-issues"] as const,
   issue: (orgId: string, issueRef: string) => ["org", orgId, "issue", issueRef] as const,
   teamLabels: (orgId: string, teamId: string) => ["org", orgId, "teams", teamId, "labels"] as const,
   subIssues: (orgId: string, issueId: string) => ["org", orgId, "issue", issueId, "sub-issues"] as const,
@@ -611,7 +613,7 @@ export function useUpdateTeam(orgId: string) {
 // fetched when someone asks to see them.
 export function useArchivedIssues(orgId: string, teamId: string, enabled: boolean) {
   return useInfiniteQuery({
-    queryKey: [...keys.issues(orgId, teamId), "archived"] as const,
+    queryKey: keys.archivedIssues(orgId, teamId),
     initialPageParam: undefined as number | undefined,
     queryFn: ({ pageParam }) =>
       unwrap(
@@ -636,6 +638,7 @@ export function useArchiveIssue(orgId: string) {
     onSuccess: (issue) => {
       client.setQueryData(keys.issue(orgId, issue.id), issue);
       void client.invalidateQueries({ queryKey: keys.issues(orgId, issue.teamId) });
+      void client.invalidateQueries({ queryKey: keys.archivedIssues(orgId, issue.teamId) });
     },
   });
 }
