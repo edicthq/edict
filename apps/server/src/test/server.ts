@@ -59,6 +59,8 @@ export async function startTestServer(
     agentLimits?: AgentLimits;
     // How webhook deliveries retry. Production's by default.
     webhookRetry?: WebhookRetry;
+    // Let webhooks reach private addresses, like the tests' 127.0.0.1 receivers.
+    privateWebhookTargets?: boolean;
   } = {},
 ): Promise<TestServer> {
   const database = options.database ?? (await createTestDatabase());
@@ -76,6 +78,7 @@ export async function startTestServer(
     jobs: options.jobs ?? false,
     agentLimits: options.agentLimits,
     webhookRetry: options.webhookRetry,
+    privateWebhookTargets: options.privateWebhookTargets,
   }, { mailer: options.mailer });
   await app.start();
 

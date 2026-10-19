@@ -4,7 +4,7 @@ import { PgBoss } from "pg-boss";
 import { and, inArray, isNotNull, lt, notInArray, sql } from "drizzle-orm";
 import { attachments, comments, inScope, issues, webhookDeliveries, WEBHOOK_CHANNEL, type Database, type Pool } from "@edicthq/db";
 import type { AttachmentStorage } from "./storage.js";
-import { DELIVERY_QUEUE, startWebhooks, type DeliveryJob, type WebhookRetry } from "./webhooks.js";
+import { DELIVERY_QUEUE, startWebhooks, type DeliveryJob, type DeliveryOptions } from "./webhooks.js";
 
 // How long the trash keeps what it holds.
 export const TRASH_DAYS = 30;
@@ -93,7 +93,7 @@ export async function startJobs(
   db: Database,
   pool: Pool,
   storage: AttachmentStorage,
-  webhookRetry: WebhookRetry,
+  delivery: DeliveryOptions,
 ): Promise<Jobs> {
   const boss = new PgBoss({ connectionString: databaseUrl, schema: "pgboss" });
   boss.on("error", (error) => console.error("background jobs:", error));
@@ -107,7 +107,7 @@ export async function startJobs(
     }
     await purgeDeliveries(db);
   });
-  const stopWebhooks = await startWebhooks(db, boss, (onNotify) => listen(pool, onNotify), webhookRetry);
+  const stopWebhooks = await startWebhooks(db, boss, (onNotify) => listen(pool, onNotify), delivery);
   return {
     queueDelivery: async (job) => {
       await boss.send(DELIVERY_QUEUE, job, { id: job.deliveryId });

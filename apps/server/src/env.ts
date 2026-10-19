@@ -40,6 +40,9 @@ export interface ServerConfig {
   // How webhook deliveries retry. DEFAULT_WEBHOOK_RETRY otherwise; tests
   // shorten it.
   webhookRetry?: WebhookRetry;
+  // Lets webhooks point at loopback, private and link-local addresses, like
+  // an agent runner on the instance's own network. Off: public addresses only.
+  privateWebhookTargets?: boolean;
 }
 
 export class ConfigError extends Error {}
@@ -83,6 +86,7 @@ export function readConfig(env: NodeJS.ProcessEnv): ServerConfig {
     emailFrom,
     authRateLimit: env.AUTH_RATE_LIMIT !== "off",
     jobs: env.JOBS !== "off",
+    privateWebhookTargets: env.PRIVATE_WEBHOOK_TARGETS === "allow",
     agentLimits: {
       requestsPerMinute: readLimit("AGENT_REQUESTS_PER_MINUTE", env.AGENT_REQUESTS_PER_MINUTE, DEFAULT_AGENT_LIMITS.requestsPerMinute),
       issuesPerHour: readLimit("AGENT_ISSUES_PER_HOUR", env.AGENT_ISSUES_PER_HOUR, DEFAULT_AGENT_LIMITS.issuesPerHour),

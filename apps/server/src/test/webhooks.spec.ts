@@ -5,6 +5,7 @@ import { describe, expect, it, onTestFinished } from "vitest";
 import { runner } from "./agent-client.js";
 import { createTeam, join, orgWithOwner } from "./org.js";
 import { startTestServer } from "./server.js";
+import { sendWebhook } from "../outbound.js";
 
 interface Received {
   headers: Record<string, string>;
@@ -40,7 +41,9 @@ async function eventually<T>(check: () => Promise<T | undefined> | T | undefined
   }
 }
 
-const fast = { jobs: true, webhookRetry: { limit: 1, delaySeconds: 1 } };
+// The receivers listen on 127.0.0.1, which instances refuse unless told to
+// allow private webhook targets.
+const fast = { jobs: true, webhookRetry: { limit: 1, delaySeconds: 1 }, privateWebhookTargets: true };
 
 describe("webhooks", () => {
   it("delivers subscribed events, signed, and logs each delivery", async () => {
@@ -148,5 +151,39 @@ describe("webhooks", () => {
     expect(rotated.body.secret).toMatch(/^whsec_/);
     expect((await owner.delete(`${org}/webhooks/${webhook.id}`)).status).toBe(204);
     expect((await owner.get(`${org}/webhooks`)).body).toEqual([]);
+  });
+});
+
+describe("webhook targets", () => {
+  it("refuses loopback, private and link-local addresses unless the instance allows them", async () => {
+    const t = await startTestServer();
+    const { owner, org } = await orgWithOwner(t.baseUrl);
+    for (const url of [
+      "http://127.0.0.1:9000/hook",
+      "http://localhost/hook",
+      "http://10.0.0.5/hook",
+      "http://192.168.1.10/hook",
+      "http://169.254.169.254/latest/meta-data/",
+      "http://[::1]/hook",
+      "http://[fd00::1]/hook",
+      "http://[::ffff:127.0.0.1]/hook",
+    ]) {
+      const res = await owner.post(`${org}/webhooks`, { url });
+      expect(res.status, url).toBe(400);
+      expect(res.body.error.message).toMatch(/private/);
+    }
+    const { webhook } = (await owner.post(`${org}/webhooks`, { url: "https://example.com/hook" })).body;
+    const moved = await owner.patch(`${org}/webhooks/${webhook.id}`, { version: webhook.version, url: "http://127.0.0.1/hook" });
+    expect(moved.status).toBe(400);
+  });
+
+  it("checks where a name resolves when it sends, not only when the webhook is saved", async () => {
+    const hook = await receiver();
+    const url = hook.url.replace("127.0.0.1", "localhost");
+    await expect(sendWebhook(url, {}, "{}", { allowPrivate: false })).rejects.toThrow(/private address/);
+    expect(hook.received).toHaveLength(0);
+    const sent = await sendWebhook(url, { "content-type": "application/json" }, "{}", { allowPrivate: true });
+    expect(sent.status).toBe(200);
+    expect(hook.received).toHaveLength(1);
   });
 });

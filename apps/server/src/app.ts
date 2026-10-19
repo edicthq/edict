@@ -59,6 +59,7 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
     maxAttachmentBytes: config.maxAttachmentBytes,
     agentLimits,
     requestLimiter: new RequestLimiter(agentLimits.requestsPerMinute),
+    privateWebhookTargets: config.privateWebhookTargets ?? false,
     queueDelivery: async (job: { orgId: string; deliveryId: string }) => {
       await jobs?.queueDelivery(job);
     },
@@ -109,7 +110,10 @@ export function createApp(config: ServerConfig, options: AppOptions = {}): App {
       );
 
       if (config.jobs !== false) {
-        jobs = await startJobs(config.databaseUrl, db, pool, deps.storage, config.webhookRetry ?? DEFAULT_WEBHOOK_RETRY);
+        jobs = await startJobs(config.databaseUrl, db, pool, deps.storage, {
+          retry: config.webhookRetry ?? DEFAULT_WEBHOOK_RETRY,
+          allowPrivate: config.privateWebhookTargets ?? false,
+        });
       }
 
       server = await listen(app, config.port);

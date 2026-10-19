@@ -3,6 +3,7 @@
 // into one delivery per webhook it goes to and a pg-boss job per delivery.
 // The job sends it, signed, and pg-boss retries it with backoff.
 import { createHmac } from "node:crypto";
+import { sendWebhook } from "./outbound.js";
 import type { PgBoss } from "pg-boss";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import {
@@ -30,6 +31,12 @@ export interface WebhookRetry {
 
 // 30 s, 1 min, 2 min ... then every 4 hours: about 24 hours in all.
 export const DEFAULT_WEBHOOK_RETRY: WebhookRetry = { limit: 14, delaySeconds: 30 };
+
+export interface DeliveryOptions {
+  retry: WebhookRetry;
+  // Whether deliveries may go to private addresses (outbound.ts).
+  allowPrivate: boolean;
+}
 
 export interface DeliveryJob {
   orgId: string;
@@ -137,7 +144,7 @@ export function sign(secret: string, body: string, at = Math.floor(Date.now() / 
 
 // One attempt at a delivery. Throws when it should be retried. `last` says
 // this is the final attempt: a failure then disables the webhook.
-export async function attempt(db: Database, job: DeliveryJob, last: boolean): Promise<void> {
+export async function attempt(db: Database, job: DeliveryJob, last: boolean, allowPrivate = false): Promise<void> {
   const found = await inScope(db, { orgId: job.orgId }, async (tx) => {
     const [row] = await tx
       .select({ delivery: webhookDeliveries, webhook: webhooks, eventType: events.type })
@@ -164,21 +171,20 @@ export async function attempt(db: Database, job: DeliveryJob, last: boolean): Pr
   let status: number | null = null;
   let response: string;
   try {
-    const res = await fetch(webhook.url, {
-      method: "POST",
-      headers: {
+    const res = await sendWebhook(
+      webhook.url,
+      {
         "content-type": "application/json",
         "user-agent": "Edict-Webhooks/1",
         "edict-event": found.eventType,
         "edict-delivery": delivery.id,
         "edict-signature": sign(webhook.secret, delivery.requestBody),
       },
-      body: delivery.requestBody,
-      redirect: "manual",
-      signal: AbortSignal.timeout(10_000),
-    });
+      delivery.requestBody,
+      { allowPrivate, timeoutMs: 10_000, maxBody: 2048 },
+    );
     status = res.status;
-    response = (await res.text()).slice(0, 2048);
+    response = res.body;
   } catch (error) {
     response = `No response: ${error instanceof Error ? error.message : String(error)}`.slice(0, 2048);
   }
@@ -237,7 +243,7 @@ export async function startWebhooks(
   db: Database,
   boss: PgBoss,
   listen: (onNotify: () => void) => Promise<() => Promise<void>>,
-  retry: WebhookRetry,
+  { retry, allowPrivate }: DeliveryOptions,
 ): Promise<() => Promise<void>> {
   await boss.createQueue(DELIVERY_QUEUE, {
     retryLimit: retry.limit,
@@ -271,7 +277,7 @@ export async function startWebhooks(
   };
 
   await boss.work<DeliveryJob, void, { includeMetadata: true }>(DELIVERY_QUEUE, { includeMetadata: true }, async ([job]) => {
-    await attempt(db, job!.data, job!.retryCount >= retry.limit);
+    await attempt(db, job!.data, job!.retryCount >= retry.limit, allowPrivate);
   });
   const unlisten = await listen(run);
   const sweep = setInterval(() => {

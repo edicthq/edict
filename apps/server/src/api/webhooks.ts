@@ -7,6 +7,7 @@ import { requireRole } from "./access.js";
 import type { Caller } from "./callers.js";
 import { body, errors, inOrg, json, noContent, OrgParams, router, type ApiDeps } from "./context.js";
 import { changesOf, invalid, notFound, requireVersion } from "./errors.js";
+import { checkWebhookUrl, PrivateTargetError } from "../outbound.js";
 
 type WebhookRow = typeof webhooks.$inferSelect;
 type DeliveryRow = typeof webhookDeliveries.$inferSelect;
@@ -137,6 +138,18 @@ function requireAdmin(caller: Caller, action: string) {
 export interface WebhookDeps extends ApiDeps {
   // Queues a delivery made outside the dispatcher, like a redelivery.
   queueDelivery?: (job: { orgId: string; deliveryId: string }) => Promise<void>;
+  // Lets webhook URLs name private addresses (outbound.ts). Off by default.
+  privateWebhookTargets?: boolean;
+}
+
+// Refuses a URL on the instance's own network before it is saved.
+async function checkUrl(deps: WebhookDeps, url: string): Promise<void> {
+  try {
+    await checkWebhookUrl(url, { allowPrivate: deps.privateWebhookTargets ?? false });
+  } catch (error) {
+    if (error instanceof PrivateTargetError) throw invalid(error.message);
+    throw error;
+  }
 }
 
 export function webhookRoutes(deps: WebhookDeps) {
@@ -166,6 +179,7 @@ export function webhookRoutes(deps: WebhookDeps) {
     const secret = newSecret();
     const row = await inOrg(deps, c, orgId, async (tx, caller) => {
       requireAdmin(caller, "create webhooks");
+      await checkUrl(deps, input.url);
       if (input.agentId) {
         const [agent] = await tx.select().from(members).where(and(eq(members.id, input.agentId), eq(members.kind, "agent")));
         if (!agent || agent.removedAt) throw invalid("agentId is not an agent in this organization.");
@@ -191,6 +205,7 @@ export function webhookRoutes(deps: WebhookDeps) {
     const { version, enabled, ...input } = c.req.valid("json");
     const row = await inOrg(deps, c, orgId, async (tx, caller) => {
       requireAdmin(caller, "change webhooks");
+      if (input.url) await checkUrl(deps, input.url);
       const current = await webhookRow(tx, webhookId, true);
       requireVersion(current.version, version, "webhook");
       const next = { ...input, eventTypes: input.eventTypes ? [...new Set(input.eventTypes)].sort() : undefined };
