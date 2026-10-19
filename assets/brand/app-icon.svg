@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- The macOS icon grid: an 824px tile with 100px of margin. -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="#161b22"/>
+  <g transform="translate(256 256) scale(32)" fill="#edeff1">
+    <path d="M5 2h7a1 1 0 0 1 0 2H5v8h7a1 1 0 0 1 0 2H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"/>
+    <path d="M8.1 6h1.8A1.1 1.1 0 0 1 11 7.1v1.8A1.1 1.1 0 0 1 9.9 10H8.1A1.1 1.1 0 0 1 7 8.9V7.1A1.1 1.1 0 0 1 8.1 6Z"/>
+  </g>
+</svg>

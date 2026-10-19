@@ -248,7 +248,7 @@ The chosen direction becomes design tokens in `packages/ui` before any product U
 
 ### Logo and app icon
 
-Edict has no real logo yet. The hexagon mark in the app and the favicon is the M0 prototype's placeholder, drawn in the agent color, so it changes with the accent. Edict needs a designed logo and app icon before v1.0. The icon has to work in one color and at 16px, without depending on the accent: favicon, desktop app and tray icons for macOS, Windows and Linux, and the avatars for the GitHub org, GHCR and npm. The desktop app in M6 cannot ship without it.
+The mark is an E whose middle arm is an agent's rounded square, picked in M6 on 2026-10-19. It works in one color and at 16px, without depending on the accent: favicon, desktop app and tray icons for macOS, Windows and Linux, and the avatars for the GitHub org, GHCR and npm. Its rules are in [`docs/design/tokens.md`](./design/tokens.md#logo) and its files in [`assets/brand`](../assets/brand).
 
 ## Quality
 

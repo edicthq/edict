@@ -164,3 +164,16 @@ Animations run once when an element appears, not on every re-render. With `prefe
 - **Delegated row**: a 3px bar on the leading edge (`line-strong`, or `agent` while live) and a second line with the agent's name in `agent-ink`, the badge, the run timer and the first line of the latest update in `ink-2`.
 - **Agent lane**: `lane` background, `agent-edge` border while live, updates on a 2px `agent-edge` rule (`warn` or `danger` when waiting on a human), links as outlined chips.
 - **Focus**: 2px `ink` outline, 2px offset, on `:focus-visible` only. The list cursor is the same ring inside the row on a `hover` background.
+
+## Logo
+
+The mark is an E whose middle arm is a rounded square, the shape of an agent's avatar: humans and agents in one letter. It was picked in M6 on 2026-10-19, from five directions and two rounds.
+
+- **Grid.** 16 × 16 with 2px strokes, the square 4 × 4 at the agent avatar's 28% corner. Every edge sits on a whole pixel at 16 and 32, so use those sizes (or multiples of 16) where you can.
+- **Color.** One color: `ink`, inverted in dark. Never the accent, so it reads the same whatever accent someone picks.
+- **Wordmark.** "Edict" in Instrument Sans 600 at −0.01em, the mark 8 to its left, about one and a quarter times the cap height.
+- **App icon.** The mark in dark-theme `ink` on a light-theme `ink` tile, on the macOS grid (an 824px tile in 1024). Windows and Linux use the same image.
+- **Avatars.** Full bleed `ink` with the mark at about 40% of the height, since GitHub, GHCR and npm crop to their own shapes.
+- **Tray.** A black template image on macOS, which the system tints.
+
+`assets/brand` holds the SVG sources. `node assets/brand/render.mjs` renders the PNGs, the favicon ICO and the touch icon from them. The Tauri shell generates its platform icons from `app-icon-1024.png` with `tauri icon`.
