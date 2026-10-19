@@ -9,7 +9,9 @@ import { request as httpRequest, type IncomingMessage } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { BlockList, isIP, type LookupFunction } from "node:net";
 
-const blocked = new BlockList();
+// One list per family: a BlockList also matches IPv4 addresses against its
+// IPv4-mapped IPv6 rules, so ::ffff:0:0/96 in a shared list blocks all of IPv4.
+const blockedV4 = new BlockList();
 for (const [network, prefix] of [
   ["0.0.0.0", 8],
   ["10.0.0.0", 8],
@@ -26,8 +28,9 @@ for (const [network, prefix] of [
   ["224.0.0.0", 4],
   ["240.0.0.0", 4],
 ] as const) {
-  blocked.addSubnet(network, prefix, "ipv4");
+  blockedV4.addSubnet(network, prefix, "ipv4");
 }
+const blockedV6 = new BlockList();
 for (const [network, prefix] of [
   ["::", 128],
   ["::1", 128],
@@ -40,18 +43,18 @@ for (const [network, prefix] of [
   ["fe80::", 10],
   ["ff00::", 8],
 ] as const) {
-  blocked.addSubnet(network, prefix, "ipv6");
+  blockedV6.addSubnet(network, prefix, "ipv6");
 }
 
 // Whether an IP address is on the public internet.
 export function isPublicAddress(address: string): boolean {
   const family = isIP(address);
-  if (family === 4) return !blocked.check(address, "ipv4");
+  if (family === 4) return !blockedV4.check(address, "ipv4");
   if (family === 6) {
     // DNS can answer an IPv4-mapped address; judge the IPv4 address in it.
     const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(address)?.[1];
     if (mapped) return isPublicAddress(mapped);
-    return !blocked.check(address, "ipv6");
+    return !blockedV6.check(address, "ipv6");
   }
   return false;
 }

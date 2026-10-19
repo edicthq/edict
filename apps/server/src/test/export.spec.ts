@@ -26,7 +26,7 @@ describe("export", () => {
     await owner.post(`${org}/issues/ENG-1/relations`, { type: "blocks", issue: two.identifier });
     await owner.post(`${org}/issues/ENG-1/links`, { url: "https://example.com/pr", title: "The PR" });
     await dev.postForm(`${org}/issues/ENG-1/attachments`, form("spec.md", "text/markdown", "# The spec"));
-    await owner.post(`${org}/webhooks`, { url: "https://example.com/hook" });
+    await owner.post(`${org}/webhooks`, { url: "https://1.1.1.1/hook" });
 
     const res = await fetch(`${t.baseUrl}/api/v1${org}/export`, { headers: { cookie: owner.cookie } });
     expect(res.status).toBe(200);
@@ -60,7 +60,7 @@ describe("export", () => {
     expect(document.issueLabels).toHaveLength(1);
     expect(document.progressUpdates).toEqual([]);
     // The signing secret is not serialized, so the zip cannot read it.
-    expect(document.webhooks).toEqual([expect.objectContaining({ url: "https://example.com/hook" })]);
+    expect(document.webhooks).toEqual([expect.objectContaining({ url: "https://1.1.1.1/hook" })]);
     expect(JSON.stringify(document.webhooks)).not.toContain("secret");
     // The history goes with it, and the export itself is recorded.
     expect(document.events.map((e: { type: string }) => e.type)).toEqual(
