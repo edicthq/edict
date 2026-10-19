@@ -868,8 +868,11 @@ export const UpdateSavedView = z
   })
   .meta({ id: "UpdateSavedView" });
 
+// What an inbox item tells its recipient: an issue was assigned or delegated
+// to them, moved by someone else, commented on, they were mentioned, an agent
+// posted progress on their issue, or a webhook turned itself off (Admins).
 export const InboxItemType = z
-  .enum(["assigned", "delegated", "status_changed", "comment_created", "mentioned"])
+  .enum(["assigned", "delegated", "status_changed", "comment_created", "mentioned", "progress_posted", "webhook_disabled"])
   .meta({ id: "InboxItemType" });
 export type InboxItemType = z.infer<typeof InboxItemType>;
 
@@ -888,8 +891,13 @@ export const InboxItem = z
     id: Id,
     type: InboxItemType,
     actor: Member.nullable(),
-    issue: InboxIssue,
+    // The issue it is about. Null only for webhook_disabled.
+    issue: InboxIssue.nullable(),
+    // The webhook that turned itself off, for webhook_disabled.
+    webhook: z.object({ id: Id, url: z.string() }).nullable(),
     commentId: Id.nullable(),
+    // For progress_posted: the state the agent reported.
+    progressState: ProgressState.nullable(),
     readAt: z.iso.datetime().nullable(),
     createdAt: z.iso.datetime(),
   })

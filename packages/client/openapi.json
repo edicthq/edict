@@ -2359,12 +2359,44 @@
           "issue": {
             "$ref": "#/components/schemas/InboxIssue"
           },
+          "webhook": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "url"
+            ]
+          },
           "commentId": {
             "type": [
               "string",
               "null"
             ],
             "format": "uuid"
+          },
+          "progressState": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProgressState"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
           },
           "readAt": {
             "type": [
@@ -2383,7 +2415,9 @@
           "type",
           "actor",
           "issue",
+          "webhook",
           "commentId",
+          "progressState",
           "readAt",
           "createdAt"
         ]
@@ -2395,11 +2429,16 @@
           "delegated",
           "status_changed",
           "comment_created",
-          "mentioned"
+          "mentioned",
+          "progress_posted",
+          "webhook_disabled"
         ]
       },
       "InboxIssue": {
-        "type": "object",
+        "type": [
+          "object",
+          "null"
+        ],
         "properties": {
           "id": {
             "type": "string",
@@ -9039,7 +9078,11 @@
     },
     "/organizations/{orgId}/inbox": {
       "get": {
-        "summary": "List inbox notifications for the current member",
+        "tags": [
+          "Inbox"
+        ],
+        "summary": "The caller's inbox, newest first",
+        "description": "Items about issues the caller can no longer see, or that are in the trash, are left out. At most 100.",
         "parameters": [
           {
             "schema": {
@@ -9077,13 +9120,36 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
     },
     "/organizations/{orgId}/inbox/unread-count": {
       "get": {
-        "summary": "Get unread count for current member",
+        "tags": [
+          "Inbox"
+        ],
+        "summary": "How many of the caller's inbox items are unread",
         "parameters": [
           {
             "schema": {
@@ -9097,11 +9163,31 @@
         ],
         "responses": {
           "200": {
-            "description": "Inbox unread summary",
+            "description": "The unread count",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InboxSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -9111,6 +9197,9 @@
     },
     "/organizations/{orgId}/inbox/{itemId}": {
       "patch": {
+        "tags": [
+          "Inbox"
+        ],
         "summary": "Mark an inbox item read or unread",
         "parameters": [
           {
@@ -9133,6 +9222,7 @@
           }
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -9143,11 +9233,41 @@
         },
         "responses": {
           "200": {
-            "description": "Updated inbox item",
+            "description": "The item",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InboxItem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the schema",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -9157,7 +9277,10 @@
     },
     "/organizations/{orgId}/inbox/read-all": {
       "post": {
-        "summary": "Mark all inbox items as read",
+        "tags": [
+          "Inbox"
+        ],
+        "summary": "Mark every unread inbox item read",
         "parameters": [
           {
             "schema": {
@@ -9171,7 +9294,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Marked items count",
+            "description": "How many items were marked",
             "content": {
               "application/json": {
                 "schema": {
@@ -9184,6 +9307,26 @@
                   "required": [
                     "count"
                   ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }

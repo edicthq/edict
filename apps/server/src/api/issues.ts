@@ -5,7 +5,6 @@ import { BulkUpdateIssues, BulkUpdateResult, CreateIssue, Id, Issue, IssueConfli
 import type { teams } from "@edicthq/db";
 import type { Caller } from "./callers.js";
 import { visibleTeam } from "./access.js";
-import { notify } from "./inbox.js";
 import { body, errors, inOrg, json, OrgParams, router, type ApiDeps } from "./context.js";
 import { changesOf, conflict, invalid, rateLimited } from "./errors.js";
 import { DEFAULT_AGENT_LIMITS } from "./rate-limit.js";
@@ -280,12 +279,6 @@ export function issueRoutes(deps: ApiDeps) {
         ...data
       } = created;
       await emit(tx, orgId, { type: "issue.created", actorId: caller.id, subjectId: row!.id, data });
-      if (created.assigneeId) {
-        await notify(tx, { orgId, recipientId: created.assigneeId, actorId: caller.id, issueId: created.id, type: "assigned" });
-      }
-      if (created.delegateId) {
-        await notify(tx, { orgId, recipientId: created.delegateId, actorId: caller.id, issueId: created.id, type: "delegated" });
-      }
       return created;
     });
     return c.json(issue, 201);

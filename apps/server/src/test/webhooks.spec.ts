@@ -121,6 +121,8 @@ describe("webhooks", () => {
     expect(delivery).toMatchObject({ status: "failed", responseStatus: 500, attempts: 2, responseBody: "nope" });
     const types = (await owner.get(`${org}/events`)).body.map((e: { type: string }) => e.type);
     expect(types).toContain("webhook.disabled");
+    const inbox = (await owner.get(`${org}/inbox`)).body as { type: string; webhook: { id: string } | null }[];
+    expect(inbox).toContainEqual(expect.objectContaining({ type: "webhook_disabled", webhook: expect.objectContaining({ id: webhook.id }) }));
 
     // Turned back on, it delivers again.
     hook.state.status = 200;

@@ -5414,7 +5414,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List inbox notifications for the current member */
+        /**
+         * The caller's inbox, newest first
+         * @description Items about issues the caller can no longer see, or that are in the trash, are left out. At most 100.
+         */
         get: {
             parameters: {
                 query?: {
@@ -5437,6 +5440,24 @@ export interface paths {
                         "application/json": components["schemas"]["InboxItem"][];
                     };
                 };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
             };
         };
         put?: never;
@@ -5454,7 +5475,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get unread count for current member */
+        /** How many of the caller's inbox items are unread */
         get: {
             parameters: {
                 query?: never;
@@ -5466,13 +5487,31 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Inbox unread summary */
+                /** @description The unread count */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": components["schemas"]["InboxSummary"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
                     };
                 };
             };
@@ -5509,19 +5548,46 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: {
+            requestBody: {
                 content: {
                     "application/json": components["schemas"]["UpdateInboxItem"];
                 };
             };
             responses: {
-                /** @description Updated inbox item */
+                /** @description The item */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": components["schemas"]["InboxItem"];
+                    };
+                };
+                /** @description The request does not match the schema */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
                     };
                 };
             };
@@ -5537,7 +5603,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Mark all inbox items as read */
+        /** Mark every unread inbox item read */
         post: {
             parameters: {
                 query?: never;
@@ -5549,7 +5615,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Marked items count */
+                /** @description How many items were marked */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5558,6 +5624,24 @@ export interface paths {
                         "application/json": {
                             count: number;
                         };
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
                     };
                 };
             };
@@ -7033,15 +7117,21 @@ export interface components {
             type: components["schemas"]["InboxItemType"];
             actor: components["schemas"]["Member"] & (Record<string, never> | null);
             issue: components["schemas"]["InboxIssue"];
+            webhook: {
+                /** Format: uuid */
+                id: string;
+                url: string;
+            } | null;
             /** Format: uuid */
             commentId: string | null;
+            progressState: components["schemas"]["ProgressState"] & (string | null);
             /** Format: date-time */
             readAt: string | null;
             /** Format: date-time */
             createdAt: string;
         };
         /** @enum {string} */
-        InboxItemType: "assigned" | "delegated" | "status_changed" | "comment_created" | "mentioned";
+        InboxItemType: "assigned" | "delegated" | "status_changed" | "comment_created" | "mentioned" | "progress_posted" | "webhook_disabled";
         InboxIssue: {
             /** Format: uuid */
             id: string;
@@ -7049,7 +7139,7 @@ export interface components {
             title: string;
             /** Format: uuid */
             teamId: string;
-        };
+        } | null;
         InboxSummary: {
             unreadCount: number;
         };

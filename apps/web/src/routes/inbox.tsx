@@ -16,6 +16,15 @@ const typeLine: Record<InboxItem["type"], string> = {
   comment_created: "commented on",
   mentioned: "mentioned you on",
   status_changed: "changed status on",
+  progress_posted: "posted progress on",
+  webhook_disabled: "",
+};
+
+const progressWords: Record<NonNullable<InboxItem["progressState"]>, string> = {
+  working: "is working on",
+  blocked: "is blocked on",
+  needs_input: "needs input on",
+  done: "finished",
 };
 
 export function InboxPage() {
@@ -78,20 +87,35 @@ export function InboxPage() {
             {items.map((item) => (
               <li key={item.id}>
                 <Link
-                  to={`/${slug}/teams/${item.issue.teamId}?peek=${item.issue.identifier}`}
+                  to={
+                    item.issue
+                      ? `/${slug}/teams/${item.issue.teamId}?peek=${item.issue.identifier}`
+                      : `/${slug}/agents`
+                  }
                   onClick={() => open(item)}
                   className={cn(rowClass, "min-w-0")}
                   aria-current={item.readAt ? undefined : "true"}
                 >
-                  {item.actor ? <Avatar name={item.actor.name} /> : null}
+                  {item.actor && item.issue ? <Avatar name={item.actor.name} /> : null}
                   <span className="min-w-0 flex-1 truncate text-body font-medium text-ink">
-                    <span className="font-semibold">{item.actor?.name ?? "Someone"}</span>{" "}
-                    {typeLine[item.type]}{" "}
-                    <TeamKey>{item.issue.identifier.split("-")[0]}</TeamKey>{" "}
-                    <span className="font-medium text-ink">{item.issue.identifier}</span>{" "}
-                    <span className={cn("text-ink-2 font-normal")}>{item.issue.title}</span>
+                    {item.issue ? (
+                      <>
+                        <span className="font-semibold">{item.actor?.name ?? "Someone"}</span>{" "}
+                        {item.progressState ? progressWords[item.progressState] : typeLine[item.type]}{" "}
+                        <TeamKey>{item.issue.identifier.split("-")[0]}</TeamKey>{" "}
+                        <span className="font-medium text-ink">{item.issue.identifier}</span>{" "}
+                        <span className={cn("text-ink-2 font-normal")}>{item.issue.title}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-semibold">A webhook turned itself off</span>{" "}
+                        <span className="font-normal text-ink-2">
+                          after its deliveries to {item.webhook?.url ?? "its URL"} failed for a day
+                        </span>
+                      </>
+                    )}
                   </span>
-                  {!item.readAt ? <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-accent" /> : null}
+                  {!item.readAt ? <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-ink" /> : null}
                   <time dateTime={item.createdAt} className="shrink-0 text-end text-sm text-ink-3">
                     {ago(item.createdAt)}
                   </time>

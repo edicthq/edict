@@ -1,7 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { comments, emit, members, user } from "@edicthq/db";
-import { extractMentions, notify } from "./inbox.js";
 import { Comment, CommentConflict, CreateComment, Id, IssueRef, UpdateComment } from "@edicthq/schema";
 import type { Caller } from "./callers.js";
 import { body, errors, inOrg, json, OrgParams, router, type ApiDeps } from "./context.js";
@@ -99,47 +98,6 @@ export function commentRoutes(deps: ApiDeps) {
       const { issue } = await visibleIssue(tx, caller, issueRef);
       const [row] = await tx.insert(comments).values({ orgId, issueId: issue.id, creatorId: caller.id, body: input.body }).returning();
       await emit(tx, orgId, { type: "comment.created", actorId: caller.id, subjectId: row!.id, data: { issueId: issue.id, version: 1 } });
-
-      const orgMembers = await tx
-        .select({ id: members.id, name: members.name, email: user.email })
-        .from(members)
-        .leftJoin(user, eq(members.userId, user.id))
-        .where(eq(members.orgId, orgId));
-
-      const mentionedIds = extractMentions(input.body, orgMembers);
-      for (const recipientId of mentionedIds) {
-        await notify(tx, {
-          orgId,
-          recipientId,
-          actorId: caller.id,
-          issueId: issue.id,
-          commentId: row!.id,
-          type: "mentioned",
-        });
-      }
-
-      const notified = new Set(mentionedIds);
-      if (issue.assigneeId && !notified.has(issue.assigneeId)) {
-        await notify(tx, {
-          orgId,
-          recipientId: issue.assigneeId,
-          actorId: caller.id,
-          issueId: issue.id,
-          commentId: row!.id,
-          type: "comment_created",
-        });
-        notified.add(issue.assigneeId);
-      }
-      if (issue.creatorId && !notified.has(issue.creatorId)) {
-        await notify(tx, {
-          orgId,
-          recipientId: issue.creatorId,
-          actorId: caller.id,
-          issueId: issue.id,
-          commentId: row!.id,
-          type: "comment_created",
-        });
-      }
 
       return toComment(row!);
     });

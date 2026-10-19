@@ -1,116 +1,233 @@
+// The inbox (ADR 0005): each item is made from one event, in the transaction
+// that writes the event, so the inbox can never disagree with the log. Reads
+// show only items about issues the recipient can see now, so an item about
+// an issue that moved into a private team or went to the trash disappears.
 import { createRoute, z } from "@hono/zod-openapi";
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
-import { comments, inbox, issues, members, teams } from "@edicthq/db";
+import { and, desc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import {
-  Id,
-  InboxItem,
-  InboxSummary,
-  UpdateInboxItem,
-  } from "@edicthq/schema";
-import { loadMember, memberWithUser, toMember } from "./access.js";
+  comments,
+  consumeEvents,
+  emit,
+  events,
+  inbox,
+  issues,
+  members,
+  teams,
+  user,
+  webhooks,
+  type EventRow,
+  type Transaction,
+} from "@edicthq/db";
+import { Id, InboxItem, InboxSummary, UpdateInboxItem, type InboxItemType, type ProgressState } from "@edicthq/schema";
+import { loadMember, teamVisibility } from "./access.js";
 import type { Caller } from "./callers.js";
-import { inOrg, json, router, type ApiDeps } from "./context.js";
+import { body, errors, inOrg, json, OrgParams, router, type ApiDeps } from "./context.js";
 import { notFound } from "./errors.js";
 
-type Transaction = Parameters<Parameters<typeof inOrg>[3]>[0];
-
-// Helper to notify a member about an issue event.
-export async function notify(
-  tx: Transaction,
-  params: {
-    orgId: string;
-    recipientId: string;
-    actorId?: string | null;
-    issueId: string;
-    commentId?: string | null;
-    type: "assigned" | "delegated" | "status_changed" | "comment_created" | "mentioned";
-  },
-): Promise<void> {
-  // Never notify oneself
-  if (params.actorId && params.actorId === params.recipientId) return;
-
-  await tx.insert(inbox).values({
-    orgId: params.orgId,
-    recipientId: params.recipientId,
-    actorId: params.actorId ?? null,
-    issueId: params.issueId,
-    commentId: params.commentId ?? null,
-    type: params.type,
-  });
+interface NewItem {
+  recipientId: string;
+  type: InboxItemType;
+  issueId?: string;
+  webhookId?: string;
+  commentId?: string;
 }
 
-// Parses @mentions in markdown body, matching member names or emails.
-export function extractMentions(text: string, orgMembers: Array<{ id: string; name: string | null; email?: string | null }>): string[] {
-  const matches = text.match(/@([a-zA-Z0-9._-]+)/g);
-  if (!matches) return [];
+type Changes = Record<string, { from: unknown; to: unknown } | undefined>;
 
-  const tokens = matches.map((m) => m.slice(1).toLowerCase());
-  const recipientIds = new Set<string>();
-
-  for (const token of tokens) {
-    for (const member of orgMembers) {
-      const name = member.name?.toLowerCase().replace(/\s+/g, "");
-      const email = member.email?.toLowerCase().split("@")[0];
-      if ((name && (name === token || name.startsWith(token))) || (email && email === token)) {
-        recipientIds.add(member.id);
-      }
+// Who hears about an event. Undoing a change tells nobody again.
+async function itemsFor(tx: Transaction, event: EventRow): Promise<NewItem[]> {
+  const data = event.data as Record<string, unknown>;
+  if (data.undoes) return [];
+  switch (event.type) {
+    case "issue.created": {
+      const out: NewItem[] = [];
+      if (typeof data.assigneeId === "string") out.push({ recipientId: data.assigneeId, type: "assigned", issueId: event.subjectId });
+      if (typeof data.delegateId === "string") out.push({ recipientId: data.delegateId, type: "delegated", issueId: event.subjectId });
+      return out;
     }
+    case "issue.updated": {
+      const changes = (data.changes ?? {}) as Changes;
+      const out: NewItem[] = [];
+      const assignee = changes.assigneeId?.to;
+      const delegate = changes.delegateId?.to;
+      if (typeof assignee === "string") out.push({ recipientId: assignee, type: "assigned", issueId: event.subjectId });
+      if (typeof delegate === "string") out.push({ recipientId: delegate, type: "delegated", issueId: event.subjectId });
+      if (changes.statusId && typeof assignee !== "string") {
+        const [issue] = await tx.select({ assigneeId: issues.assigneeId }).from(issues).where(eq(issues.id, event.subjectId));
+        if (issue?.assigneeId) out.push({ recipientId: issue.assigneeId, type: "status_changed", issueId: event.subjectId });
+      }
+      return out;
+    }
+    case "comment.created": {
+      const [row] = await tx
+        .select({ body: comments.body, issueId: comments.issueId, assigneeId: issues.assigneeId, creatorId: issues.creatorId })
+        .from(comments)
+        .innerJoin(issues, eq(issues.id, comments.issueId))
+        .where(eq(comments.id, event.subjectId));
+      if (!row) return [];
+      const mentioned = await mentionedMembers(tx, event.orgId, row.body);
+      const out: NewItem[] = mentioned.map((id) => ({ recipientId: id, type: "mentioned", issueId: row.issueId, commentId: event.subjectId }));
+      for (const id of [row.assigneeId, row.creatorId]) {
+        if (id && !out.some((item) => item.recipientId === id)) {
+          out.push({ recipientId: id, type: "comment_created", issueId: row.issueId, commentId: event.subjectId });
+        }
+      }
+      return out;
+    }
+    case "progress.posted": {
+      if (typeof data.issueId !== "string") return [];
+      const [issue] = await tx.select({ assigneeId: issues.assigneeId }).from(issues).where(eq(issues.id, data.issueId));
+      return issue?.assigneeId ? [{ recipientId: issue.assigneeId, type: "progress_posted", issueId: data.issueId }] : [];
+    }
+    case "webhook.disabled": {
+      const admins = await tx
+        .select({ id: members.id })
+        .from(members)
+        .where(and(eq(members.orgId, event.orgId), eq(members.kind, "human"), inArray(members.role, ["owner", "admin"]), isNull(members.removedAt)));
+      return admins.map((admin) => ({ recipientId: admin.id, type: "webhook_disabled", webhookId: event.subjectId }));
+    }
+    default:
+      return [];
   }
-
-  return [...recipientIds];
 }
+
+// Writes the items an event makes. Nobody hears about what they did
+// themselves, or what their own connected agent did for them. A webhook
+// turning itself off names its creator as the actor, but nobody acted.
+async function inboxFromEvent(tx: Transaction, event: EventRow): Promise<void> {
+  const items = await itemsFor(tx, event);
+  if (items.length === 0) return;
+  const skip = new Set(event.type === "webhook.disabled" ? [] : [event.actorId, event.onBehalfOfId].filter(Boolean));
+  const wanted = items.filter((item) => !skip.has(item.recipientId));
+  if (wanted.length === 0) return;
+  const active = await tx
+    .select({ id: members.id })
+    .from(members)
+    .where(and(eq(members.orgId, event.orgId), inArray(members.id, wanted.map((item) => item.recipientId)), isNull(members.removedAt)));
+  const present = new Set(active.map((row) => row.id));
+  const rows = wanted
+    .filter((item) => present.has(item.recipientId))
+    .map((item) => ({
+      orgId: event.orgId,
+      eventId: event.id,
+      recipientId: item.recipientId,
+      actorId: event.actorId,
+      issueId: item.issueId ?? null,
+      webhookId: item.webhookId ?? null,
+      commentId: item.commentId ?? null,
+      type: item.type,
+    }));
+  if (rows.length > 0) await tx.insert(inbox).values(rows);
+}
+
+consumeEvents(inboxFromEvent);
+
+// The members a markdown text @mentions by a whole handle: a person's email
+// name or full name without spaces, or an agent's name in dashed words, as
+// MCP shows handles. Members who left are not mentioned.
+export async function mentionedMembers(tx: Transaction, orgId: string, text: string): Promise<string[]> {
+  const tokens = new Set(
+    [...text.matchAll(/(?:^|[^\w@])@([a-z0-9][\w.-]*)/gi)].map((match) => match[1]!.replace(/[.-]+$/, "").toLowerCase()),
+  );
+  if (tokens.size === 0) return [];
+  const rows = await tx
+    .select({ id: members.id, kind: members.kind, agentName: members.name, userName: user.name, email: user.email })
+    .from(members)
+    .leftJoin(user, eq(user.id, members.userId))
+    .where(and(eq(members.orgId, orgId), isNull(members.removedAt)));
+  return rows
+    .filter((row) => {
+      const handles =
+        row.kind === "agent"
+          ? [(row.agentName ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")]
+          : [row.email?.split("@")[0]?.toLowerCase(), row.userName?.toLowerCase().replace(/\s+/g, "")];
+      return handles.some((handle) => handle && tokens.has(handle));
+    })
+    .map((row) => row.id);
+}
+
+// The caller's items about what they can still see.
+function visibleItems(tx: Transaction, caller: Caller, extra?: SQL) {
+  return and(
+    eq(inbox.recipientId, caller.id),
+    or(isNull(inbox.issueId), and(isNull(issues.deletedAt), teamVisibility(tx, caller))),
+    extra,
+  );
+}
+
+function itemQuery(tx: Transaction) {
+  return tx
+    .select({ item: inbox, issue: issues, team: teams, webhook: { id: webhooks.id, url: webhooks.url }, eventData: events.data })
+    .from(inbox)
+    .leftJoin(issues, eq(issues.id, inbox.issueId))
+    .leftJoin(teams, eq(teams.id, issues.teamId))
+    .leftJoin(webhooks, eq(webhooks.id, inbox.webhookId))
+    .leftJoin(events, eq(events.id, inbox.eventId));
+}
+
+type ItemRow = Awaited<ReturnType<ReturnType<typeof itemQuery>["execute"]>>[number];
+
+async function toItem(tx: Transaction, orgId: string, row: ItemRow): Promise<InboxItem> {
+  const actor = row.item.actorId ? await loadMember(tx, orgId, row.item.actorId).catch(() => null) : null;
+  const state = (row.eventData as { state?: ProgressState } | null)?.state;
+  return {
+    id: row.item.id,
+    type: row.item.type as InboxItemType,
+    actor,
+    issue:
+      row.issue && row.team
+        ? { id: row.issue.id, identifier: `${row.team.key}-${row.issue.number}`, title: row.issue.title, teamId: row.team.id }
+        : null,
+    webhook: row.webhook?.id ? { id: row.webhook.id, url: row.webhook.url } : null,
+    commentId: row.item.commentId,
+    progressState: row.item.type === "progress_posted" && state ? state : null,
+    readAt: row.item.readAt?.toISOString() ?? null,
+    createdAt: row.item.createdAt.toISOString(),
+  };
+}
+
+const ItemParams = OrgParams.extend({ itemId: Id });
 
 const listInbox = createRoute({
   method: "get",
   path: "/organizations/{orgId}/inbox",
-  summary: "List inbox notifications for the current member",
+  tags: ["Inbox"],
+  summary: "The caller's inbox, newest first",
+  description: "Items about issues the caller can no longer see, or that are in the trash, are left out. At most 100.",
   request: {
-    params: z.object({ orgId: Id }),
-    query: z.object({
-      filter: z.enum(["unread", "all"]).optional().default("unread"),
-    }),
+    params: OrgParams,
+    query: z.object({ filter: z.enum(["unread", "all"]).optional().default("unread") }),
   },
-  responses: {
-    200: json(z.array(InboxItem), "Inbox items"),
-  },
+  responses: { 200: json(z.array(InboxItem), "Inbox items"), ...errors("unauthorized", "not_found") },
 });
 
 const getUnreadCount = createRoute({
   method: "get",
   path: "/organizations/{orgId}/inbox/unread-count",
-  summary: "Get unread count for current member",
-  request: {
-    params: z.object({ orgId: Id }),
-  },
-  responses: {
-    200: json(InboxSummary, "Inbox unread summary"),
-  },
+  tags: ["Inbox"],
+  summary: "How many of the caller's inbox items are unread",
+  request: { params: OrgParams },
+  responses: { 200: json(InboxSummary, "The unread count"), ...errors("unauthorized", "not_found") },
 });
 
 const updateInboxItem = createRoute({
   method: "patch",
   path: "/organizations/{orgId}/inbox/{itemId}",
+  tags: ["Inbox"],
   summary: "Mark an inbox item read or unread",
-  request: {
-    params: z.object({ orgId: Id, itemId: Id }),
-    body: {
-      content: { "application/json": { schema: UpdateInboxItem } },
-    },
-  },
-  responses: {
-    200: json(InboxItem, "Updated inbox item"),
-  },
+  request: { params: ItemParams, ...body(UpdateInboxItem) },
+  responses: { 200: json(InboxItem, "The item"), ...errors("invalid_request", "unauthorized", "not_found") },
 });
 
 const markAllRead = createRoute({
   method: "post",
   path: "/organizations/{orgId}/inbox/read-all",
-  summary: "Mark all inbox items as read",
-  request: {
-    params: z.object({ orgId: Id }),
-  },
+  tags: ["Inbox"],
+  summary: "Mark every unread inbox item read",
+  request: { params: OrgParams },
   responses: {
-    200: json(z.object({ count: z.number().int() }), "Marked items count"),
+    200: json(z.object({ count: z.number().int() }), "How many items were marked"),
+    ...errors("unauthorized", "not_found"),
   },
 });
 
@@ -120,163 +237,60 @@ export function inboxRoutes(deps: ApiDeps) {
   app.openapi(listInbox, async (c) => {
     const { orgId } = c.req.valid("param");
     const { filter } = c.req.valid("query");
-
     const items = await inOrg(deps, c, orgId, async (tx, caller) => {
-      const conditions = [
-        eq(inbox.orgId, orgId),
-        eq(inbox.recipientId, caller.id),
-      ];
-      if (filter === "unread") {
-        conditions.push(isNull(inbox.readAt));
-      }
-
-      const rows = await tx
-        .select({
-          inboxRow: inbox,
-          issueRow: issues,
-          teamRow: teams,
-        })
-        .from(inbox)
-        .innerJoin(issues, eq(inbox.issueId, issues.id))
-        .innerJoin(teams, eq(issues.teamId, teams.id))
-        .where(and(...conditions))
-        .orderBy(desc(inbox.createdAt))
+      const rows = await itemQuery(tx)
+        .where(visibleItems(tx, caller, filter === "unread" ? isNull(inbox.readAt) : undefined))
+        .orderBy(desc(inbox.id))
         .limit(100);
-
-      const result: z.infer<typeof InboxItem>[] = [];
-      for (const { inboxRow, issueRow, teamRow } of rows) {
-        let actor: z.infer<typeof InboxItem>["actor"] = null;
-        if (inboxRow.actorId) {
-          try {
-            actor = await loadMember(tx, orgId, inboxRow.actorId);
-          } catch {
-            actor = null;
-          }
-        }
-
-        result.push({
-          id: inboxRow.id,
-          type: inboxRow.type as any,
-          actor,
-          issue: {
-            id: issueRow.id,
-            identifier: `${teamRow.key}-${issueRow.number}`,
-            title: issueRow.title,
-            teamId: teamRow.id,
-          },
-          commentId: inboxRow.commentId,
-          readAt: inboxRow.readAt ? inboxRow.readAt.toISOString() : null,
-          createdAt: inboxRow.createdAt.toISOString(),
-        });
-      }
-
-      return result;
+      const out: InboxItem[] = [];
+      for (const row of rows) out.push(await toItem(tx, orgId, row));
+      return out;
     });
-
     return c.json(items, 200);
   });
 
   app.openapi(getUnreadCount, async (c) => {
     const { orgId } = c.req.valid("param");
-
     const summary = await inOrg(deps, c, orgId, async (tx, caller) => {
-      const [countResult] = await tx
+      const [row] = await tx
         .select({ count: sql<number>`count(*)::int` })
         .from(inbox)
-        .where(
-          and(
-            eq(inbox.orgId, orgId),
-            eq(inbox.recipientId, caller.id),
-            isNull(inbox.readAt),
-          ),
-        );
-
-      return { unreadCount: countResult?.count ?? 0 };
+        .leftJoin(issues, eq(issues.id, inbox.issueId))
+        .leftJoin(teams, eq(teams.id, issues.teamId))
+        .where(visibleItems(tx, caller, isNull(inbox.readAt)));
+      return { unreadCount: row?.count ?? 0 };
     });
-
     return c.json(summary, 200);
   });
 
   app.openapi(updateInboxItem, async (c) => {
     const { orgId, itemId } = c.req.valid("param");
     const { read } = c.req.valid("json");
-
     const updated = await inOrg(deps, c, orgId, async (tx, caller) => {
-      const [existing] = await tx
-        .select({
-          inboxRow: inbox,
-          issueRow: issues,
-          teamRow: teams,
-        })
-        .from(inbox)
-        .innerJoin(issues, eq(inbox.issueId, issues.id))
-        .innerJoin(teams, eq(issues.teamId, teams.id))
-        .where(
-          and(
-            eq(inbox.orgId, orgId),
-            eq(inbox.id, itemId),
-            eq(inbox.recipientId, caller.id),
-          ),
-        );
-
-      if (!existing) {
-        throw notFound("Inbox item not found");
-      }
-
+      const [existing] = await itemQuery(tx).where(visibleItems(tx, caller, eq(inbox.id, itemId)));
+      if (!existing) throw notFound("inbox item");
+      if ((existing.item.readAt !== null) === read) return toItem(tx, orgId, existing);
       const readAt = read ? new Date() : null;
-      const [row] = await tx
-        .update(inbox)
-        .set({ readAt })
-        .where(eq(inbox.id, itemId))
-        .returning();
-
-      let actor: z.infer<typeof InboxItem>["actor"] = null;
-      if (row!.actorId) {
-        try {
-          actor = await loadMember(tx, orgId, row!.actorId);
-        } catch {
-          actor = null;
-        }
-      }
-
-      return {
-        id: row!.id,
-        type: row!.type as any,
-        actor,
-        issue: {
-          id: existing.issueRow.id,
-          identifier: `${existing.teamRow.key}-${existing.issueRow.number}`,
-          title: existing.issueRow.title,
-          teamId: existing.teamRow.id,
-        },
-        commentId: row!.commentId,
-        readAt: row!.readAt ? row!.readAt.toISOString() : null,
-        createdAt: row!.createdAt.toISOString(),
-      };
+      await tx.update(inbox).set({ readAt }).where(eq(inbox.id, itemId));
+      await emit(tx, orgId, { type: read ? "inbox.read" : "inbox.unread", actorId: caller.id, subjectId: caller.id, data: { itemIds: [itemId] } });
+      return toItem(tx, orgId, { ...existing, item: { ...existing.item, readAt } });
     });
-
     return c.json(updated, 200);
   });
 
   app.openapi(markAllRead, async (c) => {
     const { orgId } = c.req.valid("param");
-
     const result = await inOrg(deps, c, orgId, async (tx, caller) => {
-      const updatedRows = await tx
+      const marked = await tx
         .update(inbox)
         .set({ readAt: new Date() })
-        .where(
-          and(
-            eq(inbox.orgId, orgId),
-            eq(inbox.recipientId, caller.id),
-            isNull(inbox.readAt),
-          ),
-        )
-        .returning();
-
-      return { count: updatedRows.length };
+        .where(and(eq(inbox.recipientId, caller.id), isNull(inbox.readAt)))
+        .returning({ id: inbox.id });
+      if (marked.length > 0) {
+        await emit(tx, orgId, { type: "inbox.read", actorId: caller.id, subjectId: caller.id, data: { itemIds: marked.map((row) => row.id) } });
+      }
+      return { count: marked.length };
     });
-
     return c.json(result, 200);
   });
 

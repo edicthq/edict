@@ -59,6 +59,18 @@ export async function onBehalfOf(tx: Transaction, memberId: string): Promise<voi
   await tx.execute(sql`SELECT set_config('edict.on_behalf_of', ${memberId}, true)`);
 }
 
+export type EventRow = typeof events.$inferSelect;
+
+// Reads every event as it is written, in its transaction, so what it makes
+// commits with the change or not at all. The inbox is one (ADR 0005).
+export type EventConsumer = (tx: Transaction, event: EventRow) => Promise<void>;
+
+const consumers: EventConsumer[] = [];
+
+export function consumeEvents(consumer: EventConsumer): void {
+  if (!consumers.includes(consumer)) consumers.push(consumer);
+}
+
 export interface NewEvent {
   type: string;
   actorId: string;
@@ -81,7 +93,10 @@ export async function emit(tx: Transaction, orgId: string, event: NewEvent): Pro
     onBehalfOfId: event.onBehalfOfId ?? undefined,
     subjectId: event.subjectId,
     data: event.data ?? {},
-  }).returning({ id: events.id });
+  }).returning();
+  for (const consumer of consumers) {
+    await consumer(tx, row!);
+  }
   await tx.execute(sql`
     WITH queued AS (
       INSERT INTO webhook_outbox (event_id, org_id)

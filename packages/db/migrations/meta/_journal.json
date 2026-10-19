@@ -239,6 +239,13 @@
       "when": 1792357195775,
       "tag": "0034_templates_row_level_security",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1792390591201,
+      "tag": "0035_inbox_from_events",
+      "breakpoints": true
     }
   ]
 }
