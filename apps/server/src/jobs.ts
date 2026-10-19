@@ -16,6 +16,7 @@ import {
   type Pool,
 } from "@edicthq/db";
 import type { AttachmentStorage } from "./storage.js";
+import { listen } from "./listen.js";
 import { DELIVERY_QUEUE, startWebhooks, type DeliveryJob, type DeliveryOptions } from "./webhooks.js";
 
 // How long the trash keeps what it holds.
@@ -187,7 +188,8 @@ export async function startJobs(
     const archived = await archiveClosedIssues(db);
     if (archived) console.info(`archive: ${archived} closed issues`);
   });
-  const stopWebhooks = await startWebhooks(db, boss, (onNotify) => listen(pool, onNotify), delivery);
+  // A missed notification only delays deliveries: the sweep catches them.
+  const stopWebhooks = await startWebhooks(db, boss, (onNotify) => listen(pool, WEBHOOK_CHANNEL, () => onNotify(), onNotify), delivery);
   return {
     queueDelivery: async (job) => {
       await boss.send(DELIVERY_QUEUE, job, { id: job.deliveryId });
@@ -196,17 +198,5 @@ export async function startJobs(
       await stopWebhooks();
       await boss.stop({ graceful: true });
     },
-  };
-}
-
-// Holds one connection that LISTENs for emit's notifications.
-async function listen(pool: Pool, onNotify: () => void): Promise<() => Promise<void>> {
-  const client = await pool.connect();
-  client.on("notification", onNotify);
-  await client.query(`LISTEN ${WEBHOOK_CHANNEL}`);
-  return async () => {
-    client.off("notification", onNotify);
-    await client.query(`UNLISTEN ${WEBHOOK_CHANNEL}`).catch(() => undefined);
-    client.release();
   };
 }

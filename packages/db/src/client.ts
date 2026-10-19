@@ -17,7 +17,11 @@ export function databaseUrl(env: NodeJS.ProcessEnv = process.env): string {
 }
 
 export function createPool(url: string): Pool {
-  return new Pool({ connectionString: url, max: 10 });
+  const pool = new Pool({ connectionString: url, max: 10 });
+  // An idle connection Postgres closes (a restart, a failover) is dropped
+  // and replaced on the next query. Unhandled, it would crash the server.
+  pool.on("error", (error) => console.error("postgres: an idle connection closed:", error.message));
+  return pool;
 }
 
 export function createDatabase(pool: Pool) {

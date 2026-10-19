@@ -11,6 +11,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import type { Pool } from "pg";
 import { EVENTS_CHANNEL, events, inScope, issues, members, teamMembers, teams, type Database } from "@edicthq/db";
 import { WebSocketServer, type WebSocket } from "ws";
+import { listen } from "./listen.js";
 import { eventPayload } from "./webhooks.js";
 
 export interface RealtimeUser {
@@ -145,20 +146,6 @@ function sameOrigin(request: import("node:http").IncomingMessage, publicUrl: str
   }
 }
 
-// Holds one connection that LISTENs for emit's notifications, like jobs.ts
-// does for the webhook dispatcher.
-async function listen(pool: Pool, onNotify: (payload: string) => void): Promise<() => Promise<void>> {
-  const client = await pool.connect();
-  client.on("notification", (message) => {
-    if (message.channel === EVENTS_CHANNEL && message.payload) onNotify(message.payload);
-  });
-  await client.query(`LISTEN ${EVENTS_CHANNEL}`);
-  return async () => {
-    await client.query(`UNLISTEN ${EVENTS_CHANNEL}`).catch(() => undefined);
-    client.release();
-  };
-}
-
 export async function startRealtime(server: ServerType, deps: RealtimeDeps): Promise<Realtime> {
   const wss = new WebSocketServer({ noServer: true });
   const sockets = new Map<WebSocket, SocketMeta>();
@@ -274,7 +261,16 @@ export async function startRealtime(server: ServerType, deps: RealtimeDeps): Pro
     }
   };
 
-  const unlisten = await listen(deps.pool, (payload) => void fanout(payload));
+  // Events committed while the listener reconnects are lost, so every socket
+  // is told to refetch what it shows.
+  const unlisten = await listen(
+    deps.pool,
+    EVENTS_CHANNEL,
+    (payload) => void fanout(payload),
+    () => {
+      for (const ws of sockets.keys()) ws.send(JSON.stringify({ type: "resync" }));
+    },
+  );
   // Pings keep proxies from closing idle sockets. Every other beat, sockets
   // whose session ended (signed out, revoked, expired) are closed.
   let beat = 0;
