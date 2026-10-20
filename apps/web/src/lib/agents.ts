@@ -21,6 +21,8 @@ export function waitingLine(agent: Agent): string {
 // until it posts one.
 export function agentState(issue: Issue, agent: Agent | undefined): AgentState {
   if (agent?.pausedAt) return "paused";
+  // A closed issue waits on no one and runs nothing, whatever was said last.
+  if (issue.closedAt) return "done";
   const latest = issue.latestProgress;
   if (latest && latest.agentId === issue.delegateId) return latest.state;
   return "waiting";
