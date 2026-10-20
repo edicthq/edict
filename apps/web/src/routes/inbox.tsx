@@ -1,5 +1,5 @@
 import type { InboxItem } from "@edicthq/client";
-import { Avatar, Tabs, TeamKey, cn } from "@edicthq/ui";
+import { Avatar, Tabs, cn } from "@edicthq/ui";
 import { Inbox } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
@@ -85,13 +85,12 @@ export function InboxPage() {
                   className={cn(rowClass, "min-w-0")}
                   aria-current={item.readAt ? undefined : "true"}
                 >
-                  {item.actor && item.issue ? <Avatar name={item.actor.name} /> : null}
+                  {item.actor && item.issue ? <Avatar name={item.actor.name} kind={item.actor.kind === "agent" ? "agent" : "human"} /> : null}
                   <span className="min-w-0 flex-1 truncate text-body font-medium text-ink">
                     {item.issue ? (
                       <>
-                        <span className="font-semibold">{item.actor?.name ?? "Someone"}</span>{" "}
+                        <span className={cn("font-semibold", item.actor?.kind === "agent" && "text-agent-ink")}>{item.actor?.name ?? "Someone"}</span>{" "}
                         {item.progressState ? progressWords[item.progressState] : typeLine[item.type]}{" "}
-                        <TeamKey>{item.issue.identifier.split("-")[0]}</TeamKey>{" "}
                         <span className="font-medium text-ink">{item.issue.identifier}</span>{" "}
                         <span className={cn("text-ink-2 font-normal")}>{item.issue.title}</span>
                       </>
