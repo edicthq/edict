@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "connect",
-  "description": "The bundled page that asks which server to connect to. The server's own pages get their permissions at runtime, for that server's origin only (src/lib.rs).",
+  "description": "The bundled page the main window shows until an instance is saved. It can only add one. An instance's own pages get their permissions at runtime, for that instance's origin only (src/lib.rs, allow_server).",
   "windows": ["main"],
-  "permissions": ["core:default", "allow-connect"]
+  "permissions": ["core:default", "allow-add-instance"]
 }
