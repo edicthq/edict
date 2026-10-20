@@ -143,7 +143,7 @@ test("Milestone 4: board, keyboard navigation, bulk actions with undo, command p
   expect(newAccent).not.toBe(currentAccent);
 
   // Visit Settings: verify Admin setting for Organization default accent
-  await page.goto("/vector/settings");
+  await page.goto("/vector/settings/organization");
   await expect(page.getByRole("heading", { name: "Organization default agent color" })).toBeVisible();
   const orgAccentGroup = page.getByRole("radiogroup", { name: /Organization default agent/ });
   await orgAccentGroup.getByRole("radio", { name: "Teal" }).click();

@@ -89,6 +89,7 @@ const router = createBrowserRouter([
           { path: "connect", element: <ConnectPage /> },
           { path: "trash", element: <TrashPage /> },
           { path: "settings", element: <SettingsPage /> },
+          { path: "settings/:section", element: <SettingsPage /> },
           { path: "instance", element: <InstancePage /> },
         ],
       },
