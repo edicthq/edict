@@ -1,11 +1,12 @@
-import { Search } from "lucide-react";
+import { Search, SquarePen } from "lucide-react";
 import { useMemo, useState, type KeyboardEvent } from "react";
 import type { Membership } from "@edicthq/client";
-import { useNavigate } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import { Dialog, Kbd, TeamKey, cn } from "@edicthq/ui";
 import { PriorityIcon } from "@edicthq/ui";
 import { accentNames, accents, cycleAccent, cycleTheme, setAppearance, themes } from "../lib/appearance.js";
 import { useProjects, useSearchIssues, useTeams } from "../lib/queries.js";
+import { recentIssues } from "../lib/recent.js";
 import type { OrgContext } from "../routes/org.js";
 
 interface Command {
@@ -17,8 +18,9 @@ interface Command {
   run: () => void;
 }
 
-// ⌘K. Navigation and the actions this milestone has; M4 grows it into the
-// full palette from the prototype.
+// ⌘K. Empty, it leads with what you are likely to do next: create an issue,
+// go back to one you just had open, or go somewhere. Typing searches issues
+// across teams and narrows the commands.
 export function CommandPalette({
   context,
   others,
@@ -45,12 +47,55 @@ function PaletteBody({ context, others, onClose }: { context: OrgContext; others
   const searchResults = useSearchIssues(context.orgId, { q: query.trim() }, query.trim().length > 0);
   const [active, setActive] = useState(0);
 
+  const { teamId: currentTeam } = useParams();
+  // Read once per opening: the list changes only when an issue is opened.
+  const [recent] = useState(() => recentIssues(context.orgId));
+
   const commands = useMemo<Command[]>(() => {
     const go = (path: string) => () => {
       onClose();
       navigate(path);
     };
-    const list: Command[] = [
+    const list: Command[] = [];
+    const newIssueTeam = currentTeam ?? teams.data?.[0]?.id;
+    if (newIssueTeam) {
+      list.push({
+        id: "new-issue",
+        group: "Actions",
+        label: "New issue",
+        lead: <SquarePen aria-hidden="true" className="size-4 text-ink-2" strokeWidth={1.75} />,
+        hint: "C",
+        run: go(`/${context.slug}/teams/${newIssueTeam}?create=1`),
+      });
+    }
+    if (context.canManage) {
+      list.push(
+        { id: "create-team", group: "Actions", label: "Create team", run: () => context.openCreateTeam() },
+        { id: "invite", group: "Actions", label: "Invite people", run: () => context.openInvite() },
+      );
+    }
+    for (const issue of recent) {
+      list.push({
+        id: `recent-${issue.id}`,
+        group: "Recent issues",
+        label: `${issue.identifier} ${issue.title}`,
+        lead: <PriorityIcon priority={issue.priority} />,
+        run: go(`/${context.slug}/teams/${issue.teamId}?issue=${issue.identifier}`),
+      });
+    }
+    list.push(
+      { id: "my-issues", group: "Go to", label: "My issues", run: go(`/${context.slug}/my-issues`) },
+      { id: "inbox", group: "Go to", label: "Inbox", run: go(`/${context.slug}/inbox`) },
+      { id: "projects", group: "Go to", label: "Projects", run: go(`/${context.slug}/projects`) },
+      { id: "agents", group: "Go to", label: "Agents", run: go(`/${context.slug}/agents`) },
+      { id: "teams", group: "Go to", label: "All teams", run: go(`/${context.slug}`) },
+      { id: "members", group: "Go to", label: "Members", run: go(`/${context.slug}/members`) },
+      { id: "settings", group: "Go to", label: "Settings", run: go(`/${context.slug}/settings`) },
+    );
+    if (context.instanceAdmin) {
+      list.push({ id: "instance", group: "Go to", label: "Instance settings", run: go(`/${context.slug}/instance`) });
+    }
+    list.push(
       ...(teams.data ?? []).map((team) => ({
         id: `team-${team.id}`,
         group: "Teams",
@@ -65,21 +110,7 @@ function PaletteBody({ context, others, onClose }: { context: OrgContext; others
         hint: project.slug,
         run: go(`/${context.slug}/projects/${project.slug}`),
       })),
-      { id: "projects", group: "Go to", label: "Projects", run: go(`/${context.slug}/projects`) },
-      { id: "my-issues", group: "Go to", label: "My issues", run: go(`/${context.slug}/my-issues`) },
-      { id: "teams", group: "Go to", label: "All teams", run: go(`/${context.slug}`) },
-      { id: "members", group: "Go to", label: "Members", run: go(`/${context.slug}/members`) },
-      { id: "settings", group: "Go to", label: "Settings", run: go(`/${context.slug}/settings`) },
-    ];
-    if (context.instanceAdmin) {
-      list.push({ id: "instance", group: "Go to", label: "Instance settings", run: go(`/${context.slug}/instance`) });
-    }
-    if (context.canManage) {
-      list.push(
-        { id: "create-team", group: "Actions", label: "Create team", run: () => context.openCreateTeam() },
-        { id: "invite", group: "Actions", label: "Invite people", run: () => context.openInvite() },
-      );
-    }
+    );
     for (const m of others) {
       if (m.organization.id !== context.orgId) {
         list.push({
@@ -115,7 +146,7 @@ function PaletteBody({ context, others, onClose }: { context: OrgContext; others
     }
     list.push({ id: "sign-out", group: "You", label: "Sign out", run: () => void context.signOut() });
     return list;
-  }, [teams.data, projects.data, context, others, navigate, onClose]);
+  }, [teams.data, projects.data, recent, currentTeam, context, others, navigate, onClose]);
 
   const issueCommands = useMemo<Command[]>(() => {
     return (searchResults.data ?? []).map((issue) => ({
@@ -134,7 +165,9 @@ function PaletteBody({ context, others, onClose }: { context: OrgContext; others
     const q = query.trim().toLowerCase();
     const staticMatches = commands.filter((c) => c.label.toLowerCase().includes(q));
     if (q.length > 0) {
-      return [...issueCommands, ...staticMatches];
+      // A recent issue the search also found is listed once, as a result.
+      const found = new Set(issueCommands.map((c) => c.id.replace("issue-", "recent-")));
+      return [...issueCommands, ...staticMatches.filter((c) => !found.has(c.id))];
     }
     return staticMatches;
   }, [commands, issueCommands, query]);
@@ -179,7 +212,7 @@ function PaletteBody({ context, others, onClose }: { context: OrgContext; others
             setActive(0);
           }}
           onKeyDown={onKeyDown}
-          placeholder="Type a command or a team…"
+          placeholder="Search issues or type a command…"
           className="h-12 flex-1 bg-transparent text-lg tracking-[-0.01em] outline-none placeholder:text-ink-2"
         />
         <Kbd>esc</Kbd>
@@ -187,7 +220,9 @@ function PaletteBody({ context, others, onClose }: { context: OrgContext; others
       {/* biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: the ARIA combobox pattern; focus stays in the input, which points here with aria-activedescendant */}
       <ul id="palette-list" role="listbox" aria-label="Commands" className="max-h-[min(420px,60dvh)] overflow-y-auto p-2">
         {matches.length === 0 ? (
-          <li className="px-3 py-6 text-center text-ui text-ink-2">Nothing matches “{query}”.</li>
+          <li className="px-3 py-6 text-center text-ui text-ink-2">
+            {searchResults.isFetching ? "Searching…" : `Nothing matches “${query}”.`}
+          </li>
         ) : (
           matches.map((command, index) => {
             const header = command.group !== lastGroup;

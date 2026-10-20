@@ -8,6 +8,7 @@ import { CreateIssueDialog } from "../components/create-issue-dialog.js";
 import { AssigneePicker, DelegatePicker, NoAssignee, PriorityPicker, StatusPicker } from "../components/issue-fields.js";
 import { IssuePeek, type PeekMenu } from "../components/issue-peek.js";
 import { desktopShell, openSwitcher } from "../lib/desktop.js";
+import { rememberIssue } from "../lib/recent.js";
 import { EmptyState, Loading, PageBody, PageHeader } from "../components/shell.js";
 import { IssuePeople, IssueRowCells, issueRowClass, liveClass } from "../components/issue-row.js";
 import { useToast } from "../components/toast.js";
@@ -210,6 +211,10 @@ function TeamIssues({ team }: { team: Team }) {
   // An archived issue of this team opens in the peek too, from the lookup.
   const peeked =
     listed ?? (lookup.data?.archivedAt && lookup.data.teamId === team.id && peekRef === lookup.data.identifier ? lookup.data : undefined);
+  // ⌘K offers the issues opened last.
+  useEffect(() => {
+    if (peeked) rememberIssue(orgId, peeked);
+  }, [orgId, peeked]);
 
   const setParam = (name: string, value: string | null, replace = false) =>
     setParams(

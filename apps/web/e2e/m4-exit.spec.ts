@@ -125,6 +125,19 @@ test("Milestone 4: board, keyboard navigation, bulk actions with undo, command p
   await expect(page.getByRole("complementary", { name: /COR-1/ })).toBeVisible();
   await page.keyboard.press("Escape");
 
+  // Empty, the palette leads with New issue, then the issues opened last,
+  // then Go to.
+  await page.keyboard.press("ControlOrMeta+k");
+  await expect(page.getByRole("option").first()).toHaveText(/New issue/);
+  const recent = page.getByRole("option", { name: /COR-1 Implement keyboard shortcuts/ });
+  await expect(recent).toBeVisible();
+  const order = await page.getByRole("option").allTextContents();
+  expect(order.findIndex((o) => o.includes("COR-1"))).toBeLessThan(order.indexOf("My issues"));
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog").getByText("New issue", { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toBeHidden();
+
   // 6. Themes & Accent shortcuts and settings:
   // Press T to toggle theme (checks document data-theme)
   const htmlEl = page.locator("html");
