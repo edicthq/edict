@@ -26,7 +26,7 @@ test("a new issue is delegated as it is created, and Enter alone creates nothing
   await page.keyboard.press("c");
   const dialog = page.getByRole("dialog", { name: "New issue" });
   await expect(dialog).toBeVisible();
-  const top = await dialog.evaluate((element) => element.getBoundingClientRect().top / window.innerHeight);
+  const top = (await dialog.boundingBox())!.y / page.viewportSize()!.height;
   expect(top).toBeLessThan(0.2);
 
   await dialog.getByLabel("Title").fill("Ship the switcher");

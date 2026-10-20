@@ -27,9 +27,10 @@ describe("team overview", () => {
 
     const res = await owner.get(`${org}/team-overview`);
     expect(res.status).toBe(200);
-    const byTeam = new Map((res.body as { teamId: string }[]).map((row) => [row.teamId, row]));
+    const rows = res.body as { teamId: string; memberIds: string[] }[];
+    const byTeam = new Map(rows.map((row) => [row.teamId, row]));
     expect(byTeam.get(eng.id)).toMatchObject({ open: 2, inProgress: 1, delegated: 1 });
-    expect(new Set((byTeam.get(eng.id) as { memberIds: string[] }).memberIds)).toEqual(
+    expect(new Set(byTeam.get(eng.id)?.memberIds)).toEqual(
       new Set([ownerId, bea.memberId, ferro.id]),
     );
     expect(byTeam.get(ops.id)).toMatchObject({ open: 0, inProgress: 0, delegated: 0, memberIds: [ownerId] });

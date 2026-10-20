@@ -136,24 +136,23 @@ test("Milestone 4: board, keyboard navigation, bulk actions with undo, command p
   await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog").getByText("New issue", { exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog")).toBeHidden();
+  // The dialog hides at once, but its form unmounts on the close event a task
+  // later; until then the title field holds focus and would take the T below.
+  await expect(page.getByPlaceholder("Issue title")).toHaveCount(0);
 
   // 6. Themes & Accent shortcuts and settings:
   // Press T to toggle theme (checks document data-theme)
   const htmlEl = page.locator("html");
   await page.keyboard.press("t");
-  const theme1 = await htmlEl.getAttribute("data-theme");
-  expect(theme1).toBeTruthy();
+  await expect(htmlEl).toHaveAttribute("data-theme", /.+/);
+  const theme1 = (await htmlEl.getAttribute("data-theme"))!;
   await page.keyboard.press("t");
-  const theme2 = await htmlEl.getAttribute("data-theme");
-  expect(theme2).toBeTruthy();
-  expect(theme2).not.toBe(theme1);
+  await expect(htmlEl).not.toHaveAttribute("data-theme", theme1);
 
   // Press G to cycle accent
-  const currentAccent = await htmlEl.getAttribute("data-accent");
+  const currentAccent = (await htmlEl.getAttribute("data-accent")) ?? "";
   await page.keyboard.press("g");
-  const newAccent = await htmlEl.getAttribute("data-accent");
-  expect(newAccent).not.toBe(currentAccent);
+  await expect(htmlEl).not.toHaveAttribute("data-accent", currentAccent);
 
   // Visit Settings: verify Admin setting for Organization default accent
   await page.goto("/vector/settings/organization");
