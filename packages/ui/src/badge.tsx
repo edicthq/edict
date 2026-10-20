@@ -111,9 +111,9 @@ export function ProjectStatusBadge({
         "inline-flex h-5 items-center gap-1.5 whitespace-nowrap rounded-full px-2 text-meta font-medium",
         status === "in_progress" && "bg-surface text-ink shadow-[inset_0_0_0_1px_var(--line-strong)]",
         status === "planned" && "bg-hover text-ink-2",
-        status === "paused" && "bg-warn-wash text-warn",
+        status === "paused" && "bg-hover text-ink-2",
         status === "completed" && "bg-hover font-semibold text-ink",
-        status === "canceled" && "bg-hover text-ink-3 line-through",
+        status === "canceled" && "bg-hover text-ink-2 line-through",
         className,
       )}
     >
