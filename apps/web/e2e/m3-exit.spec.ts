@@ -81,6 +81,14 @@ test("an MCP client connects by URL and works a delegated issue", async ({ page,
     })
   ).json();
 
+  // With no agents yet, the Agents page leads with connecting a client. The
+  // first MCP request creates the connected agent, and it shows up live.
+  await page.goto("/agents-co/agents");
+  await expect(page.getByText("Agents appear when you connect a client")).toBeVisible();
+  await expect(page.getByRole("button", { name: "New agent" })).toBeHidden();
+  const rail = page.getByRole("navigation", { name: "Organization" }).first();
+  await expect(rail.getByRole("link", { name: /Claude Code \(Maya\)/ })).toBeHidden();
+
   const client = new Client({ name: "claude-code", version: "1.0.0" });
   await client.connect(
     new StreamableHTTPClientTransport(new URL(mcpUrl), { requestInit: { headers: { authorization: `Bearer ${tokens.access_token}` } } }),
@@ -91,6 +99,8 @@ test("an MCP client connects by URL and works a delegated issue", async ({ page,
     return result.content.map((part) => part.text).join("\n");
   };
   expect(await call("list_teams")).toContain("ENG Engineering");
+  await expect(rail.getByRole("link", { name: /Claude Code \(Maya\)/ })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Agents" }).getByText("Claude Code (Maya)")).toBeVisible();
 
   // The person delegates the issue to their agent from the peek.
   await page.goto(`/agents-co/teams/${team.id}?issue=ENG-1`);
@@ -160,7 +170,10 @@ test("an admin adds a runner agent with an API key and a webhook, then pauses it
   const org = await (await page.request.post("/api/v1/organizations", { headers, data: { name: "Runners", slug: "runners" } })).json();
   const orgId = org.organization.id as string;
 
+  // Creating a runner by hand is the advanced path, under Runners.
   await page.goto("/runners/agents");
+  await expect(page.getByRole("link", { name: "Connect an agent" }).first()).toBeVisible();
+  await page.getByRole("tab", { name: /Runners/ }).click();
   await page.getByRole("button", { name: "New agent" }).click();
   const dialog = page.getByRole("dialog", { name: "New agent" });
   await dialog.getByLabel("Name").fill("Ferro");

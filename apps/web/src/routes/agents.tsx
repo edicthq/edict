@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router";
 import type { Agent, AgentPower, Issue, Member, Webhook, WebhookDelivery } from "@edicthq/client";
-import { type AgentState, Avatar, Badge, Button, Dialog, Field, Input, ProgressBadge, Tabs, cn } from "@edicthq/ui";
+import { type AgentState, Avatar, Badge, Button, Dialog, Field, Input, ProgressBadge, Tabs, buttonClass, cn } from "@edicthq/ui";
 import { X } from "lucide-react";
 import { EmptyState, FormError, GroupHeader, Loading, PageBody, PageHeader } from "../components/shell.js";
 import { useToast } from "../components/toast.js";
@@ -39,7 +39,8 @@ const powers: { value: AgentPower; label: string; hint: string }[] = [
 // Agents are members (ADR 0008). Everyone sees the roster: what each agent is
 // doing, how much waits for it, what it works on now. Picking one opens its
 // panel; admins give runners powers, keys and webhooks there, and anyone who
-// may pauses it.
+// may pauses it. Connecting a client is how most agents arrive (ADR 0015), so
+// it leads; creating a runner by hand is the advanced path, under Runners.
 export function AgentsPage() {
   const { orgId, canManage, slug } = useOrg();
   const agents = useAgents(orgId);
@@ -70,16 +71,9 @@ export function AgentsPage() {
       <PageHeader
         title="Agents"
         actions={
-          <>
-            <Link to={`/${slug}/connect`} className="inline-flex h-8 items-center rounded-sm px-3 text-ui font-medium text-ink-2 hover:bg-hover hover:text-ink">
-              Connect an agent
-            </Link>
-            {canManage ? (
-              <Button variant="primary" onClick={() => setCreating(true)}>
-                New agent
-              </Button>
-            ) : null}
-          </>
+          <Link to={`/${slug}/connect`} className={buttonClass({ variant: "primary" })}>
+            Connect an agent
+          </Link>
         }
       />
       <div role="toolbar" aria-label="Which agents" className="flex min-h-11 items-center gap-3 border-b border-line px-6">
@@ -99,9 +93,23 @@ export function AgentsPage() {
         </p>
       </div>
 
+      {kind === "runners" ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line px-6 py-3">
+          <p className="max-w-[72ch] text-ui text-ink-2 text-pretty">
+            A runner is an agent that a server or job operates with an API key: CI, a headless Claude Code, the Agent SDK. It
+            sees the teams you give it, and a webhook can wake it when work is delegated.
+          </p>
+          {canManage ? (
+            <Button className="ms-auto" onClick={() => setCreating(true)}>
+              New agent
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
       {agents.isPending ? (
         <Loading label="Loading agents" />
-      ) : list.length ? (
+      ) : shown.length ? (
         <div className="px-3 pt-1">
           <div aria-hidden="true" className="grid h-9 grid-cols-[minmax(0,1.4fr)_120px_64px_minmax(0,1.3fr)_72px] items-center gap-4 px-3 text-sm font-medium text-ink-2">
             <span>Agent</span>
@@ -123,13 +131,13 @@ export function AgentsPage() {
             ))}
           </ul>
         </div>
-      ) : (
+      ) : kind === "runners" ? null : (
         <PageBody>
           <EmptyState
-            title="No agents yet"
-            body="Connect an MCP client such as Claude Code, and Edict adds an agent for it. Admins can also add agents for agent runners."
+            title={kind === "connected" && list.length ? "No connected agents yet" : "Agents appear when you connect a client"}
+            body="Connect an MCP client such as Claude Code, Codex or Cursor and approve it in the browser. Edict adds an agent for it, named after the client and you, like “Claude Code (Amirali)”, and it shows up here and in the sidebar."
             action={
-              <Link to={`/${slug}/connect`} className="text-ui font-medium underline decoration-line-strong underline-offset-4">
+              <Link to={`/${slug}/connect`} className={buttonClass({ variant: "secondary" })}>
                 Connect an agent
               </Link>
             }
