@@ -3,7 +3,7 @@ import { MarkdownEditor } from "../components/markdown-editor.js";
 import { Markdown, plainText } from "../components/markdown.js";
 import { Link, useNavigate, useParams } from "react-router";
 import type { ProjectStatus } from "@edicthq/client";
-import { Avatar, Button, ProgressBar, ProjectStatusBadge, PriorityIcon, Tabs, TeamKey, cn } from "@edicthq/ui";
+import { Avatar, Button, ProgressBar, ProjectStatusBadge, PriorityIcon, StatusIcon, Tabs, TeamKey, cn } from "@edicthq/ui";
 import { ArrowLeft, Calendar, FolderKanban, Plus, Trash2 } from "lucide-react";
 import { CreateProjectDialog } from "../components/create-project-dialog.js";
 import { EmptyState, GroupHeader, Loading, PageBody, PageHeader, rowClass } from "../components/shell.js";
@@ -324,28 +324,27 @@ export function ProjectDetailPage() {
 
           <ProgressBar percentage={percentage} className="h-2" />
 
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 pt-1">
-            <div className="rounded-sm bg-hover/60 p-2.5 text-center">
-              <p className="text-xs font-medium text-ink-2 uppercase tracking-wide">Backlog</p>
-              <p className="mt-1 text-base font-semibold text-ink tabular-nums">{byCategory.backlog}</p>
-            </div>
-            <div className="rounded-sm bg-hover/60 p-2.5 text-center">
-              <p className="text-xs font-medium text-ink-2 uppercase tracking-wide">Todo</p>
-              <p className="mt-1 text-base font-semibold text-ink tabular-nums">{byCategory.todo}</p>
-            </div>
-            <div className="rounded-sm bg-hover/60 p-2.5 text-center">
-              <p className="text-xs font-medium text-ink-2 uppercase tracking-wide">In Progress</p>
-              <p className="mt-1 text-base font-semibold text-ink tabular-nums">{byCategory.in_progress}</p>
-            </div>
-            <div className="rounded-sm bg-hover/60 p-2.5 text-center">
-              <p className="text-xs font-medium text-ink-2 uppercase tracking-wide">Done</p>
-              <p className="mt-1 text-base font-semibold text-ink tabular-nums">{byCategory.done}</p>
-            </div>
-            <div className="rounded-sm bg-hover/60 p-2.5 text-center">
-              <p className="text-xs font-medium text-ink-2 uppercase tracking-wide">Canceled</p>
-              <p className="mt-1 text-base font-semibold text-ink-3 tabular-nums">{byCategory.canceled}</p>
-            </div>
-          </div>
+          <dl className="grid grid-cols-2 gap-2 pt-1 sm:grid-cols-5">
+            {(
+              [
+                ["backlog", "Backlog"],
+                ["todo", "Todo"],
+                ["in_progress", "In Progress"],
+                ["done", "Done"],
+                ["canceled", "Canceled"],
+              ] as const
+            ).map(([category, name]) => (
+              <div key={category} className="flex flex-col gap-1 rounded-sm border border-line px-3 py-2.5">
+                <dt className="flex items-center gap-1.5 text-sm text-ink-2">
+                  <StatusIcon category={category} />
+                  {name}
+                </dt>
+                <dd className={cn("text-lg font-semibold tabular-nums", category === "canceled" ? "text-ink-2" : "text-ink")}>
+                  {byCategory[category]}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </section>
 
         {/* Description */}
