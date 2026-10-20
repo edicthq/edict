@@ -37,7 +37,9 @@ export function plainLine(markdown: string): string {
   return markdown
     .replace(/```[\s\S]*?```/g, " ")
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/[`*_>#~]/g, "")
+    .replace(/[`*>#~]/g, "")
+    // Underscores for emphasis go; ones inside words like open_switcher stay.
+    .replace(/(?<![A-Za-z0-9])_+|_+(?![A-Za-z0-9])/g, "")
     .replace(/\s+/g, " ")
     .trim();
 }

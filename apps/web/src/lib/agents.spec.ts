@@ -1,6 +1,6 @@
 import type { Agent, Issue } from "@edicthq/client";
 import { describe, expect, it } from "vitest";
-import { agentState } from "./agents.js";
+import { agentState, plainLine } from "./agents.js";
 
 const agent = { id: "agent-1", pausedAt: null } as unknown as Agent;
 const issue = (changes: Partial<Issue>): Issue =>
@@ -25,5 +25,11 @@ describe("agentState", () => {
 
   it("is paused whenever the agent is", () => {
     expect(agentState(issue({ closedAt: "2026-10-20T00:00:00Z" }), { ...agent, pausedAt: "2026-10-20T00:00:00Z" } as Agent)).toBe("paused");
+  });
+});
+
+describe("plainLine", () => {
+  it("drops markdown but keeps underscores inside words", () => {
+    expect(plainLine("Added `open_switcher`, which is _very_ **small**.")).toBe("Added open_switcher, which is very small.");
   });
 });
