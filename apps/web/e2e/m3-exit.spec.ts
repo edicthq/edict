@@ -96,7 +96,7 @@ test("an MCP client connects by URL and works a delegated issue", async ({ page,
   await page.goto(`/agents-co/teams/${team.id}?issue=ENG-1`);
   const peek = page.getByRole("complementary", { name: /ENG-1/ });
   await expect(peek).toBeVisible();
-  await expect(peek.getByText("No agent on this issue yet.")).toBeVisible();
+  await expect(peek.getByText("No agent yet")).toBeVisible();
   await page.keyboard.press("d");
   await expect(page.getByRole("option", { name: /Claude Code \(Maya\).*connected by Maya · picks up work when asked/ })).toBeVisible();
   await page.getByRole("combobox", { name: "Delegate to an agent" }).fill("claude");
