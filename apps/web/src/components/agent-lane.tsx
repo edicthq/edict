@@ -3,8 +3,9 @@ import type { Agent, Issue, Member, ProgressUpdate } from "@edicthq/client";
 import { Avatar, Button, ProgressBadge } from "@edicthq/ui";
 import { GitPullRequest } from "lucide-react";
 import { Link } from "react-router";
-import { connectionLine, firstName, waitingLine, workOnPhrase } from "../lib/agents.js";
+import { connectionLine, firstName, progressState, waitingLine, workOnPhrase } from "../lib/agents.js";
 import { ago } from "../lib/issues.js";
+import { useNow } from "../lib/live.js";
 import { useProgress } from "../lib/queries.js";
 import { DelegatePicker } from "./issue-fields.js";
 import { Markdown } from "./markdown.js";
@@ -73,9 +74,11 @@ function AgentLaneBody({
   members: Member[];
 }) {
   const human = members.find((m) => m.id === agent.connectedBy);
+  const now = useNow();
   // The lane's state follows this agent's own updates, whether or not it is
-  // the issue's delegate.
-  const state = agent.pausedAt ? "paused" : (updates.at(-1)?.state ?? "waiting");
+  // the issue's delegate. Working goes quiet after a silence (lib/agents.ts).
+  const last = updates.at(-1);
+  const state = agent.pausedAt ? "paused" : last ? progressState(last, now) : "waiting";
   return (
     <>
       <header className="flex items-start gap-3 border-b border-line px-4 py-4">
@@ -106,6 +109,10 @@ function AgentLaneBody({
               <span className="size-1.5 rounded-full bg-agent motion-safe:animate-pulse [animation-delay:300ms]" />
             </span>
             {agent.name} is working
+          </p>
+        ) : state === "quiet" && last ? (
+          <p className="mt-4 text-sm text-ink-2" role="status">
+            No word from {agent.name} for {ago(last.createdAt, now)}
           </p>
         ) : null}
       </div>

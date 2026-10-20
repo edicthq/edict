@@ -6,6 +6,7 @@ import { X } from "lucide-react";
 import { EmptyState, FormError, GroupHeader, Loading, PageBody, PageHeader } from "../components/shell.js";
 import { useToast } from "../components/toast.js";
 import { agentState, connectionLine, firstName, plainLine } from "../lib/agents.js";
+import { useNow } from "../lib/live.js";
 import { ago } from "../lib/issues.js";
 import {
   useAgentQueue,
@@ -158,12 +159,13 @@ export function AgentsPage() {
 
 // What an agent is doing across its queue: paused, or what most needs a person,
 // or working, or nothing at all.
-function rosterState(agent: Agent, queue: Issue[]): AgentState | "idle" {
+function rosterState(agent: Agent, queue: Issue[], now: number): AgentState | "idle" {
   if (agent.pausedAt) return "paused";
-  const states = queue.map((issue) => agentState(issue, agent));
+  const states = queue.map((issue) => agentState(issue, agent, now));
   if (states.includes("blocked")) return "blocked";
   if (states.includes("needs_input")) return "needs_input";
   if (states.includes("working")) return "working";
+  if (states.includes("quiet")) return "quiet";
   return "idle";
 }
 
@@ -178,8 +180,9 @@ function lastActive(agent: Agent, queue: Issue[]): string | null {
 function RosterRow({ agent, members, selected, onSelect }: { agent: Agent; members: Member[]; selected: boolean; onSelect: () => void }) {
   const { orgId } = useOrg();
   const queue = useAgentQueue(orgId, agent.id).data ?? [];
-  const state = rosterState(agent, queue);
-  const current = queue.find((issue) => agentState(issue, agent) === "working") ?? queue[0];
+  const now = useNow();
+  const state = rosterState(agent, queue, now);
+  const current = queue.find((issue) => agentState(issue, agent, now) === "working") ?? queue[0];
   const active = lastActive(agent, queue);
   return (
     <button
@@ -230,7 +233,8 @@ function AgentPanel({ agent, members, webhooks, onClose }: { agent: Agent; membe
   const pause = usePauseAgent(orgId);
   const toast = useToast();
   const human = members.find((m) => m.id === agent.connectedBy);
-  const live = queue.find((issue) => agentState(issue, agent) === "working");
+  const now = useNow();
+  const live = queue.find((issue) => agentState(issue, agent, now) === "working");
   // The person who connected an agent can pause it too.
   const mayPause = canManage || agent.connectedBy === membership.member.id;
 
@@ -305,7 +309,7 @@ function AgentPanel({ agent, members, webhooks, onClose }: { agent: Agent; membe
                   >
                     <span className="w-14 shrink-0 text-sm font-medium text-ink-2 tabular-nums">{issue.identifier}</span>
                     <span className="truncate">{issue.title}</span>
-                    <ProgressBadge state={agentState(issue, agent)} className="ms-auto" />
+                    <ProgressBadge state={agentState(issue, agent, now)} className="ms-auto" />
                   </Link>
                 </li>
               ))}

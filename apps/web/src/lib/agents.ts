@@ -1,4 +1,4 @@
-import type { Agent, Issue, Member } from "@edicthq/client";
+import type { Agent, Issue, Member, ProgressUpdate } from "@edicthq/client";
 import type { AgentState } from "@edicthq/ui";
 
 // How an agent connects and when it starts on delegated work, as every
@@ -17,14 +17,29 @@ export function waitingLine(agent: Agent): string {
   return `Waiting for ${agent.clientName ?? agent.name} to pick it up`;
 }
 
+// How long Working lasts without a word from the agent on the issue before it
+// shows as quiet and its motion stops. Half an hour: an agent following the
+// MCP guidance speaks when it starts, gets stuck and finishes, and its client
+// hooks add a word on every commit and at the end of every turn, so a live
+// run rarely goes 30 minutes silent; a session that crashed or was closed
+// stops showing as live within the half hour instead of forever.
+export const QUIET_AFTER_MS = 30 * 60_000;
+
+// What one progress update says now: Working decays to quiet; blocked and
+// needs input stay, since they wait on a person rather than on the agent.
+export function progressState(update: Pick<ProgressUpdate, "state" | "createdAt">, now: number): AgentState {
+  if (update.state === "working" && now - Date.parse(update.createdAt) > QUIET_AFTER_MS) return "quiet";
+  return update.state;
+}
+
 // The delegate's state on an issue: its latest progress update, or waiting
 // until it posts one.
-export function agentState(issue: Issue, agent: Agent | undefined): AgentState {
+export function agentState(issue: Issue, agent: Agent | undefined, now: number): AgentState {
   if (agent?.pausedAt) return "paused";
   // A closed issue waits on no one and runs nothing, whatever was said last.
   if (issue.closedAt) return "done";
   const latest = issue.latestProgress;
-  if (latest && latest.agentId === issue.delegateId) return latest.state;
+  if (latest && latest.agentId === issue.delegateId) return progressState(latest, now);
   return "waiting";
 }
 

@@ -33,10 +33,12 @@ export function Count({ className, ...props }: HTMLAttributes<HTMLSpanElement>) 
   return <span className={cn("text-sm text-ink-2 tabular-nums", className)} {...props} />;
 }
 
-export type AgentState = "working" | "blocked" | "needs_input" | "done" | "waiting" | "paused";
+// Quiet: was working, but has said nothing for a while.
+export type AgentState = "working" | "quiet" | "blocked" | "needs_input" | "done" | "waiting" | "paused";
 
 const stateLabel: Record<AgentState, string> = {
   working: "Working",
+  quiet: "Quiet",
   blocked: "Blocked",
   needs_input: "Needs input",
   done: "Done",
@@ -55,7 +57,7 @@ export function ProgressBadge({ state, className }: { state: AgentState; classNa
         state === "working" && "bg-agent-wash text-agent-ink",
         state === "needs_input" && "bg-warn-wash text-warn",
         state === "blocked" && "bg-danger-wash text-danger",
-        (state === "done" || state === "waiting" || state === "paused") && "bg-hover text-ink-2",
+        (state === "quiet" || state === "done" || state === "waiting" || state === "paused") && "bg-hover text-ink-2",
         className,
       )}
     >

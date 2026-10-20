@@ -15,6 +15,7 @@ import { IssuePeople, IssueRowCells, issueRowClass, liveClass } from "../compone
 import { useToast } from "../components/toast.js";
 import { useOfferUndo } from "../components/undo.js";
 import { agentState, plainLine, waitingLine } from "../lib/agents.js";
+import { useNow } from "../lib/live.js";
 import { ago, assignable, boardColumns, categoryLabel, priorityLabel, statusFill, type StatusGroup } from "../lib/issues.js";
 import {
   useAgents,
@@ -971,7 +972,8 @@ function GroupHeading({ group, statuses }: { group: IssueGroup; statuses: Status
 // "Claude is working" in the page bar while an agent runs on one of the
 // team's issues: the one place the page itself says an agent is live.
 function LiveAgents({ issues, agents }: { issues: Issue[]; agents: Agent[] }) {
-  const live = agents.filter((agent) => issues.some((issue) => issue.delegateId === agent.id && agentState(issue, agent) === "working"));
+  const now = useNow();
+  const live = agents.filter((agent) => issues.some((issue) => issue.delegateId === agent.id && agentState(issue, agent, now) === "working"));
   if (live.length === 0) return null;
   const names = live.length === 1 ? live[0]!.name : `${live.length} agents`;
   return (
@@ -1002,9 +1004,10 @@ function FilterPill({ name, onRemove }: { name: string; onRemove: () => void }) 
 // On a board card: the delegate's name and state, then the first two lines of
 // what it last said.
 function BoardAgentLine({ issue, agents }: { issue: Issue; agents: Agent[] }) {
+  const now = useNow();
   const agent = agents.find((a) => a.id === issue.delegateId);
   if (!agent) return null;
-  const state = agentState(issue, agent);
+  const state = agentState(issue, agent, now);
   const latest = issue.latestProgress?.agentId === agent.id ? issue.latestProgress : null;
   const line = latest ? plainLine(latest.message) : state === "waiting" ? waitingLine(agent) : null;
   return (
@@ -1045,6 +1048,7 @@ function IssueList({
   onFocus: (id: string) => void;
   onToggleSelect: (id: string, shift: boolean) => void;
 }) {
+  const now = useNow();
   const parentOf = (issue: Issue) => issues.find((i) => i.id === issue.parentId)?.identifier;
   return (
     <div className="px-3">
@@ -1075,7 +1079,7 @@ function IssueList({
                     data-selected={isSelected || undefined}
                     className={cn(
                       issueRowClass,
-                      liveClass(issue, agents),
+                      liveClass(issue, agents, now),
                       isSelected && "bg-hover shadow-[inset_2px_0_0_0_var(--ink)]",
                       "data-focused:bg-hover focus-visible:shadow-[inset_0_0_0_1.5px_var(--ink)] focus-visible:outline-none",
                     )}
@@ -1148,6 +1152,7 @@ function IssueBoard({
   onToggleSelect: (id: string, shift: boolean) => void;
   onMove: (issue: Issue, statusId: string) => void;
 }) {
+  const now = useNow();
   const [dragging, setDragging] = useState<Issue | null>(null);
   const [over, setOver] = useState<string | null>(null);
   return (
@@ -1202,7 +1207,7 @@ function IssueBoard({
                   data-selected={isSelected || undefined}
                   className={cn(
                     "flex w-full flex-col gap-2 rounded-md bg-surface px-3 pt-2.5 pb-3 text-start shadow-[inset_0_0_0_1px_var(--line)]",
-                    agentState(issue, agents.find((a) => a.id === issue.delegateId)) === "working" &&
+                    agentState(issue, agents.find((a) => a.id === issue.delegateId), now) === "working" &&
                       "shadow-[inset_0_0_0_1px_var(--agent-edge)]",
                     "focus-visible:shadow-[inset_0_0_0_2px_var(--ink)] focus-visible:outline-none data-focused:shadow-[inset_0_0_0_1px_var(--line-strong)]",
                     isSelected && "bg-hover shadow-[inset_0_0_0_2px_var(--ink)]",

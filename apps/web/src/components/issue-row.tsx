@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import type { Agent, Issue, Label, Member, Status } from "@edicthq/client";
 import { Avatar, LabelPill, PriorityIcon, ProgressBadge, StatusIcon, cn } from "@edicthq/ui";
 import { agentState, plainLine, waitingLine } from "../lib/agents.js";
+import { useNow } from "../lib/live.js";
 import { ago, statusFill } from "../lib/issues.js";
 import { NoAssignee } from "./issue-fields.js";
 
@@ -18,9 +19,9 @@ import { NoAssignee } from "./issue-fields.js";
 export const issueRowClass =
   "relative grid min-h-10 w-full grid-cols-[16px_58px_16px_minmax(0,1fr)_auto_auto_30px] items-center gap-x-3 gap-y-1 rounded-sm py-2 ps-4 pe-3 text-start transition-[background-color] duration-[140ms] ease-standard hover:bg-hover max-sm:grid-cols-[14px_16px_auto_minmax(0,1fr)_auto] max-sm:gap-x-2 max-sm:gap-y-1.5 max-sm:rounded-none max-sm:border-b max-sm:border-line max-sm:py-3 max-sm:pe-4";
 
-export function liveClass(issue: Issue, agents: Agent[]): string | false {
+export function liveClass(issue: Issue, agents: Agent[], now: number): string | false {
   return (
-    agentState(issue, agents.find((a) => a.id === issue.delegateId)) === "working" &&
+    agentState(issue, agents.find((a) => a.id === issue.delegateId), now) === "working" &&
     "before:absolute before:inset-y-1.5 before:start-0 before:w-[3px] before:rounded-full before:bg-agent"
   );
 }
@@ -78,8 +79,9 @@ export function IssueRowCells({ issue, statuses, labels, orgMembers, agents, lea
 
 // A row that opens the issue over its team's list, for lists outside a team.
 export function IssueRowLink({ to, ...props }: IssueRowProps & { to: string }) {
+  const now = useNow();
   return (
-    <Link to={to} className={cn(issueRowClass, liveClass(props.issue, props.agents))}>
+    <Link to={to} className={cn(issueRowClass, liveClass(props.issue, props.agents, now))}>
       <IssueRowCells {...props} />
     </Link>
   );
@@ -123,15 +125,17 @@ export function IssuePeople({
 // The delegate's latest words under the title: its name, its state and what
 // it last said, or that it has not picked the issue up yet.
 export function AgentLine({ issue, agents }: { issue: Issue; agents: Agent[] }) {
+  const now = useNow();
   const agent = agents.find((a) => a.id === issue.delegateId);
   if (!agent) return null;
-  const state = agentState(issue, agent);
+  const state = agentState(issue, agent, now);
   const latest = issue.latestProgress?.agentId === agent.id ? issue.latestProgress : null;
   return (
     <span className="col-span-4 col-start-4 flex min-w-0 items-center gap-2 text-sm max-sm:col-start-2 max-sm:row-start-3">
       <span className="shrink-0 font-medium text-agent-ink">{agent.name}</span>
       <ProgressBadge state={state} />
       <span className="min-w-0 truncate text-ink-2">
+        {latest && state === "quiet" ? `last update ${ago(latest.createdAt, now)} ago · ` : null}
         {latest ? plainLine(latest.message) : state === "waiting" ? waitingLine(agent) : null}
       </span>
     </span>

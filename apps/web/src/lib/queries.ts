@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Accent, Agent, AgentPower, Attachment, Comment, InboxItem, InstanceStatus, Issue, Label, paths, ProjectStatus, RelationType, Role, SavedView, SavedViewQuery, SignUpMode, Status, Webhook, WebLink } from "@edicthq/client";
 import { ApiFailure, api, unwrap } from "./api.js";
+import { usePollWhileDown } from "./live.js";
 
 export const keys = {
   memberships: ["memberships"] as const,
@@ -823,8 +824,8 @@ export function useProgress(orgId: string, issueId: string) {
           params: { path: { orgId, issueRef: issueId }, query: { limit: 100 } },
         }),
       ),
-    // Agents post while the peek is open.
-    refetchInterval: 5000,
+    // Agents post while the peek is open; realtime brings their updates.
+    refetchInterval: usePollWhileDown(5000),
   });
 }
 
@@ -958,7 +959,7 @@ export function useAgentQueue(orgId: string, agentId: string) {
           params: { path: { orgId }, query: { delegateId: agentId, include: "open", limit: 5 } },
         }),
       ),
-    refetchInterval: 15_000,
+    refetchInterval: usePollWhileDown(15_000),
   });
 }
 
@@ -1118,7 +1119,7 @@ export function useInboxUnreadCount(orgId: string) {
   return useQuery({
     queryKey: keys.inboxUnread(orgId),
     queryFn: () => unwrap(api.GET("/organizations/{orgId}/inbox/unread-count", org(orgId))),
-    refetchInterval: 15_000,
+    refetchInterval: usePollWhileDown(15_000),
   });
 }
 

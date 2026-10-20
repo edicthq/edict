@@ -34,6 +34,7 @@ import { mod } from "../lib/labels.js";
 import { useRealtime } from "../lib/realtime.js";
 import type { Agent, Member, Team } from "@edicthq/client";
 import { agentState, connectionLine } from "../lib/agents.js";
+import { useNow } from "../lib/live.js";
 import { useAgentQueue, useAgents, useInboxUnreadCount, useMembers, useMemberships, useTeams } from "../lib/queries.js";
 
 export interface OrgContext {
@@ -416,7 +417,8 @@ function TeamItem({ slug, team, current }: { slug: string; team: Team; current: 
 // much is waiting for it, and the issue it works on now.
 function AgentRow({ agent, members, slug, orgId }: { agent: Agent; members: Member[]; slug: string; orgId: string }) {
   const queue = useAgentQueue(orgId, agent.id).data ?? [];
-  const states = queue.map((issue) => agentState(issue, agent));
+  const now = useNow();
+  const states = queue.map((issue) => agentState(issue, agent, now));
   const live = queue.find((_, index) => states[index] === "working");
   const state: AgentState | null = agent.pausedAt
     ? "paused"

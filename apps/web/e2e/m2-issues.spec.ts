@@ -72,6 +72,9 @@ test("label an issue, add a sub-issue and a relation, and move it to another tea
     peek.getByRole("button", { name: "Add", exact: true }).click(),
   ]);
   expect(created.status(), await created.text()).toBe(201);
+  // The form closes once the relation is saved; until then its own "Blocks"
+  // option is on screen too.
+  await expect(peek.getByRole("textbox", { name: "Issue" })).toBeHidden();
   await expect(relations.getByText("Blocks")).toBeVisible();
   await expect(relations.getByRole("button", { name: /OPS-1 Restart the relay/ })).toBeVisible();
 

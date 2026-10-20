@@ -160,7 +160,7 @@ Animations run once when an element appears, not on every re-render. With `prefe
 ## Components these tokens imply
 
 - **Agent avatar**: rounded square, `agent` fill, `on-agent` initials, the `pulse-live` ring while a run is live.
-- **State badge**: `text-meta` 500, `radius-full`, 20 high, sentence case. Working: `agent-wash` and `agent-ink` with a blinking dot. Needs input: `warn-wash` and `warn`. Blocked: `danger-wash` and `danger`. Done and Delegated: `hover` and `ink-2`.
+- **State badge**: `text-meta` 500, `radius-full`, 20 high, sentence case. Working: `agent-wash` and `agent-ink` with a blinking dot. Needs input: `warn-wash` and `warn`. Blocked: `danger-wash` and `danger`. Quiet (Working with no word from the agent for 30 minutes): `hover` and `ink-2`, no dot, and the row's live bar and the lane's thinking dots stop. Done and Delegated: `hover` and `ink-2`.
 - **Delegated row**: a 3px bar on the leading edge (`line-strong`, or `agent` while live) and a second line with the agent's name in `agent-ink`, the badge, the run timer and the first line of the latest update in `ink-2`.
 - **Agent lane**: `lane` background, `agent-edge` border while live, updates on a 2px `agent-edge` rule (`warn` or `danger` when waiting on a human), links as outlined chips.
 - **Focus**: 2px `ink` outline, 2px offset, on `:focus-visible` only. The list cursor is the same ring inside the row on a `hover` background.
