@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
-import type { Agent, AgentPower, Member, Webhook, WebhookDelivery } from "@edicthq/client";
-import { Avatar, Badge, Button, Dialog, Field, Input, ProgressBadge, cn } from "@edicthq/ui";
+import { Link, useLocation, useSearchParams } from "react-router";
+import type { Agent, AgentPower, Issue, Member, Webhook, WebhookDelivery } from "@edicthq/client";
+import { type AgentState, Avatar, Badge, Button, Dialog, Field, Input, ProgressBadge, Tabs, cn } from "@edicthq/ui";
+import { X } from "lucide-react";
 import { EmptyState, FormError, GroupHeader, Loading, PageBody, PageHeader } from "../components/shell.js";
 import { useToast } from "../components/toast.js";
-import { connectionLine, firstName } from "../lib/agents.js";
+import { agentState, connectionLine, firstName, plainLine } from "../lib/agents.js";
 import { ago } from "../lib/issues.js";
 import {
+  useAgentQueue,
   useAgents,
   useApiKeys,
   useCreateAgent,
@@ -33,28 +35,43 @@ const powers: { value: AgentPower; label: string; hint: string }[] = [
   { value: "agents", label: "Agents", hint: "Create and manage agents." },
 ];
 
-// Agents are members (ADR 0008). Everyone sees them; Admins create runner
-// agents, give them powers, keys and webhooks, and pause any agent.
+// Agents are members (ADR 0008). Everyone sees the roster: what each agent is
+// doing, how much waits for it, what it works on now. Picking one opens its
+// panel; admins give runners powers, keys and webhooks there, and anyone who
+// may pauses it.
 export function AgentsPage() {
   const { orgId, canManage, slug } = useOrg();
   const agents = useAgents(orgId);
   const members = useMembers(orgId);
   const webhooks = useWebhooks(orgId, canManage);
   const [creating, setCreating] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const location = useLocation();
+  const [kind, setKind] = useState<"all" | "connected" | "runners">("all");
 
-  useEffect(() => {
-    if (!agents.data || !location.hash) return;
-    document.getElementById(location.hash.slice(1))?.scrollIntoView({ block: "start" });
-  }, [agents.data]);
+  // The rail links to /agents#<id>; the panel keeps ?agent=<id>.
+  const selectedId = params.get("agent") ?? (location.hash ? location.hash.slice(1) : null);
+  const list = agents.data ?? [];
+  const selected = list.find((agent) => agent.id === selectedId);
+  const select = (id: string | null) => {
+    const next = new URLSearchParams(params);
+    if (id) next.set("agent", id);
+    else next.delete("agent");
+    setParams(next, { replace: true });
+    if (location.hash) history.replaceState(null, "", `${location.pathname}?${next}`);
+  };
+  const shown = list.filter((agent) =>
+    kind === "connected" ? agent.connectedBy !== null : kind === "runners" ? agent.connectedBy === null : true,
+  );
 
   return (
-    <>
+    <div className="relative flex min-h-full flex-col">
       <PageHeader
         title="Agents"
         actions={
           <>
             <Link to={`/${slug}/connect`} className="inline-flex h-8 items-center rounded-sm px-3 text-ui font-medium text-ink-2 hover:bg-hover hover:text-ink">
-              Connect your agent
+              Connect an agent
             </Link>
             {canManage ? (
               <Button variant="primary" onClick={() => setCreating(true)}>
@@ -64,81 +81,247 @@ export function AgentsPage() {
           </>
         }
       />
-      <PageBody className="flex max-w-[860px] flex-col gap-6">
-        <p className="max-w-[64ch] px-3 text-ui text-ink-2 text-pretty">
-          An agent does the work delegated to it while the assignee stays accountable. Connected agents act on behalf of
-          the person who connected their MCP client. Runner agents act with an API key, and a webhook wakes them when
-          work arrives.
+      <div role="toolbar" aria-label="Which agents" className="flex min-h-11 items-center gap-3 border-b border-line px-6">
+        <Tabs
+          label="Which agents"
+          variant="segmented"
+          value={kind}
+          onChange={setKind}
+          items={[
+            { value: "all", label: "All", count: list.length },
+            { value: "connected", label: "Connected", count: list.filter((a) => a.connectedBy !== null).length },
+            { value: "runners", label: "Runners", count: list.filter((a) => a.connectedBy === null).length },
+          ]}
+        />
+        <p className="ms-auto hidden text-sm text-ink-2 lg:block">
+          Connected agents act for the person who connected them. Runners use API keys.
         </p>
-        {agents.isPending ? (
-          <Loading label="Loading agents" />
-        ) : agents.data?.length ? (
-          <ul className="flex flex-col gap-3">
-            {agents.data.map((agent) => (
-              <AgentCard
-                key={agent.id}
-                agent={agent}
-                members={members.data ?? []}
-                webhooks={(webhooks.data ?? []).filter((hook) => hook.agentId === agent.id)}
-              />
+      </div>
+
+      {agents.isPending ? (
+        <Loading label="Loading agents" />
+      ) : list.length ? (
+        <div className="px-3 pt-1">
+          <div aria-hidden="true" className="grid h-9 grid-cols-[minmax(0,1.4fr)_120px_64px_minmax(0,1.3fr)_72px] items-center gap-4 px-3 text-sm font-medium text-ink-2">
+            <span>Agent</span>
+            <span>State</span>
+            <span className="text-end">Queue</span>
+            <span>Working on</span>
+            <span className="text-end">Active</span>
+          </div>
+          <ul aria-label="Agents" className="flex flex-col gap-px">
+            {shown.map((agent) => (
+              <li key={agent.id}>
+                <RosterRow
+                  agent={agent}
+                  members={members.data ?? []}
+                  selected={agent.id === selected?.id}
+                  onSelect={() => select(agent.id === selected?.id ? null : agent.id)}
+                />
+              </li>
             ))}
           </ul>
-        ) : (
+        </div>
+      ) : (
+        <PageBody>
           <EmptyState
             title="No agents yet"
             body="Connect an MCP client such as Claude Code, and Edict adds an agent for it. Admins can also add agents for agent runners."
             action={
               <Link to={`/${slug}/connect`} className="text-ui font-medium underline decoration-line-strong underline-offset-4">
-                Connect your agent
+                Connect an agent
               </Link>
             }
           />
-        )}
-        {canManage ? <OrganizationWebhooks webhooks={(webhooks.data ?? []).filter((hook) => !hook.agentId)} /> : null}
-      </PageBody>
-      {canManage ? <NewAgentDialog open={creating} onClose={() => setCreating(false)} /> : null}
-    </>
+        </PageBody>
+      )}
+
+      {canManage ? (
+        <div className="max-w-[860px] px-3 pt-10 pb-28">
+          <OrganizationWebhooks webhooks={(webhooks.data ?? []).filter((hook) => !hook.agentId)} />
+        </div>
+      ) : null}
+
+      {selected ? (
+        <AgentPanel
+          key={selected.id}
+          agent={selected}
+          members={members.data ?? []}
+          webhooks={(webhooks.data ?? []).filter((hook) => hook.agentId === selected.id)}
+          onClose={() => select(null)}
+        />
+      ) : null}
+      {canManage ? <NewAgentDialog open={creating} onClose={() => setCreating(false)} onCreated={(agent) => select(agent.id)} /> : null}
+    </div>
   );
 }
 
-function AgentCard({ agent, members, webhooks }: { agent: Agent; members: Member[]; webhooks: Webhook[] }) {
-  const { orgId, canManage, membership } = useOrg();
-  const update = useUpdateAgent(orgId);
+// What an agent is doing across its queue: paused, or what most needs a person,
+// or working, or nothing at all.
+function rosterState(agent: Agent, queue: Issue[]): AgentState | "idle" {
+  if (agent.pausedAt) return "paused";
+  const states = queue.map((issue) => agentState(issue, agent));
+  if (states.includes("blocked")) return "blocked";
+  if (states.includes("needs_input")) return "needs_input";
+  if (states.includes("working")) return "working";
+  return "idle";
+}
+
+function lastActive(agent: Agent, queue: Issue[]): string | null {
+  const times = queue
+    .map((issue) => (issue.latestProgress?.agentId === agent.id ? issue.latestProgress.createdAt : null))
+    .filter((time): time is string => time !== null)
+    .sort();
+  return times.at(-1) ?? null;
+}
+
+function RosterRow({ agent, members, selected, onSelect }: { agent: Agent; members: Member[]; selected: boolean; onSelect: () => void }) {
+  const { orgId } = useOrg();
+  const queue = useAgentQueue(orgId, agent.id).data ?? [];
+  const state = rosterState(agent, queue);
+  const current = queue.find((issue) => agentState(issue, agent) === "working") ?? queue[0];
+  const active = lastActive(agent, queue);
+  return (
+    <button
+      type="button"
+      id={agent.id}
+      aria-current={selected ? "true" : undefined}
+      onClick={onSelect}
+      className={cn(
+        "relative grid min-h-12 w-full grid-cols-[minmax(0,1.4fr)_120px_64px_minmax(0,1.3fr)_72px] items-center gap-4 rounded-sm px-3 py-1.5 text-start transition-[background-color] duration-[140ms] ease-standard hover:bg-hover",
+        selected && "bg-hover shadow-[inset_2px_0_0_0_var(--ink)]",
+        agent.pausedAt && "opacity-60",
+      )}
+    >
+      <span className="flex min-w-0 items-center gap-2.5">
+        <Avatar name={agent.name} kind="agent" />
+        <span className="min-w-0">
+          <span className="block truncate text-ui font-medium text-agent-ink">{agent.name}</span>
+          <span className="block truncate text-sm text-ink-2">{connectionLine(agent, members)}</span>
+        </span>
+      </span>
+      <span>
+        {state === "idle" ? <span className="text-sm text-ink-2">Idle</span> : <ProgressBadge state={state} />}
+      </span>
+      <span className="text-end text-ui tabular-nums">
+        {queue.length}
+      </span>
+      <span className="flex min-w-0 items-baseline gap-1.5 text-ui">
+        {current ? (
+          <>
+            <span className="shrink-0 text-sm font-medium text-ink-2 tabular-nums">{current.identifier}</span>
+            <span className="truncate">{current.title}</span>
+          </>
+        ) : (
+          <span className="text-ink-3">—</span>
+        )}
+      </span>
+      <span className="text-end text-sm text-ink-2 tabular-nums">
+        {active ? ago(active) : "—"}
+      </span>
+    </button>
+  );
+}
+
+// One agent's panel: what it does now and next, then its powers and access.
+function AgentPanel({ agent, members, webhooks, onClose }: { agent: Agent; members: Member[]; webhooks: Webhook[]; onClose: () => void }) {
+  const { orgId, slug, canManage, membership } = useOrg();
+  const queue = useAgentQueue(orgId, agent.id).data ?? [];
   const pause = usePauseAgent(orgId);
   const toast = useToast();
-  const [name, setName] = useState(agent.name);
-  useEffect(() => setName(agent.name), [agent.name]);
-  // Ticks show at once; a failed save puts them back.
-  const [grants, setGrants] = useState(agent.grants);
-  useEffect(() => setGrants(agent.grants), [agent.grants]);
+  const human = members.find((m) => m.id === agent.connectedBy);
+  const live = queue.find((issue) => agentState(issue, agent) === "working");
   // The person who connected an agent can pause it too.
   const mayPause = canManage || agent.connectedBy === membership.member.id;
-  const human = members.find((m) => m.id === agent.connectedBy);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !document.querySelector("dialog[open]")) onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   return (
-    <li id={agent.id} className="scroll-mt-4 rounded-md bg-surface shadow-[inset_0_0_0_1px_var(--line)]">
-      <div className="flex items-start gap-3 p-4">
-        <Avatar name={agent.name} kind="agent" size={32} />
+    <aside
+      aria-label={`${agent.name} details`}
+      className="fixed inset-y-2 end-2 z-20 flex w-[min(440px,calc(100vw-16px))] flex-col overflow-hidden rounded-md bg-surface shadow-overlay outline outline-line motion-safe:animate-[peek-slide_220ms_cubic-bezier(0.2,0,0,1)]"
+    >
+      <header className="flex items-start gap-3 border-b border-line p-4">
+        <span className={cn("rounded-[9px]", live && "outline-2 outline-offset-2 outline-agent-edge")}>
+          <Avatar name={agent.name} kind="agent" size={32} />
+        </span>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="truncate text-body font-semibold">{agent.name}</h2>
+          <h2 className="truncate text-body font-semibold text-agent-ink">{agent.name}</h2>
+          <p className="text-sm text-ink-2">{connectionLine(agent, members)}</p>
+          <div className="mt-1.5 flex flex-wrap gap-1">
             {agent.pausedAt ? <ProgressBadge state="paused" /> : null}
             <Badge>{agent.role === "guest" ? "Guest" : "Member"}</Badge>
             {agent.grants.map((grant) => (
               <Badge key={grant}>can {powers.find((p) => p.value === grant)?.label.toLowerCase()}</Badge>
             ))}
           </div>
-          <p className="mt-0.5 text-sm text-ink-2">{connectionLine(agent, members)}</p>
-          {agent.description ? <p className="mt-2 text-ui text-ink-2 text-pretty">{agent.description}</p> : null}
-          {human ? (
-            <p className="mt-2 text-sm text-ink-2 text-pretty">
-              Sees what {firstName(human.name)} sees, and never does more than they can.
-            </p>
-          ) : null}
         </div>
-        {mayPause ? (
+        <button
+          type="button"
+          aria-label="Close"
+          onClick={onClose}
+          className="grid size-7 shrink-0 place-items-center rounded-sm text-ink-2 hover:bg-hover hover:text-ink"
+        >
+          <X aria-hidden="true" className="size-4" strokeWidth={1.75} />
+        </button>
+      </header>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4">
+        {agent.description ? <p className="text-ui text-ink-2 text-pretty">{agent.description}</p> : null}
+        {human ? (
+          <p className="text-sm text-ink-2 text-pretty">Sees what {firstName(human.name)} sees, and never does more than they can.</p>
+        ) : null}
+
+        {live?.latestProgress ? (
+          <section aria-label="Working now" className="rounded-md border border-agent-edge bg-lane p-3">
+            <div className="flex items-center gap-2 text-sm">
+              <ProgressBadge state="working" />
+              <Link to={`/${slug}/issue/${live.identifier}`} className="ms-auto font-medium text-ink-2 tabular-nums hover:text-ink">
+                {live.identifier}
+              </Link>
+            </div>
+            <p className="mt-2 text-ui font-medium">{live.title}</p>
+            <p className="mt-1.5 border-s-2 border-agent-edge ps-2.5 text-ui text-ink-2 text-pretty">{plainLine(live.latestProgress.message)}</p>
+          </section>
+        ) : null}
+
+        <section aria-labelledby="agent-queue" className="flex flex-col gap-1">
+          <h3 id="agent-queue" className="text-sm font-semibold text-ink-2">
+            Queue <span className="font-normal tabular-nums">{queue.length}</span>
+          </h3>
+          {queue.length ? (
+            <ul className="flex flex-col">
+              {queue.map((issue) => (
+                <li key={issue.id}>
+                  <Link
+                    to={`/${slug}/issue/${issue.identifier}`}
+                    className="flex min-h-8 items-center gap-2 rounded-sm px-1.5 text-ui hover:bg-hover"
+                  >
+                    <span className="w-14 shrink-0 text-sm font-medium text-ink-2 tabular-nums">{issue.identifier}</span>
+                    <span className="truncate">{issue.title}</span>
+                    <ProgressBadge state={agentState(issue, agent)} className="ms-auto" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-ink-2">Nothing is delegated to {agent.name} right now.</p>
+          )}
+        </section>
+
+        {canManage ? <AgentSettings agent={agent} webhooks={webhooks} /> : null}
+      </div>
+
+      {mayPause ? (
+        <footer className="flex items-center gap-3 border-t border-line p-4">
           <Button
-            variant={agent.pausedAt ? "primary" : "ghost"}
+            variant={agent.pausedAt ? "primary" : "secondary"}
             disabled={pause.isPending || (!!agent.pausedAt && !canManage)}
             onClick={() =>
               pause.mutate(
@@ -152,67 +335,85 @@ function AgentCard({ agent, members, webhooks }: { agent: Agent; members: Member
           >
             {agent.pausedAt ? "Resume" : "Pause"}
           </Button>
-        ) : null}
-      </div>
-      {canManage ? (
-        <div className="flex flex-col gap-5 border-t border-line p-4">
-          <form
-            className="flex items-end gap-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (name.trim() && name.trim() !== agent.name) {
-                update.mutate({ agent, changes: { name: name.trim() } }, { onError: (error) => toast(error.message) });
-              }
-            }}
-          >
-            <Field label="Name" className="min-w-0 flex-1">
-              {(control) => <Input {...control} value={name} onChange={(event) => setName(event.target.value)} maxLength={80} />}
-            </Field>
-            <Button type="submit" variant="ghost" disabled={name.trim() === agent.name || !name.trim()}>
-              Rename
-            </Button>
-          </form>
-          <fieldset className="flex flex-col gap-2">
-            <legend className="mb-1 text-sm font-semibold text-ink-2">Powers beyond issues, comments and progress</legend>
-            {powers.map((power) => (
-              <label key={power.value} className="flex items-start gap-2 text-ui">
-                <input
-                  type="checkbox"
-                  className="mt-0.5 size-4 accent-[var(--ink)]"
-                  checked={grants.includes(power.value)}
-                  disabled={update.isPending}
-                  onChange={(event) => {
-                    const next = event.target.checked
-                      ? [...grants, power.value]
-                      : grants.filter((grant) => grant !== power.value);
-                    setGrants(next);
-                    update.mutate(
-                      { agent, changes: { grants: next } },
-                      {
-                        onError: (error) => {
-                          setGrants(agent.grants);
-                          toast(error.message);
-                        },
-                      },
-                    );
-                  }}
-                />
-                <span>
-                  <span className="font-medium">{power.label}</span>
-                  <span className="block text-ink-2">{power.hint}</span>
-                </span>
-              </label>
-            ))}
-          </fieldset>
-          {agent.connectedBy ? null : (
-            <>
-              <ApiKeys agent={agent} />
-              <AgentWebhook agent={agent} webhook={webhooks[0]} />
-            </>
-          )}
-        </div>
+          <p className="text-sm text-ink-2 text-pretty">
+            {agent.pausedAt
+              ? "Paused agents can't act until resumed."
+              : agent.connectedBy
+                ? "Pausing signs it out everywhere until it is resumed."
+                : "Pausing revokes its keys and stops its webhook."}
+          </p>
+        </footer>
       ) : null}
-    </li>
+    </aside>
+  );
+}
+
+// An admin's controls: the name, powers beyond the defaults, and for runners
+// their API keys and webhook.
+function AgentSettings({ agent, webhooks }: { agent: Agent; webhooks: Webhook[] }) {
+  const { orgId } = useOrg();
+  const update = useUpdateAgent(orgId);
+  const toast = useToast();
+  const [name, setName] = useState(agent.name);
+  useEffect(() => setName(agent.name), [agent.name]);
+  // Ticks show at once; a failed save puts them back.
+  const [grants, setGrants] = useState(agent.grants);
+  useEffect(() => setGrants(agent.grants), [agent.grants]);
+  return (
+    <>
+      <form
+        className="flex items-end gap-2 border-t border-line pt-5"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (name.trim() && name.trim() !== agent.name) {
+            update.mutate({ agent, changes: { name: name.trim() } }, { onError: (error) => toast(error.message) });
+          }
+        }}
+      >
+        <Field label="Name" className="min-w-0 flex-1">
+          {(control) => <Input {...control} value={name} onChange={(event) => setName(event.target.value)} maxLength={80} />}
+        </Field>
+        <Button type="submit" variant="ghost" disabled={name.trim() === agent.name || !name.trim()}>
+          Rename
+        </Button>
+      </form>
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-1 text-sm font-semibold text-ink-2">Powers beyond issues, comments and progress</legend>
+        {powers.map((power) => (
+          <label key={power.value} className="flex items-start gap-2 text-ui">
+            <input
+              type="checkbox"
+              className="mt-0.5 size-4 accent-[var(--ink)]"
+              checked={grants.includes(power.value)}
+              disabled={update.isPending}
+              onChange={(event) => {
+                const next = event.target.checked ? [...grants, power.value] : grants.filter((grant) => grant !== power.value);
+                setGrants(next);
+                update.mutate(
+                  { agent, changes: { grants: next } },
+                  {
+                    onError: (error) => {
+                      setGrants(agent.grants);
+                      toast(error.message);
+                    },
+                  },
+                );
+              }}
+            />
+            <span>
+              <span className="font-medium">{power.label}</span>
+              <span className="block text-ink-2">{power.hint}</span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
+      {agent.connectedBy ? null : (
+        <>
+          <ApiKeys agent={agent} />
+          <AgentWebhook agent={agent} webhook={webhooks[0]} />
+        </>
+      )}
+    </>
   );
 }
 
@@ -502,7 +703,7 @@ function SecretDialog({ title, body, secret, onClose }: { title: string; body: s
   );
 }
 
-function NewAgentDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+function NewAgentDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (agent: Agent) => void }) {
   const { orgId } = useOrg();
   const create = useCreateAgent(orgId);
   const teams = useTeams(orgId);
@@ -528,7 +729,7 @@ function NewAgentDialog({ open, onClose }: { open: boolean; onClose: () => void 
               onSuccess: (agent) => {
                 reset();
                 onClose();
-                requestAnimationFrame(() => document.getElementById(agent.id)?.scrollIntoView({ block: "start" }));
+                onCreated(agent);
               },
               onError: (error) => setFailure(error.message),
             },

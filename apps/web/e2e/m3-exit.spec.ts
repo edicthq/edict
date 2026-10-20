@@ -167,7 +167,8 @@ test("an admin adds a runner agent with an API key and a webhook, then pauses it
   await dialog.getByLabel("What it does").fill("Fixes failing CI runs");
   await dialog.getByRole("button", { name: "Create agent" }).click();
   await expect(dialog).toBeHidden();
-  const card = page.locator("li", { has: page.getByRole("heading", { name: "Ferro" }) });
+  // A new agent opens in the roster's panel.
+  const card = page.getByRole("complementary", { name: "Ferro details" });
   await expect(card.getByText("runner · picks up work when it next runs")).toBeVisible();
 
   await card.getByRole("button", { name: "New API key" }).click();
