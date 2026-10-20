@@ -49,7 +49,47 @@ body {
   color: var(--ink);
   font: 13px/1.45 var(--font);
   -webkit-font-smoothing: antialiased;
+  /* Chrome, as in a native app: no text selection, no hand cursor. */
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
 }
+
+input, .error { user-select: text; -webkit-user-select: text; }
+
+button { cursor: default; }
+
+/* The 48px strip at the top of every window. It drags the window (only where
+   nothing else sits on it), leaves room for the macOS traffic lights and holds
+   the page's own window buttons on Windows and Linux. */
+.titlebar {
+  display: flex;
+  align-items: center;
+  height: 48px;
+  flex: none;
+}
+
+[data-platform="macos"] .titlebar { padding-left: 84px; }
+
+.window-controls { display: flex; align-self: stretch; margin-left: auto; }
+
+.window-controls:empty { display: none; }
+
+.window-button {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  transition: background-color 140ms var(--ease), color 140ms var(--ease);
+}
+
+.window-button:hover { background: var(--hover); color: var(--ink); }
+
+.window-button svg { width: 16px; height: 16px; }
 
 input, button { font: inherit; color: inherit; }
 
@@ -75,7 +115,6 @@ input, button { font: inherit; color: inherit; }
   background: var(--ink);
   color: var(--on-human);
   font-weight: 500;
-  cursor: pointer;
   white-space: nowrap;
 }
 
@@ -94,7 +133,6 @@ input, button { font: inherit; color: inherit; }
   background: var(--surface);
   font-size: 12px;
   font-weight: 500;
-  cursor: pointer;
 }
 
 .quiet:hover { background: var(--hover); }

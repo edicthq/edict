@@ -5,11 +5,13 @@
 // (ADR 0027), a tray icon and signed updates.
 //
 // An instance's pages reach the shell through Tauri's global API, but only
-// that instance's origin, and only for events, notifications and opening the
-// switcher: the capability is granted at runtime for each saved instance. The
+// that instance's origin, and only for events, notifications, opening the
+// switcher and its own window's controls: the capability is granted at
+// runtime for each saved instance. The
 // commands that read or change the saved instances belong to the app's own
 // bundled pages (capabilities/), never to an instance's.
 
+mod chrome;
 mod instances;
 
 use std::sync::Mutex;
@@ -27,6 +29,7 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_store::StoreExt;
 use tauri_plugin_updater::UpdaterExt;
+use tauri_plugin_window_state::StateFlags;
 
 pub use instances::{default_name, window_title, Instance, Saved};
 
@@ -119,8 +122,9 @@ async fn check_server(server: &Url) -> Result<(), String> {
     Ok(())
 }
 
-// Lets an instance's pages listen for the shell's events, send notifications
-// and open the switcher. Nothing else, and only from that instance's origin.
+// Lets an instance's pages listen for the shell's events, send notifications,
+// open the switcher, and drag, minimize, maximize, close and badge the window
+// they are in. Nothing that reads data, and only from that instance's origin.
 fn allow_server(app: &AppHandle, server: &Url) {
     let origin = server.origin().ascii_serialization();
     let capability = CapabilityBuilder::new(format!("instance-{origin}"))
@@ -128,9 +132,19 @@ fn allow_server(app: &AppHandle, server: &Url) {
         .window(MAIN)
         .permission("core:event:default")
         .permission("notification:default")
-        .permission("allow-open-switcher");
+        .permission("allow-open-switcher")
+        .permission("core:window:allow-start-dragging")
+        .permission("core:window:allow-internal-toggle-maximize")
+        .permission("core:window:allow-minimize")
+        .permission("core:window:allow-toggle-maximize")
+        .permission("core:window:allow-close")
+        .permission("core:window:allow-set-badge-count");
     // Adding the same instance twice in one run is refused, and harmless.
     let _ = app.add_capability(capability);
+}
+
+fn version(app: &AppHandle) -> String {
+    app.package_info().version.to_string()
 }
 
 fn now() -> u64 {
@@ -229,7 +243,8 @@ fn show_switcher(app: &AppHandle, add: bool) {
     }
     let (width, height) = (440.0, 480.0);
     let page = if add { "switcher.html#add" } else { "switcher.html" };
-    let mut builder = WebviewWindowBuilder::new(app, SWITCHER, WebviewUrl::App(page.into()))
+    let builder = WebviewWindowBuilder::new(app, SWITCHER, WebviewUrl::App(page.into()));
+    let mut builder = chrome::styled(builder, &version(app))
         .title("Instances")
         .inner_size(width, height)
         .resizable(false)
@@ -254,6 +269,7 @@ fn show_switcher(app: &AppHandle, add: bool) {
             // The window menu belongs to the main window on Windows and Linux.
             #[cfg(not(target_os = "macos"))]
             let _ = window.remove_menu();
+            chrome::paint(&window, true);
             let _ = window.show();
             let _ = window.set_focus();
         }
@@ -618,6 +634,14 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        // The main window keeps its size and place across launches. Never
+        // its visibility: a window closed to the tray must come back.
+        .plugin(
+            tauri_plugin_window_state::Builder::new()
+                .with_state_flags(StateFlags::all() - StateFlags::VISIBLE - StateFlags::DECORATIONS)
+                .with_denylist(&[SWITCHER])
+                .build(),
+        )
         .invoke_handler(tauri::generate_handler![
             list_instances,
             add_instance,
@@ -664,7 +688,7 @@ pub fn run() {
             app.manage(Shell(Mutex::new(saved.clone())));
 
             let opener = handle.clone();
-            WebviewWindowBuilder::new(app, MAIN, url)
+            let main = chrome::styled(WebviewWindowBuilder::new(app, MAIN, url), &version(&handle))
                 .title(window_title(&saved))
                 .inner_size(1280.0, 820.0)
                 .min_inner_size(720.0, 520.0)
@@ -674,7 +698,11 @@ pub fn run() {
                     let _ = opener.opener().open_url(url.as_str(), None::<&str>);
                     NewWindowResponse::Deny
                 })
+                // Shown once painted for the theme, so it never flashes white.
+                .visible(false)
                 .build()?;
+            chrome::paint(&main, false);
+            main.show()?;
 
             build_tray(&handle, &saved)?;
             set_menus(&handle, &saved)?;
@@ -720,6 +748,11 @@ pub fn run() {
             // The switcher is a quick look: clicking away closes it.
             RunEvent::WindowEvent { label, event: WindowEvent::Focused(false), .. } if label == SWITCHER => {
                 close_switcher(app);
+            }
+            RunEvent::WindowEvent { label, event: WindowEvent::ThemeChanged(_), .. } => {
+                if let Some(window) = app.get_webview_window(&label) {
+                    chrome::paint(&window, label == SWITCHER);
+                }
             }
             #[cfg(target_os = "macos")]
             RunEvent::Reopen { .. } => show_main(app),

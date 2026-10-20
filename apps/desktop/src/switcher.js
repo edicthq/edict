@@ -392,5 +392,7 @@ window.addEventListener("focus", () => {
 });
 
 window.edictSwitcher = { focusAdd };
+// Not resizable, so close is its only window button.
+window.edictChrome.controls(document.getElementById("window-controls"), ["close"]);
 load();
 if (location.hash === "#add") focusAdd();

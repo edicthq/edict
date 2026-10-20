@@ -10,10 +10,11 @@
         min-height: 100vh;
         display: grid;
         place-items: center;
-        padding: 24px;
+        padding: 48px 24px;
       }
+      .titlebar { position: fixed; inset: 0 0 auto; }
       main { width: min(360px, 100%); display: flex; flex-direction: column; gap: 16px; }
-      svg { width: 32px; height: 32px; margin-bottom: 8px; }
+      main > svg { width: 32px; height: 32px; margin-bottom: 8px; }
       h1 { margin: 0; font-size: 24px; line-height: 1.15; font-weight: 600; letter-spacing: -0.022em; }
       main > p { margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.6; text-wrap: pretty; }
       form { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
@@ -22,6 +23,9 @@
     </style>
   </head>
   <body>
+    <div class="titlebar" data-tauri-drag-region>
+      <div class="window-controls" id="window-controls"></div>
+    </div>
     <main>
       <svg viewBox="0 0 16 16" aria-hidden="true">
         <path fill="currentColor" d="M5 2h7a1 1 0 0 1 0 2H5v8h7a1 1 0 0 1 0 2H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z" />
@@ -36,6 +40,7 @@
         <button class="primary" type="submit">Connect</button>
       </form>
     </main>
+    <script src="chrome.js"></script>
     <script src="connect.js"></script>
   </body>
 </html>

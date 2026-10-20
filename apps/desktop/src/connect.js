@@ -18,3 +18,5 @@ form.addEventListener("submit", async (event) => {
     button.textContent = "Connect";
   }
 });
+
+window.edictChrome.controls(document.getElementById("window-controls"), ["minimize", "maximize", "close"]);
