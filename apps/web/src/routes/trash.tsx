@@ -91,7 +91,7 @@ function TrashRow({ issue, by }: { issue: TrashedIssue; by?: string }) {
     <li>
       <div className={rowClass}>
         <TeamKey>{key!}</TeamKey>
-        <span className="font-mono text-sm text-ink-2 tabular-nums">{issue.identifier}</span>
+        <span className="font-code text-sm text-ink-2 tabular-nums">{issue.identifier}</span>
         <span className="min-w-0 flex-1 truncate text-body">{issue.title}</span>
         <span className="flex items-center gap-1.5 text-sm text-ink-2 max-sm:hidden">
           <Avatar name={by ?? "?"} size={18} />

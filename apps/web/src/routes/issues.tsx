@@ -1311,7 +1311,7 @@ function ArchivedIssues({ orgId, team, onOpen }: { orgId: string; team: Team; on
                     onClick={() => onOpen(issue)}
                     className="flex min-h-9 w-full items-center gap-3 rounded-sm px-4 text-start text-ink-2 hover:bg-hover hover:text-ink"
                   >
-                    <span className="w-[58px] shrink-0 font-mono text-sm tabular-nums">{issue.identifier}</span>
+                    <span className="w-[58px] shrink-0 font-code text-sm tabular-nums">{issue.identifier}</span>
                     <span className="min-w-0 flex-1 truncate text-body">{issue.title}</span>
                     {issue.archivedAt ? (
                       <time dateTime={issue.archivedAt} className="shrink-0 text-sm">

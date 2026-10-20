@@ -121,7 +121,8 @@ function ProgressEntry({ update }: { update: ProgressUpdate }) {
       </time>
       <div className="min-w-0 border-s-2 border-agent-edge ps-3">
         {update.state !== "working" ? <ProgressBadge state={update.state} className="mb-1.5" /> : null}
-        <Markdown text={update.message} className="text-ui" />
+        {/* Inline code in an agent's words sits on the agent wash (tokens.md). */}
+        <Markdown text={update.message} className="text-ui [&_code]:bg-agent-wash!" />
         {update.links.length ? (
           <ul className="mt-2 flex flex-wrap gap-1.5">
             {update.links.map((link) => (

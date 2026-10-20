@@ -830,7 +830,7 @@ function FileRow({ attachment }: { attachment: Attachment }) {
         {image ? (
           <img src={attachment.path} alt="" loading="lazy" className="size-full object-cover" />
         ) : (
-          <span className="grid size-full place-items-center font-mono text-[10px] text-ink-2 uppercase">
+          <span className="grid size-full place-items-center font-code text-[10px] text-ink-2 uppercase">
             {extension(attachment)}
           </span>
         )}

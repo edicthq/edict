@@ -194,7 +194,7 @@ function UpdatesSection() {
               <a href={updates.latest.url} target="_blank" rel="noreferrer" className="text-ink underline underline-offset-2">
                 Release notes
               </a>
-              . Upgrade with <code className="font-mono text-sm">docker compose pull && docker compose up -d</code>.
+              . Upgrade with <code className="font-code text-sm">docker compose pull && docker compose up -d</code>.
             </>
           ) : null}
         </p>
@@ -247,7 +247,7 @@ function TelemetrySection() {
         </label>
         <figure className="flex flex-col gap-1">
           <figcaption className="text-ink-2">The payload, as sent</figcaption>
-          <pre className="rounded-md border border-line bg-surface px-3 py-2 font-mono text-sm text-ink">
+          <pre className="rounded-md border border-line bg-surface px-3 py-2 font-code text-sm text-ink">
             {JSON.stringify(telemetry.payload, null, 2)}
           </pre>
         </figure>
