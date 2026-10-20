@@ -229,7 +229,7 @@ Opt-in and off by default. The instance admin page shows the exact payload: vers
 
 ## Desktop
 
-The Tauri app is a shell. It loads the UI from the server the user points it at, so the UI always matches the server version. Native extras: global quick-create hotkey, OS notifications, `edict://` deep links, tray icon, auto-update. Signing into several servers comes after v1.
+The Tauri app is a shell. It loads the UI from the server the user points it at, so the UI always matches the server version. Native extras: global quick-create hotkey, OS notifications, `edict://` deep links, tray icon, auto-update. It keeps several instances and switches between them in one window ([ADR 0028](./adr/0028-desktop-app-keeps-several-instances.md)).
 
 There is no Apple Developer ID or Windows signing yet, so v1 ships unsigned and labeled beta:
 
@@ -299,4 +299,4 @@ Agents come before polish on purpose. From M3 on, Edict's own development runs i
 
 ### After v1
 
-Cycles, CLI, git integration (branch names and pull requests move issues), importers, email notifications, per-agent revert, import of our own export format, the GitHub Issues triage agent, signing the desktop apps, signing into several servers from the desktop app, custom fields if users ask for them.
+Cycles, CLI, git integration (branch names and pull requests move issues), importers, email notifications, per-agent revert, import of our own export format, the GitHub Issues triage agent, signing the desktop apps, custom fields if users ask for them.
