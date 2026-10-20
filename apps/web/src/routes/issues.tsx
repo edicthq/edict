@@ -738,7 +738,8 @@ function TeamIssues({ team }: { team: Team }) {
             }
           />
         )}
-        {loading ? null : <ArchivedIssues orgId={orgId} team={team} onOpen={openIssue} />}
+        {/* The board fills the height, so archived issues are reached from the list. */}
+        {loading || view !== "list" ? null : <ArchivedIssues orgId={orgId} team={team} onOpen={openIssue} />}
       </div>
 
       {selectedIds.size > 0 && statuses.data ? (
@@ -887,7 +888,7 @@ function groupName(group: IssueGroup): string {
 
 function GroupHeading({ group, statuses }: { group: IssueGroup; statuses: Status[] }) {
   return (
-    <h2 className="flex h-[34px] items-center gap-2 bg-bg px-3 text-sm font-semibold text-ink">
+    <h2 className="flex h-[34px] shrink-0 items-center gap-2 bg-bg px-3 text-sm font-semibold text-ink">
       {group.status ? (
         <StatusIcon category={group.status.category} fill={statusFill(statuses, group.status)} />
       ) : group.priority ? (
@@ -922,24 +923,35 @@ function FilterPill({ name, onRemove }: { name: string; onRemove: () => void }) 
   );
 }
 
-// The assignee, with the delegate overlapping it as in the concept.
-function Assignee({ issue, orgMembers, agents }: { issue: Issue; orgMembers: Member[]; agents: Agent[] }) {
+// The assignee, then the delegate beside it. They sit apart rather than
+// overlapping, so the human's initials stay readable.
+function Assignee({
+  issue,
+  orgMembers,
+  agents,
+  size = 22,
+}: {
+  issue: Issue;
+  orgMembers: Member[];
+  agents: Agent[];
+  size?: 18 | 22;
+}) {
   const assignee = orgMembers.find((m) => m.id === issue.assigneeId);
   const delegate = agents.find((a) => a.id === issue.delegateId);
   return (
-    <span className="flex items-center">
+    <span className="flex items-center gap-[3px]">
       {assignee ? (
         <span title={assignee.name}>
-          <Avatar name={assignee.name} />
+          <Avatar name={assignee.name} size={size} />
         </span>
       ) : (
         <span title="No assignee">
-          <NoAssignee size={22} />
+          <NoAssignee size={size} />
         </span>
       )}
       {delegate ? (
-        <span title={`Delegated to ${delegate.name}`} className="-ms-1.5 rounded-[7px] ring-2 ring-bg">
-          <Avatar name={delegate.name} kind="agent" />
+        <span title={`Delegated to ${delegate.name}`}>
+          <Avatar name={delegate.name} kind="agent" size={size} />
         </span>
       ) : null}
     </span>
@@ -960,6 +972,25 @@ function AgentLine({ issue, agents }: { issue: Issue; agents: Agent[] }) {
       <span className="min-w-0 truncate text-ink-2">
         {latest ? plainLine(latest.message) : state === "waiting" ? waitingLine(agent) : null}
       </span>
+    </span>
+  );
+}
+
+// On a board card: the delegate's name and state, then the first two lines of
+// what it last said.
+function BoardAgentLine({ issue, agents }: { issue: Issue; agents: Agent[] }) {
+  const agent = agents.find((a) => a.id === issue.delegateId);
+  if (!agent) return null;
+  const state = agentState(issue, agent);
+  const latest = issue.latestProgress?.agentId === agent.id ? issue.latestProgress : null;
+  const line = latest ? plainLine(latest.message) : state === "waiting" ? waitingLine(agent) : null;
+  return (
+    <span className="flex flex-col gap-1 border-t border-line pt-2 text-sm">
+      <span className="flex min-w-0 items-center gap-1.5">
+        <span className="truncate font-medium text-agent-ink">{agent.name}</span>
+        <ProgressBadge state={state} />
+      </span>
+      {line ? <span className="line-clamp-2 text-ink-2">{line}</span> : null}
     </span>
   );
 }
@@ -1005,7 +1036,7 @@ function IssueList({
 }) {
   const parentOf = (issue: Issue) => issues.find((i) => i.id === issue.parentId)?.identifier;
   return (
-    <div className="px-3 pb-28">
+    <div className="px-3">
       {groups.map((group) => (
         <section key={groupKey(group)} aria-label={groupName(group)} className="mb-3">
           <div className="sticky top-0 z-[1]">
@@ -1173,49 +1204,44 @@ function IssueBoard({
                   data-selected={isSelected || undefined}
                   className={cn(
                     "flex w-full flex-col gap-2 rounded-md bg-surface px-3 pt-2.5 pb-3 text-start shadow-[inset_0_0_0_1px_var(--line)]",
+                    agentState(issue, agents.find((a) => a.id === issue.delegateId)) === "working" &&
+                      "shadow-[inset_0_0_0_1px_var(--agent-edge)]",
                     "focus-visible:shadow-[inset_0_0_0_2px_var(--ink)] focus-visible:outline-none data-focused:shadow-[inset_0_0_0_1px_var(--line-strong)]",
                     isSelected && "bg-hover shadow-[inset_0_0_0_2px_var(--ink)]",
                     dragging?.id === issue.id && "opacity-50",
                   )}
                 >
-                  <span className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
+                  <span className="flex items-center gap-2">
+                    <span title={priorityLabel[issue.priority]} className="relative flex size-4 items-center justify-center">
+                      <span className={cn("transition-opacity", isSelected || selectedIds.size > 0 ? "opacity-0" : "group-hover/card:opacity-0")}>
+                        <PriorityIcon priority={issue.priority} />
+                      </span>
                       <input
                         type="checkbox"
                         checked={isSelected}
                         onClick={(e) => e.stopPropagation()}
                         onChange={(e) => onToggleSelect(issue.id, (e.nativeEvent as MouseEvent).shiftKey)}
                         className={cn(
-                          "size-3.5 accent-[var(--ink)] cursor-pointer transition-opacity",
+                          "absolute inset-0 size-4 accent-[var(--ink)] cursor-pointer transition-opacity",
                           isSelected || selectedIds.size > 0 ? "opacity-100" : "opacity-0 group-hover/card:opacity-100",
                         )}
                         aria-label={`Select ${issue.identifier}`}
                       />
-                      <span className="text-sm font-medium text-ink-2 tabular-nums">{issue.identifier}</span>
                     </span>
-                    <span title={priorityLabel[issue.priority]}>
-                      <PriorityIcon priority={issue.priority} />
-                    </span>
+                    <span className="flex-1 text-sm font-medium text-ink-2 tabular-nums">{issue.identifier}</span>
+                    <Assignee issue={issue} orgMembers={orgMembers} agents={agents} size={18} />
                   </span>
-                  <span className="text-body leading-[1.35] text-pretty">{issue.title}</span>
-                  <span className="flex items-center gap-2">
-                    <span className="flex min-w-0 flex-1 flex-wrap gap-1">
+                  <span className="text-body leading-[1.4] tracking-[-0.005em] text-pretty">{issue.title}</span>
+                  {issue.labelIds.length > 0 ? (
+                    <span className="flex flex-wrap gap-1">
                       {labels
                         .filter((label) => issue.labelIds.includes(label.id))
                         .map((label) => (
                           <LabelPill key={label.id} name={label.name} hue={label.hue} />
                         ))}
                     </span>
-                    <Assignee issue={issue} orgMembers={orgMembers} agents={agents} />
-                  </span>
-                  {issue.delegateId ? (
-                    <span className="flex min-w-0 items-center gap-2 text-sm">
-                      <ProgressBadge state={agentState(issue, agents.find((a) => a.id === issue.delegateId))} />
-                      <span className="min-w-0 truncate text-ink-2">
-                        {issue.latestProgress?.agentId === issue.delegateId ? plainLine(issue.latestProgress.message) : null}
-                      </span>
-                    </span>
                   ) : null}
+                  <BoardAgentLine issue={issue} agents={agents} />
                 </button>
               </li>
               );
@@ -1260,7 +1286,8 @@ function ArchivedIssues({ orgId, team, onOpen }: { orgId: string; team: Team; on
   const archived = useArchivedIssues(orgId, team.id, shown);
   const list = archived.data?.pages.flat() ?? [];
   return (
-    <section aria-label="Archived issues" className="px-6 pt-4 pb-10">
+    // The bottom padding keeps the last row clear of the bulk-edit bar.
+    <section aria-label="Archived issues" className="px-4 pt-1 pb-28">
       {shown ? (
         <>
           <h2 className="px-4 pb-1 text-sm font-semibold text-ink-2">Archived</h2>
