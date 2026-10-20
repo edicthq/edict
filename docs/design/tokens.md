@@ -115,7 +115,7 @@ Section labels are sentence case at `text-sm` 600 in `ink-2`, never uppercase. N
 
 | Size | Value |
 |---|---|
-| Rail width | 252 |
+| Rail width | 240 |
 | List row | 40 high (8 vertical padding). The agent line adds 20 |
 | Group header | 34 |
 | Peek | up to 1000 wide, 8 from the viewport edges. Agent lane 360 |
@@ -164,6 +164,56 @@ Animations run once when an element appears, not on every re-render. With `prefe
 - **Delegated row**: a 3px bar on the leading edge (`line-strong`, or `agent` while live) and a second line with the agent's name in `agent-ink`, the badge, the run timer and the first line of the latest update in `ink-2`.
 - **Agent lane**: `lane` background, `agent-edge` border while live, updates on a 2px `agent-edge` rule (`warn` or `danger` when waiting on a human), links as outlined chips.
 - **Focus**: 2px `ink` outline, 2px offset, on `:focus-visible` only. The list cursor is the same ring inside the row on a `hover` background.
+
+## Direction: calm desk, live agents
+
+The polish pass before v1.0 settled how screens are put together, on top of these tokens. It was approved on 2026-10-20. Humans get a quiet, dense workspace in ink. The only color and motion on screen come from agents doing work.
+
+### One page frame
+
+- Every page starts with a 48px page bar on a hairline: the title, led by a team key or a breadcrumb (Projects › name), then a status such as a live "Claude is working" pill, then the page's actions. At most one ink button.
+- The bar stays put while the page scrolls. In the desktop app it is also the handle to drag the window by.
+- A page with view options puts them in a toolbar under the bar, at least 44 high. No page has a big title above its content.
+- Fields that belong to the page, like a project's status, lead and target date, sit in the bar as chips that open app menus.
+
+### One issue row
+
+- An issue looks the same wherever it is listed: a team's list, My issues, a project, the inbox. In order: priority, identifier, status, title, labels, the people on it and how long ago it changed.
+- An issue delegated to an agent gets a second line: the agent's name in `agent-ink`, its state badge and the first line of its latest update. A 3px bar on the leading edge turns `agent` only while the run is live.
+- The assignee's circle and the delegate's square sit side by side, never overlapping.
+
+### A calmer rail
+
+- From the top: the workspace button with New issue beside it, the search field, then Inbox, My issues and Projects.
+- Agents follow, one line each, with their state badge and the issue a working agent is on.
+- Then teams, each opening to Issues and Board. Connect an agent, Members, Trash, Settings and the person's own name sit at the bottom.
+
+### Agents at a glance
+
+- The agents page is a roster: each agent's state, queue, current issue and last activity on one row. Picking a row opens a side panel with its work, powers and access, and editing happens there.
+- The Teams page is a roster too: each team's open, in-progress and delegated issues, its members and its agents.
+
+### Show, don't announce
+
+- An empty section folds into one quiet add-action. A heading appears once the section has content.
+- Settings are split into your own preferences and the organization's, with a subnav.
+- ⌘K opens on what you are likely to do next: New issue, the issues you opened last, then Go to.
+
+### On a phone
+
+- Below 640px a row takes two lines: the status and a title that wraps, then priority, identifier, two labels as plain dots and the people. The agent line follows, and the age goes.
+- Below 768px the rail opens as a drawer from a 48px top bar holding the workspace, search, the inbox with its unread count, and the menu.
+- A page's toolbar folds into one View sheet, and New issue is a 52px ink button floating over the lists.
+
+### Don'ts
+
+- No accent on human actions, links, selection or focus. Ink only.
+- No amber or red outside an agent waiting on a human. A paused project is neutral.
+- No UPPERCASE labels, and no `ink-3` text.
+- No native selects or date inputs. Use the app's menus and its calendar.
+- No shadows on cards in the page.
+- No overlapping avatar pairs.
+- No section whose only content is "No X."
 
 ## Logo
 
