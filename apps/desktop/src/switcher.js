@@ -107,7 +107,7 @@ function render() {
 
 function renderRow({ instance, index }, position) {
   const isActive = instance.url === state.active;
-  const row = el("li", { id: `row-${index}`, className: "row" });
+  const row = el("div", { id: `row-${index}`, className: "row" });
   row.setAttribute("role", "option");
   row.setAttribute("aria-selected", String(position === state.cursor));
   row.dataset.url = instance.url;
@@ -183,7 +183,7 @@ function renderMenu(instance) {
       state.menu = null;
       action();
     });
-    return el("li", {}, [button]);
+    return el("div", {}, [button]);
   };
   const menu = el("ul", { className: "menu" }, [
     item("Rename", isMac ? "⌘↩" : "F2", () => startRename(instance)),
