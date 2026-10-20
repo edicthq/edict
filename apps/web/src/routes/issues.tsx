@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-r
 import type { Agent, Issue, Label, Member, Priority, SavedViewQuery, Status, Team } from "@edicthq/client";
 import { Avatar, Button, Kbd, LabelPill, Menu, PriorityIcon, ProgressBadge, StatusIcon, TeamKey, cn } from "@edicthq/ui";
 import type { MenuItem } from "@edicthq/ui";
-import { ArrowDown, ArrowUp, Bookmark, ListFilter, Search, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Bookmark, Columns3, ListFilter, Rows3, Search, Trash2, X } from "lucide-react";
 import { CreateIssueDialog } from "../components/create-issue-dialog.js";
 import { AssigneePicker, DelegatePicker, NoAssignee, PriorityPicker, StatusPicker } from "../components/issue-fields.js";
 import { IssuePeek, type PeekMenu } from "../components/issue-peek.js";
@@ -481,6 +481,7 @@ function TeamIssues({ team }: { team: Team }) {
       <PageHeader
         lead={<TeamKey>{team.key}</TeamKey>}
         title={team.name}
+        status={<LiveAgents issues={issues.data ?? []} agents={agents.data ?? []} />}
         actions={
           <>
             <Button variant="ghost" className="h-8 text-ui" onClick={() => navigate(`/${slug}/teams/${team.id}/members`)}>
@@ -492,37 +493,24 @@ function TeamIssues({ team }: { team: Team }) {
           </>
         }
       />
-      <div className="flex flex-wrap items-center gap-3 px-6 pb-2">
-        <div role="group" aria-label="View" className="inline-flex gap-0.5 rounded-md bg-hover p-[3px]">
+      <div role="toolbar" aria-label="View options" className="flex min-h-11 shrink-0 flex-wrap items-center gap-1 border-b border-line px-6 py-1.5">
+        <div role="group" aria-label="View" className="me-2 inline-flex gap-0.5 rounded-sm bg-hover p-0.5">
           {(["list", "board"] as const).map((v) => (
             <button
               key={v}
               type="button"
               aria-pressed={view === v}
               onClick={() => setParam("view", v === "board" ? "board" : null)}
-              className="rounded-[7px] px-3 py-1 text-ui font-medium text-ink-2 hover:text-ink aria-pressed:bg-surface aria-pressed:text-ink aria-pressed:shadow-[0_0_0_1px_var(--line)]"
+              className="inline-flex h-6 items-center gap-1.5 rounded-[5px] px-2.5 text-ui font-medium text-ink-2 hover:text-ink aria-pressed:bg-surface aria-pressed:text-ink aria-pressed:shadow-[0_0_0_1px_var(--line)]"
             >
+              {v === "list" ? (
+                <Rows3 aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+              ) : (
+                <Columns3 aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+              )}
               {v === "list" ? "List" : "Board"}
             </button>
           ))}
-        </div>
-
-        <div className="relative">
-          <Search aria-hidden="true" className="pointer-events-none absolute start-2 top-1/2 size-3.5 -translate-y-1/2 text-ink-3" />
-          <input
-            ref={searchRef}
-            value={issueView.q}
-            onChange={(event) => patchView({ q: event.target.value }, true)}
-            onKeyDown={(event) => {
-              if (event.key !== "Escape") return;
-              event.stopPropagation();
-              if (issueView.q) patchView({ q: "" }, true);
-              else event.currentTarget.blur();
-            }}
-            placeholder="Search"
-            aria-label="Search issues"
-            className="h-7 w-44 rounded-md bg-surface ps-7 pe-2 text-ui text-ink placeholder:text-ink-3 shadow-[inset_0_0_0_1px_var(--line)] focus-visible:shadow-[inset_0_0_0_1.5px_var(--line-strong)] focus-visible:outline-none"
-          />
         </div>
 
         <Menu
@@ -652,8 +640,27 @@ function TeamIssues({ team }: { team: Team }) {
           </>
         ) : null}
 
+        <div className="ms-auto" />
+        <div className="relative me-2">
+          <Search aria-hidden="true" className="pointer-events-none absolute start-2 top-1/2 size-3.5 -translate-y-1/2 text-ink-3" />
+          <input
+            ref={searchRef}
+            value={issueView.q}
+            onChange={(event) => patchView({ q: event.target.value }, true)}
+            onKeyDown={(event) => {
+              if (event.key !== "Escape") return;
+              event.stopPropagation();
+              if (issueView.q) patchView({ q: "" }, true);
+              else event.currentTarget.blur();
+            }}
+            placeholder="Search"
+            aria-label="Search issues"
+            className="h-7 w-44 rounded-md bg-surface ps-7 pe-2 text-ui text-ink placeholder:text-ink-3 shadow-[inset_0_0_0_1px_var(--line)] focus-visible:shadow-[inset_0_0_0_1.5px_var(--line-strong)] focus-visible:outline-none"
+          />
+        </div>
+
         {issues.data ? (
-          <span className="ms-auto text-sm text-ink-2 tabular-nums">
+          <span className="text-sm text-ink-2 tabular-nums">
             {hasFilters(issueView)
               ? `${filtered.length} of ${issues.data.length} ${issues.data.length === 1 ? "issue" : "issues"}`
               : `${issues.data.length} ${issues.data.length === 1 ? "issue" : "issues"}`}
@@ -662,7 +669,7 @@ function TeamIssues({ team }: { team: Team }) {
       </div>
 
       {filterKeys(issueView).length > 0 ? (
-        <div className="flex flex-wrap items-center gap-1.5 px-6 pb-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-line px-6 py-2">
           {filterKeys(issueView).map((key) => (
             <FilterPill key={key} name={filterName(key)} onRemove={() => toggleFilterKey(key)} />
           ))}
@@ -903,6 +910,20 @@ function GroupHeading({ group, statuses }: { group: IssueGroup; statuses: Status
       <span>{groupName(group)}</span>
       <span className="font-normal text-ink-2 tabular-nums">{group.issues.length}</span>
     </h2>
+  );
+}
+
+// "Claude is working" in the page bar while an agent runs on one of the
+// team's issues: the one place the page itself says an agent is live.
+function LiveAgents({ issues, agents }: { issues: Issue[]; agents: Agent[] }) {
+  const live = agents.filter((agent) => issues.some((issue) => issue.delegateId === agent.id && agentState(issue, agent) === "working"));
+  if (live.length === 0) return null;
+  const names = live.length === 1 ? live[0]!.name : `${live.length} agents`;
+  return (
+    <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-agent-wash px-2.5 text-sm font-medium text-agent-ink">
+      <span aria-hidden="true" className="size-1.5 rounded-full bg-agent motion-safe:animate-pulse" />
+      {names} {live.length === 1 ? "is" : "are"} working
+    </span>
   );
 }
 

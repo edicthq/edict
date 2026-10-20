@@ -23,7 +23,7 @@ test("a fresh instance: set up, create an organization and a team, invite someon
   await teamDialog.getByRole("button", { name: "Create team" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Engineering" })).toBeVisible();
 
-  await page.getByRole("link", { name: "Manage" }).click();
+  await page.getByRole("navigation", { name: "Organization" }).first().getByRole("link", { name: "Members" }).click();
   await page.getByRole("button", { name: "Invite people" }).click();
   const inviteDialog = page.getByRole("dialog", { name: /Invite people/ });
   await inviteDialog.getByLabel("Email").fill("mia@example.com");

@@ -1,12 +1,29 @@
-import { CheckSquare, ChevronDown, FolderKanban, Inbox, LogOut, Plus, Server, Settings, Trash2 } from "lucide-react";
+import {
+  ArrowLeftRight,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  CircleUserRound,
+  FolderKanban,
+  Inbox,
+  LogOut,
+  Plug,
+  Plus,
+  Search,
+  Server,
+  Settings,
+  SquarePen,
+  Trash2,
+  Users,
+} from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import type { Membership } from "@edicthq/client";
-import { Link, NavLink, Outlet, useNavigate, useOutletContext, useParams } from "react-router";
-import { Avatar, Button, Count, Kbd, LogoMark, ProgressBadge, TeamKey, cn } from "@edicthq/ui";
+import { Link, NavLink, Outlet, useLocation, useNavigate, useOutletContext, useParams } from "react-router";
+import { type AgentState, Avatar, Button, Kbd, LogoMark, ProgressBadge, TeamKey, cn } from "@edicthq/ui";
 import { CreateTeamDialog } from "../components/create-team-dialog.js";
 import { InviteDialog } from "../components/invite-dialog.js";
 import { CommandPalette } from "../components/palette.js";
-import { useDesktopBridge } from "../lib/desktop.js";
+import { desktopShell, openSwitcher, useDesktopBridge } from "../lib/desktop.js";
 import { cycleAccent, cycleTheme, isTyping, setOrganizationAccent } from "../lib/appearance.js";
 import { UndoProvider } from "../components/undo.js";
 import { VerifyBanner } from "../components/verify-banner.js";
@@ -14,7 +31,7 @@ import { AuthShell, Loading } from "../components/shell.js";
 import { authClient, useSession } from "../lib/auth.js";
 import { mod } from "../lib/labels.js";
 import { useRealtime } from "../lib/realtime.js";
-import type { Agent, Member } from "@edicthq/client";
+import type { Agent, Member, Team } from "@edicthq/client";
 import { agentState, connectionLine } from "../lib/agents.js";
 import { useAgentQueue, useAgents, useInboxUnreadCount, useMembers, useMemberships, useTeams } from "../lib/queries.js";
 
@@ -143,8 +160,8 @@ export function OrgLayout() {
 
 function RailSection({ title, aside, children }: { title: string; aside?: ReactNode; children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-0.5">
-      <div className="flex items-center gap-2 px-1 pb-1">
+    <section className="flex flex-col gap-px">
+      <div className="flex h-7 items-center gap-2 ps-2 pe-1">
         <h2 className="text-sm font-semibold text-ink-2">{title}</h2>
         {aside ? <div className="ms-auto flex items-center">{aside}</div> : null}
       </div>
@@ -153,88 +170,95 @@ function RailSection({ title, aside, children }: { title: string; aside?: ReactN
   );
 }
 
+const railItem = "flex h-7 items-center gap-2 rounded-sm px-2 text-ui transition-[background-color,color] duration-[140ms] ease-standard";
 const railLink = ({ isActive }: { isActive: boolean }) =>
-  cn(
-    "flex h-[30px] items-center gap-2 rounded-sm px-2 text-ui transition-[background-color,color] duration-[140ms] ease-standard",
-    isActive
-      ? "bg-surface font-medium text-ink shadow-[inset_0_0_0_1px_var(--line)]"
-      : "text-ink-2 hover:text-ink",
-  );
+  cn(railItem, isActive ? "bg-surface font-medium text-ink shadow-[inset_0_0_0_1px_var(--line)]" : "text-ink hover:bg-hover");
 
-// Unread inbox count in the rail, none shown when the inbox is empty.
+// Unread inbox count in the rail, in ink: a count of things for a human.
 function InboxBadge({ orgId }: { orgId: string }) {
   const unread = useInboxUnreadCount(orgId);
   const count = unread.data?.unreadCount ?? 0;
-  if (count) {
-    return <span className="ms-auto rounded-full bg-agent-wash px-1.5 py-0.5 text-xs font-medium text-agent-ink tabular-nums">{count}</span>;
-  }
-  return null;
+  if (!count) return null;
+  return <span className="ms-auto text-sm font-semibold text-ink tabular-nums">{count}</span>;
+}
+
+// The desktop app's title strip: room for the macOS traffic lights, back and
+// forward, and a handle to drag the window by. Browsers show none of it.
+function TitleStrip() {
+  const navigate = useNavigate();
+  if (!desktopShell()) return null;
+  const arrow = "grid size-7 place-items-center rounded-sm text-ink-2 hover:bg-hover hover:text-ink";
+  return (
+    <div data-tauri-drag-region className="-mx-2 -mt-2.5 mb-1 flex h-12 shrink-0 items-center gap-0.5 px-2 [[data-title-bar=overlay]_&]:ps-[78px]">
+      <button type="button" aria-label="Back" title={`Back (${mod}[)`} className={arrow} onClick={() => navigate(-1)}>
+        <ChevronLeft aria-hidden="true" className="size-4" strokeWidth={1.75} />
+      </button>
+      <button type="button" aria-label="Forward" title={`Forward (${mod}])`} className={arrow} onClick={() => navigate(1)}>
+        <ChevronRight aria-hidden="true" className="size-4" strokeWidth={1.75} />
+      </button>
+    </div>
+  );
 }
 
 function Rail({ context, others }: { context: OrgContext; others: Membership[] }) {
   const { orgId, slug, canManage, membership, instanceAdmin } = context;
   const teams = useTeams(orgId);
   const members = useMembers(orgId);
-  const humans = members.data?.filter((m) => m.kind === "human") ?? [];
   const agents = useAgents(orgId).data ?? [];
+  const navigate = useNavigate();
+  const { teamId: currentTeam } = useParams();
+  const newIssue = () => {
+    const teamId = currentTeam ?? teams.data?.[0]?.id;
+    if (teamId) navigate(`/${slug}/teams/${teamId}?create=1`);
+  };
 
   return (
     <nav
       aria-label="Organization"
-      className="sticky top-0 flex h-dvh w-[252px] shrink-0 flex-col gap-5 overflow-y-auto border-e border-line bg-rail px-3 py-4 max-md:hidden"
+      className="sticky top-0 flex h-dvh w-[240px] shrink-0 flex-col gap-4 overflow-y-auto border-e border-line bg-rail px-2 pt-2.5 pb-2 max-md:hidden"
     >
-      <div className="flex items-center gap-2 px-1">
-        <LogoMark />
-        <span className="text-body font-semibold tracking-[-0.01em]">Edict</span>
-        <OrgSwitcher current={membership} others={others} />
+      <div className="flex flex-col gap-2">
+        <TitleStrip />
+        <div className="flex items-center gap-1">
+          <Workspace context={context} others={others} />
+          {teams.data?.length ? (
+            <button
+              type="button"
+              aria-label="New issue"
+              title="New issue (C)"
+              onClick={newIssue}
+              className="grid size-7 shrink-0 place-items-center rounded-sm text-ink-2 hover:bg-hover hover:text-ink"
+            >
+              <SquarePen aria-hidden="true" className="size-4" strokeWidth={1.75} />
+            </button>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          onClick={context.openPalette}
+          className="flex h-[30px] items-center gap-2 rounded-sm bg-surface ps-2 pe-1.5 text-ui text-ink-2 shadow-[inset_0_0_0_1px_var(--line)] transition-[color] duration-[140ms] ease-standard hover:text-ink"
+        >
+          <Search aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+          <span>Search or command</span>
+          <Kbd className="ms-auto">{`${mod}K`}</Kbd>
+        </button>
       </div>
 
-      <button
-        type="button"
-        onClick={context.openPalette}
-        className="flex h-8 items-center justify-between rounded-sm bg-surface ps-2.5 pe-1.5 text-ui text-ink-2 shadow-[inset_0_0_0_1px_var(--line)] transition-[color] duration-[140ms] ease-standard hover:text-ink"
-      >
-        <span>Search or command</span>
-        <Kbd>{`${mod}K`}</Kbd>
-      </button>
-
-      <div className="flex flex-col gap-0.5">
-        <NavLink to={`/${slug}/my-issues`} className={railLink}>
-          <CheckSquare aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
-          My issues
-        </NavLink>
+      <div className="flex flex-col gap-px">
         <NavLink to={`/${slug}/inbox`} className={railLink}>
-          <Inbox aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+          <Inbox aria-hidden="true" className="size-4 text-ink-2" strokeWidth={1.75} />
           Inbox
           <InboxBadge orgId={orgId} />
         </NavLink>
+        <NavLink to={`/${slug}/my-issues`} className={railLink}>
+          <CircleUserRound aria-hidden="true" className="size-4 text-ink-2" strokeWidth={1.75} />
+          My issues
+        </NavLink>
         <NavLink to={`/${slug}/projects`} className={railLink}>
-          <FolderKanban aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+          <FolderKanban aria-hidden="true" className="size-4 text-ink-2" strokeWidth={1.75} />
           Projects
         </NavLink>
       </div>
-
-      <RailSection
-        title="Teams"
-        aside={
-          canManage ? (
-            <Button variant="ghost" aria-label="Create team" title="Create team" className="size-6 px-0" onClick={context.openCreateTeam}>
-              <Plus aria-hidden="true" className="size-3.5" strokeWidth={2} />
-            </Button>
-          ) : null
-        }
-      >
-        {teams.data?.length ? (
-          teams.data.map((team) => (
-            <NavLink key={team.id} to={`/${slug}/teams/${team.id}`} className={railLink}>
-              <TeamKey>{team.key}</TeamKey>
-              <span className="truncate">{team.name}</span>
-            </NavLink>
-          ))
-        ) : (
-          <p className="px-2 text-sm text-ink-2">No teams yet.</p>
-        )}
-      </RailSection>
 
       <RailSection
         title="Agents"
@@ -245,7 +269,7 @@ function Rail({ context, others }: { context: OrgContext; others: Membership[] }
         }
       >
         {agents.length ? (
-          agents.map((agent) => <AgentCard key={agent.id} agent={agent} members={members.data ?? []} slug={slug} orgId={orgId} />)
+          agents.map((agent) => <AgentRow key={agent.id} agent={agent} members={members.data ?? []} slug={slug} orgId={orgId} />)
         ) : (
           <p className="px-2 text-sm text-ink-2 text-pretty">
             Agents join when someone{" "}
@@ -258,119 +282,176 @@ function Rail({ context, others }: { context: OrgContext; others: Membership[] }
       </RailSection>
 
       <RailSection
-        title="Humans"
+        title="Teams"
         aside={
-          <NavLink to={`/${slug}/members`} className="rounded-xs px-1 text-sm text-ink-2 hover:text-ink aria-[current=page]:text-ink">
-            {canManage ? "Manage" : "All"}
-          </NavLink>
+          canManage ? (
+            <button
+              type="button"
+              aria-label="Create team"
+              title="Create team"
+              onClick={context.openCreateTeam}
+              className="grid size-6 place-items-center rounded-sm text-ink-2 hover:bg-hover hover:text-ink"
+            >
+              <Plus aria-hidden="true" className="size-3.5" strokeWidth={2} />
+            </button>
+          ) : null
         }
       >
-        {humans.map((human) => (
-          <div key={human.id} className="flex min-h-[30px] items-center gap-2 px-2 text-ui">
-            <Avatar name={human.name} />
-            <span className="truncate">{human.name}</span>
-            {human.id === membership.member.id ? <Count className="ms-auto">you</Count> : null}
-          </div>
-        ))}
+        {teams.data?.length ? (
+          teams.data.map((team) => (
+            <TeamItem key={team.id} slug={slug} team={team} current={team.id === currentTeam} />
+          ))
+        ) : (
+          <p className="px-2 text-sm text-ink-2">No teams yet.</p>
+        )}
       </RailSection>
 
-      <div className="mt-auto flex flex-col gap-3">
-        <div className="flex flex-col gap-0.5">
-          <NavLink to={`/${slug}/trash`} className={railLink}>
-            <Trash2 aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
-            Trash
+      <div className="mt-auto flex flex-col gap-px">
+        <NavLink to={`/${slug}/connect`} className={railLink}>
+          <Plug aria-hidden="true" className="size-4 text-ink-2" strokeWidth={1.75} />
+          Connect an agent
+        </NavLink>
+        <NavLink to={`/${slug}/members`} className={railLink}>
+          <Users aria-hidden="true" className="size-4 text-ink-2" strokeWidth={1.75} />
+          Members
+        </NavLink>
+        <NavLink to={`/${slug}/trash`} className={railLink}>
+          <Trash2 aria-hidden="true" className="size-4 text-ink-2" strokeWidth={1.75} />
+          Trash
+        </NavLink>
+        <NavLink to={`/${slug}/settings`} className={railLink}>
+          <Settings aria-hidden="true" className="size-4 text-ink-2" strokeWidth={1.75} />
+          Settings
+        </NavLink>
+        {instanceAdmin ? (
+          <NavLink to={`/${slug}/instance`} className={railLink}>
+            <Server aria-hidden="true" className="size-4 text-ink-2" strokeWidth={1.75} />
+            Instance settings
           </NavLink>
-          <NavLink to={`/${slug}/settings`} className={railLink}>
-            <Settings aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
-            Settings
-          </NavLink>
-          {instanceAdmin ? (
-            <NavLink to={`/${slug}/instance`} className={railLink}>
-              <Server aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
-              Instance settings
-            </NavLink>
-          ) : null}
-        </div>
-        <div className="flex items-center gap-2 border-t border-line px-1 pt-3">
+        ) : null}
+        <div className="mt-2 flex items-center gap-2 border-t border-line px-2 pt-2.5">
           <Avatar name={membership.member.name} />
-          <div className="min-w-0">
-            <p className="truncate text-ui font-medium">{membership.member.name}</p>
-            <p className="truncate text-sm text-ink-2">{membership.member.email}</p>
-          </div>
-          <Button variant="ghost" aria-label="Sign out" title="Sign out" className="ms-auto size-7 px-0" onClick={context.signOut}>
+          <p className="min-w-0 truncate text-ui font-medium" title={membership.member.email ?? undefined}>
+            {membership.member.name}
+          </p>
+          <button
+            type="button"
+            aria-label="Sign out"
+            title="Sign out"
+            onClick={context.signOut}
+            className="ms-auto grid size-7 place-items-center rounded-sm text-ink-2 hover:bg-hover hover:text-ink"
+          >
             <LogOut aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
-          </Button>
+          </button>
         </div>
       </div>
     </nav>
   );
 }
 
-// An agent in the rail, as the C2 concept shows it: how it connects, its
-// state, and the open issues in its queue.
-function AgentCard({ agent, members, slug, orgId }: { agent: Agent; members: Member[]; slug: string; orgId: string }) {
-  const queue = useAgentQueue(orgId, agent.id).data ?? [];
-  const states = queue.map((issue) => agentState(issue, agent));
-  const working = states.includes("working");
+// A team, with its Issues and Board under it while it is the one on screen or
+// someone opened it.
+function TeamItem({ slug, team, current }: { slug: string; team: Team; current: boolean }) {
+  const location = useLocation();
+  const [open, setOpen] = useState(current);
+  useEffect(() => {
+    if (current) setOpen(true);
+  }, [current]);
+  const board = current && new URLSearchParams(location.search).get("view") === "board";
+  const sub = (active: boolean) =>
+    cn(railItem, "ps-[34px]", active ? "bg-hover font-medium text-ink" : "text-ink-2 hover:bg-hover hover:text-ink");
   return (
-    <div
-      className={cn(
-        "flex flex-col gap-1 rounded-sm px-2 py-1.5",
-        working && "bg-surface shadow-[inset_0_0_0_1px_var(--agent-edge)]",
-      )}
-    >
-      <NavLink to={`/${slug}/agents#${agent.id}`} className="flex items-start gap-2 text-ui">
-        <Avatar name={agent.name} kind="agent" />
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-2">
-            <span className="truncate font-medium">{agent.name}</span>
-            {agent.pausedAt ? (
-              <ProgressBadge state="paused" className="ms-auto" />
-            ) : working ? (
-              <ProgressBadge state="working" className="ms-auto" />
-            ) : null}
-          </span>
-          <span title={connectionLine(agent, members)} className="block truncate text-sm text-ink-2">
-            {connectionLine(agent, members)}
-          </span>
-        </span>
-      </NavLink>
-      {queue.length ? (
-        <ul className="flex flex-col">
-          {queue.slice(0, 3).map((issue, index) => (
-            <li key={issue.id}>
-              <Link
-                to={`/${slug}/issue/${issue.identifier}`}
-                className="flex min-w-0 items-baseline gap-1.5 rounded-xs py-0.5 text-sm hover:text-ink"
-              >
-                <span className="shrink-0 font-medium text-ink-2 tabular-nums">{issue.identifier}</span>
-                {states[index] === "needs_input" ? (
-                  <span className="shrink-0 font-medium text-warn">Needs input</span>
-                ) : states[index] === "blocked" ? (
-                  <span className="shrink-0 font-medium text-danger">Blocked</span>
-                ) : (
-                  <span className="truncate text-ink">{issue.title}</span>
-                )}
-              </Link>
-            </li>
-          ))}
-        </ul>
+    <div className="flex flex-col gap-px">
+      <div className="group/team relative flex items-center">
+        <NavLink to={`/${slug}/teams/${team.id}`} end className={({ isActive }) => cn(railItem, "flex-1 pe-8 text-ink hover:bg-hover", isActive && !open && "bg-hover font-medium")}>
+          <TeamKey>{team.key}</TeamKey>
+          <span className="truncate">{team.name}</span>
+        </NavLink>
+        <button
+          type="button"
+          aria-label={open ? `Collapse ${team.name}` : `Expand ${team.name}`}
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+          className="absolute end-1 grid size-6 place-items-center rounded-xs text-ink-3 hover:text-ink"
+        >
+          <ChevronDown aria-hidden="true" className={cn("size-3.5 transition-transform duration-[140ms]", !open && "-rotate-90")} strokeWidth={2} />
+        </button>
+      </div>
+      {open ? (
+        <>
+          <Link to={`/${slug}/teams/${team.id}`} className={sub(current && !board)} aria-current={current && !board ? "page" : undefined}>
+            Issues
+          </Link>
+          <Link to={`/${slug}/teams/${team.id}?view=board`} className={sub(board)} aria-current={board ? "page" : undefined}>
+            Board
+          </Link>
+        </>
       ) : null}
     </div>
   );
 }
 
-function OrgSwitcher({ current, others }: { current: Membership; others: Membership[] }) {
+// An agent on one line: its name in the agent color, what it is doing or how
+// much is waiting for it, and the issue it works on now.
+function AgentRow({ agent, members, slug, orgId }: { agent: Agent; members: Member[]; slug: string; orgId: string }) {
+  const queue = useAgentQueue(orgId, agent.id).data ?? [];
+  const states = queue.map((issue) => agentState(issue, agent));
+  const live = queue.find((_, index) => states[index] === "working");
+  const state: AgentState | null = agent.pausedAt
+    ? "paused"
+    : states.includes("blocked")
+      ? "blocked"
+      : states.includes("needs_input")
+        ? "needs_input"
+        : live
+          ? "working"
+          : null;
   return (
-    <details className="group relative ms-auto min-w-0">
+    <div className="flex flex-col">
+      <NavLink
+        to={`/${slug}/agents#${agent.id}`}
+        title={connectionLine(agent, members)}
+        className={({ isActive }) => cn(railItem, isActive ? "bg-hover" : "hover:bg-hover")}
+      >
+        <Avatar name={agent.name} kind="agent" size={18} />
+        <span className="min-w-0 truncate font-medium text-agent-ink">{agent.name}</span>
+        {state ? (
+          <ProgressBadge state={state} className="ms-auto h-[18px] px-1.5" />
+        ) : (
+          <span className="ms-auto text-sm text-ink-2 tabular-nums">{queue.length || "idle"}</span>
+        )}
+      </NavLink>
+      {live ? (
+        <Link
+          to={`/${slug}/issue/${live.identifier}`}
+          className="flex min-w-0 items-baseline gap-1.5 rounded-xs ps-[34px] pe-2 pb-1 text-sm text-ink-2 hover:text-ink"
+        >
+          <span className="shrink-0 font-medium text-agent-ink tabular-nums">{live.identifier}</span>
+          <span className="truncate">{live.title}</span>
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
+// The workspace button: the organization on screen, the others to switch to,
+// and in the desktop app the instance switcher (ADR 0028).
+function Workspace({ context, others }: { context: OrgContext; others: Membership[] }) {
+  const current = context.membership;
+  const inApp = Boolean(desktopShell());
+  return (
+    <details className="group relative min-w-0 flex-1">
       <summary
-        className="flex h-6 cursor-pointer list-none items-center gap-1 rounded-sm px-1.5 text-sm text-ink-2 hover:bg-hover hover:text-ink [&::-webkit-details-marker]:hidden"
+        className="flex h-8 cursor-pointer list-none items-center gap-2 rounded-sm px-1.5 hover:bg-hover [&::-webkit-details-marker]:hidden"
         aria-label={`Organization: ${current.organization.name}. Switch organization`}
       >
-        <span className="truncate">{current.organization.slug}</span>
-        <ChevronDown aria-hidden="true" className="size-3 shrink-0" strokeWidth={2} />
+        <span aria-hidden="true" className="grid size-5 shrink-0 place-items-center rounded-[5px] bg-ink text-on-human">
+          <LogoMark size={14} className="text-on-human" />
+        </span>
+        <span className="truncate text-ui font-semibold">{current.organization.name}</span>
+        <ChevronDown aria-hidden="true" className="size-3 shrink-0 text-ink-3" strokeWidth={2} />
       </summary>
-      <div className="absolute end-0 top-7 z-20 flex w-56 flex-col gap-0.5 rounded-md bg-surface p-1 shadow-overlay">
+      <div className="absolute start-0 top-9 z-20 flex w-60 flex-col gap-0.5 rounded-md bg-surface p-1 shadow-overlay">
         {others.map((m) => (
           <NavLink
             key={m.organization.id}
@@ -386,6 +467,17 @@ function OrgSwitcher({ current, others }: { current: Membership; others: Members
           <Plus aria-hidden="true" className="size-3.5" strokeWidth={2} />
           New organization
         </NavLink>
+        {inApp ? (
+          <button
+            type="button"
+            onClick={openSwitcher}
+            className="flex h-8 items-center gap-2 rounded-sm border-t border-line px-2 text-ui text-ink-2 hover:bg-hover hover:text-ink"
+          >
+            <ArrowLeftRight aria-hidden="true" className="size-3.5" strokeWidth={2} />
+            Switch instance…
+            <Kbd className="ms-auto">{`${mod}⇧O`}</Kbd>
+          </button>
+        ) : null}
       </div>
     </details>
   );

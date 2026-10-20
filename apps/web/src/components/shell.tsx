@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { cn } from "@edicthq/ui";
+import { Minus, Square, X } from "lucide-react";
+import { desktopShell, windowCommand } from "../lib/desktop.js";
 import { Logo } from "./logo.js";
 
 // Sign-in, sign-up, onboarding and invite pages: one narrow column on the
@@ -8,6 +10,11 @@ import { Logo } from "./logo.js";
 export function AuthShell({ title, lead, children }: { title: string; lead?: ReactNode; children?: ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col px-6">
+      {desktopShell() ? (
+        <div data-tauri-drag-region className="fixed inset-x-0 top-0 z-10 flex h-12 justify-end pe-2">
+          <WindowControls />
+        </div>
+      ) : null}
       <header className="mx-auto flex w-full max-w-[360px] pt-10 pb-12 sm:pt-16">
         <Link to="/" className="rounded-sm">
           <Logo />
@@ -22,17 +29,63 @@ export function AuthShell({ title, lead, children }: { title: string; lead?: Rea
   );
 }
 
-// The page title row from the prototype: a 24px title, optionally led by a
-// team key chip, with actions on the trailing side.
-export function PageHeader({ title, lead, actions }: { title: ReactNode; lead?: ReactNode; actions?: ReactNode }) {
+// The page bar: 48 high on a hairline, with the title (optionally led by a team
+// key chip or a breadcrumb), a status such as a live agent, and the page's
+// actions. It stays put while the page scrolls. In the desktop app it is also
+// a handle to drag the window by, and on Windows and Linux it ends in the
+// window controls.
+export function PageHeader({
+  title,
+  lead,
+  status,
+  actions,
+}: {
+  title: ReactNode;
+  lead?: ReactNode;
+  status?: ReactNode;
+  actions?: ReactNode;
+}) {
   return (
-    <header className="flex flex-wrap items-center gap-x-4 gap-y-3 px-6 pt-4 pb-3">
-      <div className="flex min-w-0 items-center gap-2.5">
+    <header
+      data-tauri-drag-region
+      className="app-bar sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2.5 border-b border-line bg-bg ps-6 pe-4"
+    >
+      <div data-tauri-drag-region className="flex min-w-0 items-center gap-2">
         {lead}
-        <h1 className="truncate text-2xl font-semibold tracking-[-0.02em]">{title}</h1>
+        <h1 data-tauri-drag-region className="truncate text-body font-semibold tracking-[-0.005em]">
+          {title}
+        </h1>
       </div>
-      {actions ? <div className="ms-auto flex items-center gap-2">{actions}</div> : null}
+      {status ? <div className="flex min-w-0 items-center">{status}</div> : null}
+      <div data-tauri-drag-region className="flex-1 self-stretch" />
+      {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
+      <WindowControls />
     </header>
+  );
+}
+
+// Minimize, maximize and close for the frameless desktop window on Windows and
+// Linux. macOS keeps its own traffic lights, and browsers have their frame.
+export function WindowControls() {
+  if (desktopShell()?.titleBar !== "custom") return null;
+  const control = "grid h-8 w-10 place-items-center rounded-sm text-ink-2 hover:bg-hover hover:text-ink";
+  return (
+    <div className="-me-2 ms-1 flex items-center">
+      <button type="button" aria-label="Minimize" className={control} onClick={() => windowCommand("minimize")}>
+        <Minus aria-hidden="true" className="size-4" strokeWidth={1.5} />
+      </button>
+      <button type="button" aria-label="Maximize" className={control} onClick={() => windowCommand("toggle_maximize")}>
+        <Square aria-hidden="true" className="size-3" strokeWidth={1.5} />
+      </button>
+      <button
+        type="button"
+        aria-label="Close"
+        className={cn(control, "hover:bg-danger hover:text-on-human")}
+        onClick={() => windowCommand("close")}
+      >
+        <X aria-hidden="true" className="size-4" strokeWidth={1.5} />
+      </button>
+    </div>
   );
 }
 
