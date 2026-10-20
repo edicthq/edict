@@ -16,6 +16,7 @@ export type ProjectConflict = Schemas["ProjectConflict"]["error"];
 export type TrashedProject = Schemas["TrashedProject"];
 export type TrashedTeam = Schemas["TrashedTeam"];
 export type Team = Schemas["Team"];
+export type TeamOverview = Schemas["TeamOverview"];
 export type Invite = Schemas["Invite"];
 export type CreatedInvite = Schemas["CreatedInvite"];
 export type InvitePreview = Schemas["InvitePreview"];

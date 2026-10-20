@@ -381,6 +381,21 @@ export const Team = z
   .meta({ id: "Team" });
 export type Team = z.infer<typeof Team>;
 
+// A team at a glance, for the Teams page.
+export const TeamOverview = z
+  .object({
+    teamId: Id,
+    // Issues not done, canceled or archived.
+    open: z.number().int(),
+    inProgress: z.number().int(),
+    // Open issues delegated to an agent.
+    delegated: z.number().int(),
+    // Humans and agents in the team.
+    memberIds: z.array(Id),
+  })
+  .meta({ id: "TeamOverview" });
+export type TeamOverview = z.infer<typeof TeamOverview>;
+
 export const CreateTeam = z
   .object({
     name: z.string().trim().min(1).max(80),

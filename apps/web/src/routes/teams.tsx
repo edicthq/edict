@@ -2,25 +2,68 @@ import { Lock } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import type { Team } from "@edicthq/client";
-import { Avatar, Badge, Button, Select, TeamKey } from "@edicthq/ui";
+import { Avatar, Badge, Button, Select, TeamKey, cn } from "@edicthq/ui";
 import { EmptyState, FormError, GroupHeader, Loading, PageBody, PageHeader, rowClass } from "../components/shell.js";
 import { roleLabel } from "../lib/labels.js";
 import { useToast } from "../components/toast.js";
 import { useOfferUndo } from "../components/undo.js";
 import {
   useAddTeamMember,
+  useAgents,
   useDeleteTeam,
   useMembers,
   useRemoveTeamMember,
   useTeamMembers,
+  useTeamOverview,
   useTeams,
   useUpdateTeam,
 } from "../lib/queries.js";
 import { useOrg } from "./org.js";
 
+const teamGrid =
+  "grid grid-cols-[minmax(0,1fr)_56px] items-center gap-4 px-3 sm:grid-cols-[minmax(0,1fr)_56px_minmax(0,180px)] md:grid-cols-[minmax(0,1fr)_56px_84px_84px_minmax(0,180px)] lg:grid-cols-[minmax(0,1fr)_56px_84px_84px_minmax(0,180px)_minmax(0,160px)]";
+
+function Count({ value, label, className }: { value: number | undefined; label: [string, string]; className?: string }) {
+  return (
+    <span className={cn("text-end text-ui tabular-nums", !value && "text-ink-2", className)}>
+      {value === undefined ? "" : value}
+      {value === undefined ? null : <span className="sr-only"> {label[value === 1 ? 0 : 1]}</span>}
+    </span>
+  );
+}
+
+// Up to five faces, then "+N". Agents are rounded squares in the accent.
+function Stack({ names, kind, label, className }: { names: string[]; kind: "human" | "agent"; label: [string, string]; className?: string }) {
+  const shown = names.slice(0, 5);
+  return (
+    <span className={cn("flex min-w-0 items-center", className)} title={names.join(", ")}>
+      {names.length === 0 ? (
+        <span className="text-sm text-ink-2">None</span>
+      ) : (
+        <>
+          <span className="sr-only">
+            {names.length} {label[names.length === 1 ? 0 : 1]}: {names.join(", ")}
+          </span>
+          <span className="flex -space-x-1">
+            {shown.map((name) => (
+              <Avatar key={name} name={name} kind={kind} className="ring-2 ring-bg" />
+            ))}
+          </span>
+          {names.length > shown.length ? (
+            <span className="ms-1.5 text-sm text-ink-2 tabular-nums">+{names.length - shown.length}</span>
+          ) : null}
+        </>
+      )}
+    </span>
+  );
+}
+
 export function TeamsPage() {
   const { orgId, canManage, slug, openCreateTeam } = useOrg();
   const teams = useTeams(orgId);
+  const overview = useTeamOverview(orgId);
+  const members = useMembers(orgId);
+  const agents = useAgents(orgId);
 
   return (
     <>
@@ -38,25 +81,51 @@ export function TeamsPage() {
         {teams.isPending ? (
           <Loading label="Loading teams" />
         ) : teams.data?.length ? (
-          <>
-            <GroupHeader count={teams.data.length}>All teams</GroupHeader>
-            <ul className="flex flex-col gap-px">
-              {teams.data.map((team) => (
-                <li key={team.id}>
-                  <Link to={`/${slug}/teams/${team.id}`} className={rowClass}>
-                    <TeamKey>{team.key}</TeamKey>
-                    <span className="truncate text-body tracking-[-0.005em]">{team.name}</span>
-                    {team.private ? (
-                      <Badge>
-                        <Lock aria-hidden="true" className="size-3" strokeWidth={2} />
-                        Private
-                      </Badge>
-                    ) : null}
-                  </Link>
-                </li>
-              ))}
+          <div className="pt-1">
+            <div aria-hidden="true" className={cn(teamGrid, "h-9 text-sm font-medium text-ink-2")}>
+              <span>Team</span>
+              <span className="text-end">Open</span>
+              <span className="text-end max-md:hidden">In progress</span>
+              <span className="text-end max-md:hidden">With agents</span>
+              <span className="ps-4 max-sm:hidden">Members</span>
+              <span className="max-lg:hidden">Agents</span>
+            </div>
+            <ul aria-label="Teams" className="flex flex-col gap-px">
+              {teams.data.map((team) => {
+                const row = overview.data?.find((o) => o.teamId === team.id);
+                const ids = new Set(row?.memberIds ?? []);
+                const people = (members.data ?? []).filter((m) => ids.has(m.id) && m.kind === "human");
+                // Connected agents work in their human's teams.
+                const teamAgents = (agents.data ?? []).filter(
+                  (agent) => !agent.pausedAt && (ids.has(agent.id) || (agent.connectedBy !== null && ids.has(agent.connectedBy))),
+                );
+                return (
+                  <li key={team.id}>
+                    <Link
+                      to={`/${slug}/teams/${team.id}`}
+                      className={cn(teamGrid, "min-h-12 rounded-sm py-1.5 transition-[background-color] duration-[140ms] ease-standard hover:bg-hover")}
+                    >
+                      <span className="flex min-w-0 items-center gap-2.5">
+                        <TeamKey>{team.key}</TeamKey>
+                        <span className="truncate text-body font-medium tracking-[-0.005em]">{team.name}</span>
+                        {team.private ? (
+                          <Badge>
+                            <Lock aria-hidden="true" className="size-3" strokeWidth={2} />
+                            Private
+                          </Badge>
+                        ) : null}
+                      </span>
+                      <Count value={row?.open} label={["open issue", "open issues"]} />
+                      <Count value={row?.inProgress} label={["in progress", "in progress"]} className="max-md:hidden" />
+                      <Count value={row?.delegated} label={["delegated to an agent", "delegated to agents"]} className="max-md:hidden" />
+                      <Stack names={people.map((m) => m.name)} kind="human" label={["member", "members"]} className="ps-4 max-sm:hidden" />
+                      <Stack names={teamAgents.map((a) => a.name)} kind="agent" label={["agent", "agents"]} className="max-lg:hidden" />
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
-          </>
+          </div>
         ) : (
           <EmptyState
             title="No teams yet"

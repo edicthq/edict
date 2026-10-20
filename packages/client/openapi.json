@@ -304,6 +304,38 @@
           "version"
         ]
       },
+      "TeamOverview": {
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "open": {
+            "type": "integer"
+          },
+          "inProgress": {
+            "type": "integer"
+          },
+          "delegated": {
+            "type": "integer"
+          },
+          "memberIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "teamId",
+          "open",
+          "inProgress",
+          "delegated",
+          "memberIds"
+        ]
+      },
       "AddTeamMember": {
         "type": "object",
         "properties": {
@@ -4041,6 +4073,60 @@
           },
           "403": {
             "description": "The caller's role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{orgId}/team-overview": {
+      "get": {
+        "tags": [
+          "Teams"
+        ],
+        "summary": "Open work and members of each team the caller can see",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One row per visible team, by key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TeamOverview"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
             "content": {
               "application/json": {
                 "schema": {

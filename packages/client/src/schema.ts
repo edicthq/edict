@@ -832,6 +832,62 @@ export interface paths {
         };
         trace?: never;
     };
+    "/organizations/{orgId}/team-overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Open work and members of each team the caller can see */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description One row per visible team, by key */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TeamOverview"][];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{orgId}/teams/{teamId}/members": {
         parameters: {
             query?: never;
@@ -7253,6 +7309,14 @@ export interface components {
             key?: string;
             private?: boolean;
             archiveAfterDays?: number | null;
+        };
+        TeamOverview: {
+            /** Format: uuid */
+            teamId: string;
+            open: number;
+            inProgress: number;
+            delegated: number;
+            memberIds: string[];
         };
         AddTeamMember: {
             /** Format: uuid */

@@ -63,6 +63,7 @@ describe("OpenAPI document", () => {
       "GET /organizations/{orgId}/projects",
       "GET /organizations/{orgId}/projects/{projectRef}",
       "GET /organizations/{orgId}/projects/{projectRef}/issues",
+      "GET /organizations/{orgId}/team-overview",
       "GET /organizations/{orgId}/teams",
       "GET /organizations/{orgId}/teams/{teamId}",
       "GET /organizations/{orgId}/teams/{teamId}/issues",

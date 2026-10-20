@@ -57,6 +57,16 @@ export function useTeams(orgId: string) {
   });
 }
 
+// Open work and members per team. Issue changes elsewhere don't patch it, so
+// it refetches each time the Teams page opens.
+export function useTeamOverview(orgId: string) {
+  return useQuery({
+    queryKey: ["org", orgId, "team-overview"] as const,
+    queryFn: () => unwrap(api.GET("/organizations/{orgId}/team-overview", org(orgId))),
+    refetchOnMount: "always",
+  });
+}
+
 export function useTeamMembers(orgId: string, teamId: string) {
   return useQuery({
     queryKey: keys.teamMembers(orgId, teamId),
