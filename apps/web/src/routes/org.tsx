@@ -189,7 +189,7 @@ function TitleStrip() {
   if (!desktopShell()) return null;
   const arrow = "grid size-7 place-items-center rounded-sm text-ink-2 hover:bg-hover hover:text-ink";
   return (
-    <div data-tauri-drag-region className="-mx-2 -mt-2.5 mb-1 flex h-12 shrink-0 items-center gap-0.5 px-2 [[data-title-bar=overlay]_&]:ps-[78px]">
+    <div data-tauri-drag-region className="-mx-2 -mt-2.5 mb-1 flex h-12 shrink-0 items-center gap-0.5 px-2 [[data-title-bar=overlay]_&]:ps-[84px]">
       <button type="button" aria-label="Back" title={`Back (${mod}[)`} className={arrow} onClick={() => navigate(-1)}>
         <ChevronLeft aria-hidden="true" className="size-4" strokeWidth={1.75} />
       </button>

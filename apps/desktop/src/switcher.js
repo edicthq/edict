@@ -56,9 +56,15 @@ function apply(listing) {
   state.active = listing.active;
   state.loaded = true;
   if (first) {
-    // The first row is the instance in front, so Enter goes back to the
-    // previous one, like ⌘Tab.
-    state.cursor = state.instances.length > 1 && state.instances[0].url === state.active ? 1 : 0;
+    // The cursor starts on the instance used before the one in front, so
+    // Enter goes back to it, like ⌘Tab. The rows keep their saved order, so
+    // ⌘1 to ⌘9 always name the same instance.
+    let previous = -1;
+    state.instances.forEach((instance, index) => {
+      if (instance.url === state.active) return;
+      if (previous < 0 || instance.lastUsedAt >= state.instances[previous].lastUsedAt) previous = index;
+    });
+    state.cursor = previous < 0 ? 0 : previous;
   }
   if (state.renaming && !state.instances.some((instance) => instance.url === state.renaming)) state.renaming = null;
   render();

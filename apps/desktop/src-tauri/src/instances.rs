@@ -20,8 +20,8 @@ pub struct Instance {
     pub last_used_at: u64,
 }
 
-/// Every saved instance and the active one's url. `instances` keeps the order
-/// they were added in; `ordered` gives the order people see.
+/// Every saved instance, in the order they were added, and the active one's
+/// url.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 pub struct Saved {
     pub instances: Vec<Instance>,
@@ -63,12 +63,16 @@ impl Saved {
         Url::parse(&self.active_instance()?.url).ok()
     }
 
-    /// Most recently used first. Instances never used keep the order they
-    /// were added in.
+    /// The order they were added in, so ⌘1 to ⌘9 keep naming the same
+    /// instance however often someone switches.
     pub fn ordered(&self) -> Vec<Instance> {
-        let mut instances = self.instances.clone();
-        instances.sort_by(|a, b| b.last_used_at.cmp(&a.last_used_at));
-        instances
+        self.instances.clone()
+    }
+
+    /// The instance used last, which takes over when the active one goes.
+    /// Among ties, the one added last.
+    pub fn most_recent(&self) -> Option<&Instance> {
+        self.instances.iter().rev().max_by_key(|instance| instance.last_used_at)
     }
 
     /// Saves an instance, or finds it when its origin is already saved, and
@@ -124,7 +128,7 @@ impl Saved {
         };
         let removed = self.instances.remove(index);
         if self.active.as_deref() == Some(removed.url.as_str()) {
-            self.active = self.ordered().first().map(|instance| instance.url.clone());
+            self.active = self.most_recent().map(|instance| instance.url.clone());
         }
         true
     }
@@ -185,7 +189,7 @@ impl Saved {
         let wanted = active.and_then(Value::as_str).and_then(|active| normalize(active).ok());
         saved.active = wanted
             .and_then(|url| saved.find(&url).map(|instance| instance.url.clone()))
-            .or_else(|| saved.ordered().first().map(|instance| instance.url.clone()));
+            .or_else(|| saved.most_recent().map(|instance| instance.url.clone()));
         if saved.active.as_deref() != active.and_then(Value::as_str) {
             changed = true;
         }
@@ -251,14 +255,15 @@ mod tests {
     }
 
     #[test]
-    fn the_most_recently_used_comes_first() {
+    fn switching_keeps_the_order_so_shortcuts_keep_their_instance() {
         let mut saved = Saved::default();
         saved.add(&url("a.example.com"), 10);
         saved.add(&url("b.example.com"), 20);
         saved.add(&url("c.example.com"), 30);
         assert!(saved.activate(&url("a.example.com"), 40));
         let order: Vec<_> = saved.ordered().into_iter().map(|instance| instance.name).collect();
-        assert_eq!(order, ["a.example.com", "c.example.com", "b.example.com"]);
+        assert_eq!(order, ["a.example.com", "b.example.com", "c.example.com"]);
+        assert_eq!(saved.most_recent().unwrap().name, "a.example.com");
     }
 
     #[test]
@@ -281,9 +286,9 @@ mod tests {
         let mut saved = Saved::default();
         saved.add(&url("a.example.com"), 50);
         saved.add(&url("b.example.com"), 50);
-        assert_eq!(saved.ordered()[0].name, "b.example.com");
+        assert_eq!(saved.most_recent().unwrap().name, "b.example.com");
         saved.activate(&url("a.example.com"), 10);
-        assert_eq!(saved.ordered()[0].name, "a.example.com");
+        assert_eq!(saved.most_recent().unwrap().name, "a.example.com");
     }
 
     #[test]
@@ -399,8 +404,8 @@ mod tests {
             serde_json::to_value(saved.listing()).unwrap(),
             json!({
                 "instances": [
-                    { "url": "https://b.example.com/", "name": "b.example.com", "lastUsedAt": 20 },
                     { "url": "https://a.example.com/", "name": "a.example.com", "lastUsedAt": 10 },
+                    { "url": "https://b.example.com/", "name": "b.example.com", "lastUsedAt": 20 },
                 ],
                 "active": "https://b.example.com/",
             })
