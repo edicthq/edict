@@ -11,6 +11,7 @@ export function Dialog({
   children,
   className,
   labelledBy,
+  placement = "center",
 }: {
   open: boolean;
   onClose: () => void;
@@ -19,6 +20,9 @@ export function Dialog({
   className?: string;
   // When the dialog renders its own heading instead of title.
   labelledBy?: string;
+  // "top" anchors it high, like the palette, so it stays put while its
+  // content grows.
+  placement?: "center" | "top";
 }) {
   const ref = useRef<HTMLDialogElement>(null);
 
@@ -41,7 +45,8 @@ export function Dialog({
         if (event.target === ref.current) onClose();
       }}
       className={cn(
-        "m-auto w-[min(480px,calc(100vw-32px))] max-h-[calc(100dvh-32px)] overflow-auto rounded-md bg-surface p-0 text-ink shadow-overlay",
+        "w-[min(480px,calc(100vw-32px))] overflow-auto rounded-md bg-surface p-0 text-ink shadow-overlay",
+        placement === "top" ? "mx-auto mt-[12vh] mb-auto max-h-[calc(88dvh-16px)]" : "m-auto max-h-[calc(100dvh-32px)]",
         "backdrop:bg-scrim open:animate-[dialog-rise_220ms_cubic-bezier(0.2,0,0,1)] motion-reduce:open:animate-none",
         className,
       )}

@@ -872,6 +872,8 @@ function TeamIssues({ team }: { team: Team }) {
           statuses={statuses.data}
           members={members}
           labels={labels.data ?? []}
+          agents={agents.data ?? []}
+          orgMembers={orgMembers.data ?? []}
           parent={creating?.parent}
           open={creating !== null}
           onClose={() => setCreating(null)}

@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { MarkdownEditor } from "./markdown-editor.js";
-import type { Label, Member, Priority, Status, Team } from "@edicthq/client";
+import type { Agent, Label, Member, Priority, Status, Team } from "@edicthq/client";
 import { Button, Dialog, Kbd, TeamKey } from "@edicthq/ui";
 import { mod } from "../lib/labels.js";
 import { useCreateIssue, useCreateLabel, useProjects, useTemplates } from "../lib/queries.js";
-import { AssigneePicker, EstimatePicker, LabelPicker, PriorityPicker, ProjectPicker, StatusPicker } from "./issue-fields.js";
+import { connectionLine } from "../lib/agents.js";
+import { AssigneePicker, DelegatePicker, EstimatePicker, LabelPicker, PriorityPicker, ProjectPicker, StatusPicker } from "./issue-fields.js";
 import { FormError } from "./shell.js";
 
 export function CreateIssueDialog({
@@ -13,6 +14,8 @@ export function CreateIssueDialog({
   statuses,
   members,
   labels,
+  agents = [],
+  orgMembers = [],
   parent,
   defaultProjectId,
   open,
@@ -24,6 +27,9 @@ export function CreateIssueDialog({
   statuses: Status[];
   members: Member[];
   labels: Label[];
+  // The agents one can delegate to, and everyone, to say how each connects.
+  agents?: Agent[];
+  orgMembers?: Member[];
   // Creates a sub-issue of this issue.
   parent?: { id: string; identifier: string };
   defaultProjectId?: string | null;
@@ -32,13 +38,15 @@ export function CreateIssueDialog({
   onCreated: (identifier: string) => void;
 }) {
   return (
-    <Dialog open={open} onClose={onClose} labelledBy="create-issue-title" className="w-[min(640px,calc(100vw-32px))]">
+    <Dialog open={open} onClose={onClose} labelledBy="create-issue-title" placement="top" className="w-[min(640px,calc(100vw-32px))]">
       <CreateIssueForm
         orgId={orgId}
         team={team}
         statuses={statuses}
         members={members}
         labels={labels}
+        agents={agents}
+        orgMembers={orgMembers}
         parent={parent}
         defaultProjectId={defaultProjectId}
         onDone={onClose}
@@ -54,6 +62,8 @@ function CreateIssueForm({
   statuses,
   members,
   labels,
+  agents,
+  orgMembers,
   parent,
   defaultProjectId,
   onDone,
@@ -64,6 +74,8 @@ function CreateIssueForm({
   statuses: Status[];
   members: Member[];
   labels: Label[];
+  agents: Agent[];
+  orgMembers: Member[];
   parent?: { id: string; identifier: string };
   defaultProjectId?: string | null;
   onDone: () => void;
@@ -78,6 +90,8 @@ function CreateIssueForm({
   const [statusId, setStatusId] = useState(() => statuses.find((s) => s.default)?.id ?? statuses[0]?.id ?? "");
   const [priority, setPriority] = useState<Priority>("none");
   const [assigneeId, setAssigneeId] = useState<string | null>(null);
+  const [delegateId, setDelegateId] = useState<string | null>(null);
+  const delegate = agents.find((agent) => agent.id === delegateId);
   const [estimate, setEstimate] = useState<number | null>(null);
   const [projectId, setProjectId] = useState<string | null>(defaultProjectId ?? null);
   const projects = useProjects(orgId);
@@ -97,7 +111,7 @@ function CreateIssueForm({
     }
     setFailure(null);
     try {
-      const issue = await create.mutateAsync({ title, description, statusId, priority, assigneeId, delegateId: null, estimate, labelIds, parentId: parent?.id ?? null, projectId: projectId ?? null });
+      const issue = await create.mutateAsync({ title, description, statusId, priority, assigneeId, delegateId, estimate, labelIds, parentId: parent?.id ?? null, projectId: projectId ?? null });
       onDone();
       onCreated(issue.identifier);
     } catch (error) {
@@ -153,6 +167,14 @@ function CreateIssueForm({
           onChange={(event) => setTitle(event.target.value)}
           placeholder="Issue title"
           maxLength={255}
+          onKeyDown={(event) => {
+            // Enter goes on to the description; only ⌘↵ creates, so a stray
+            // Enter after a shortcut opened the dialog creates nothing.
+            if (event.key === "Enter" && !event.metaKey && !event.ctrlKey) {
+              event.preventDefault();
+              document.getElementById("new-issue-description")?.focus();
+            }
+          }}
           className="bg-transparent text-xl font-semibold tracking-[-0.015em] text-ink placeholder:text-ink-3 focus-visible:outline-none"
         />
         <MarkdownEditor
@@ -168,6 +190,9 @@ function CreateIssueForm({
         <StatusPicker statuses={statuses} value={statusId} onChange={setStatusId} />
         <PriorityPicker value={priority} onChange={setPriority} />
         <AssigneePicker members={members} value={assigneeId} onChange={setAssigneeId} />
+        {agents.length ? (
+          <DelegatePicker agents={agents} members={orgMembers} value={delegateId} onChange={setDelegateId} />
+        ) : null}
         <EstimatePicker value={estimate} onChange={setEstimate} />
         <ProjectPicker projects={projects.data ?? []} value={projectId} onChange={setProjectId} />
         <LabelPicker
@@ -177,6 +202,11 @@ function CreateIssueForm({
           onCreate={(name) => createLabel.mutateAsync({ name })}
         />
       </div>
+      {delegate ? (
+        <p className="-mt-2 px-5 pb-4 text-sm text-ink-2">
+          <span className="font-medium text-agent-ink">{delegate.name}</span> · {connectionLine(delegate, orgMembers)}
+        </p>
+      ) : null}
       <div className="flex flex-col gap-3 border-t border-line px-5 py-3">
         <FormError message={failure} />
         <div className="flex items-center justify-end gap-2">
