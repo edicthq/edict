@@ -7,6 +7,7 @@ import {
   FolderKanban,
   Inbox,
   LogOut,
+  Menu as MenuIcon,
   Plug,
   Plus,
   Search,
@@ -19,7 +20,7 @@ import {
 import { useEffect, useState, type ReactNode } from "react";
 import type { Membership } from "@edicthq/client";
 import { Link, NavLink, Outlet, useLocation, useNavigate, useOutletContext, useParams } from "react-router";
-import { type AgentState, Avatar, Button, Kbd, LogoMark, ProgressBadge, TeamKey, cn } from "@edicthq/ui";
+import { type AgentState, Avatar, Kbd, LogoMark, ProgressBadge, TeamKey, cn } from "@edicthq/ui";
 import { CreateTeamDialog } from "../components/create-team-dialog.js";
 import { InviteDialog } from "../components/invite-dialog.js";
 import { CommandPalette } from "../components/palette.js";
@@ -64,6 +65,19 @@ export function OrgLayout() {
   const session = useSession();
   const navigate = useNavigate();
   const [dialog, setDialog] = useState<"team" | "invite" | "palette" | null>(null);
+  // The rail, opened as a drawer on a phone.
+  const [drawer, setDrawer] = useState(false);
+  const location = useLocation();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: closes on every navigation
+  useEffect(() => setDrawer(false), [location.pathname, location.search]);
+  useEffect(() => {
+    if (!drawer) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDrawer(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [drawer]);
   const current = memberships.data?.find((m) => m.organization.slug === slug);
   useRealtime(current?.organization.id);
   // Members who have not picked an agent color see the organization's.
@@ -133,9 +147,12 @@ export function OrgLayout() {
       >
         Skip to content
       </a>
-      <Rail context={context} others={memberships.data ?? []} />
+      <Rail context={context} others={memberships.data ?? []} drawer={drawer} />
+      {drawer ? (
+        <div aria-hidden="true" className="fixed inset-0 z-30 bg-scrim md:hidden" onClick={() => setDrawer(false)} />
+      ) : null}
       <div className="flex h-dvh min-w-0 flex-1 flex-col">
-        <MobileBar context={context} />
+        <MobileBar context={context} others={memberships.data ?? []} onMenu={() => setDrawer(true)} />
         <VerifyBanner />
         <main id="main" className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           <Outlet context={context} />
@@ -147,6 +164,7 @@ export function OrgLayout() {
           <InviteDialog context={context} open={dialog === "invite"} onClose={() => setDialog(null)} />
         </>
       ) : null}
+      <NewIssueButton slug={context.slug} orgId={context.orgId} />
       <CommandPalette
         context={context}
         others={memberships.data ?? []}
@@ -200,7 +218,7 @@ function TitleStrip() {
   );
 }
 
-function Rail({ context, others }: { context: OrgContext; others: Membership[] }) {
+function Rail({ context, others, drawer }: { context: OrgContext; others: Membership[]; drawer: boolean }) {
   const { orgId, slug, canManage, membership, instanceAdmin } = context;
   const teams = useTeams(orgId);
   const members = useMembers(orgId);
@@ -215,7 +233,10 @@ function Rail({ context, others }: { context: OrgContext; others: Membership[] }
   return (
     <nav
       aria-label="Organization"
-      className="sticky top-0 flex h-dvh w-[240px] shrink-0 flex-col gap-4 overflow-y-auto border-e border-line bg-rail px-2 pt-2.5 pb-2 max-md:hidden"
+      className={cn(
+        "sticky top-0 flex h-dvh w-[240px] shrink-0 flex-col gap-4 overflow-y-auto border-e border-line bg-rail px-2 pt-2.5 pb-2",
+        drawer ? "max-md:fixed max-md:inset-y-0 max-md:start-0 max-md:z-40 max-md:w-[min(280px,85vw)] max-md:shadow-overlay" : "max-md:hidden",
+      )}
     >
       <div className="flex flex-col gap-2">
         <TitleStrip />
@@ -484,50 +505,50 @@ function Workspace({ context, others }: { context: OrgContext; others: Membershi
 }
 
 // Below the md breakpoint the rail becomes a bar above the page.
-function MobileBar({ context }: { context: OrgContext }) {
-  const { slug, membership, instanceAdmin } = context;
-  const link = ({ isActive }: { isActive: boolean }) =>
-    cn("flex h-8 items-center rounded-sm px-2.5 text-ui", isActive ? "bg-surface font-medium text-ink shadow-[inset_0_0_0_1px_var(--line)]" : "text-ink-2");
+// A phone's top bar: the organization, search, the inbox and the menu that
+// opens the rail as a drawer.
+function MobileBar({ context, others, onMenu }: { context: OrgContext; others: Membership[]; onMenu: () => void }) {
+  const unread = useInboxUnreadCount(context.orgId).data?.unreadCount ?? 0;
+  const icon = "relative grid size-9 shrink-0 place-items-center rounded-sm text-ink-2 hover:bg-hover hover:text-ink";
   return (
-    <nav aria-label="Organization" className="flex flex-col gap-2 border-b border-line bg-rail px-4 pt-3 pb-2 md:hidden">
-      <div className="flex items-center gap-2">
-        <LogoMark />
-        <span className="truncate text-ui font-semibold">{membership.organization.name}</span>
-        <Button variant="ghost" aria-label="Search or command" className="ms-auto" onClick={context.openPalette}>
-          Search
-        </Button>
-        <Button variant="ghost" aria-label="Sign out" className="size-8 px-0" onClick={context.signOut}>
-          <LogOut aria-hidden="true" className="size-4" strokeWidth={1.75} />
-        </Button>
-      </div>
-      <div className="flex gap-1 overflow-x-auto">
-        <NavLink to={`/${slug}`} end className={link}>
-          Teams
-        </NavLink>
-        <NavLink to={`/${slug}/my-issues`} className={link}>
-          My issues
-        </NavLink>
-        <NavLink to={`/${slug}/inbox`} className={link}>
-          Inbox
-        </NavLink>
-        <NavLink to={`/${slug}/projects`} className={link}>
-          Projects
-        </NavLink>
-        <NavLink to={`/${slug}/members`} className={link}>
-          Members
-        </NavLink>
-        <NavLink to={`/${slug}/agents`} className={link}>
-          Agents
-        </NavLink>
-        <NavLink to={`/${slug}/settings`} className={link}>
-          Settings
-        </NavLink>
-        {instanceAdmin ? (
-          <NavLink to={`/${slug}/instance`} className={link}>
-            Instance
-          </NavLink>
+    <header className="flex h-12 shrink-0 items-center gap-1 border-b border-line bg-rail ps-2 pe-1.5 md:hidden">
+      <Workspace context={context} others={others} />
+      <button type="button" aria-label="Search or command" className={icon} onClick={context.openPalette}>
+        <Search aria-hidden="true" className="size-[18px]" strokeWidth={1.75} />
+      </button>
+      <Link to={`/${context.slug}/inbox`} aria-label={unread ? `Inbox, ${unread} unread` : "Inbox"} className={icon}>
+        <Inbox aria-hidden="true" className="size-[18px]" strokeWidth={1.75} />
+        {unread ? (
+          <span className="absolute end-0 top-0.5 h-[15px] min-w-[15px] rounded-full bg-ink px-1 text-center text-[10px] leading-[15px] font-semibold text-on-human tabular-nums shadow-[0_0_0_2px_var(--rail)]">
+            {unread}
+          </span>
         ) : null}
-      </div>
-    </nav>
+      </Link>
+      <button type="button" aria-label="Open menu" className={icon} onClick={onMenu}>
+        <MenuIcon aria-hidden="true" className="size-[18px]" strokeWidth={1.75} />
+      </button>
+    </header>
+  );
+}
+
+// A phone's New issue button, floating over the lists where issues are made.
+function NewIssueButton({ slug, orgId }: { slug: string; orgId: string }) {
+  const { teamId } = useParams();
+  const location = useLocation();
+  const teams = useTeams(orgId);
+  const navigate = useNavigate();
+  const target = teamId ?? teams.data?.[0]?.id;
+  const path = location.pathname.slice(slug.length + 1);
+  const onList = /^\/(teams\/[^/]+|my-issues|inbox|projects\/[^/]+)$/.test(path);
+  if (!target || !onList || new URLSearchParams(location.search).has("issue")) return null;
+  return (
+    <button
+      type="button"
+      aria-label="New issue"
+      onClick={() => navigate(`/${slug}/teams/${target}?create=1`)}
+      className="fixed end-4 bottom-6 z-20 grid size-[52px] place-items-center rounded-full bg-ink text-on-human shadow-overlay md:hidden"
+    >
+      <SquarePen aria-hidden="true" className="size-5" strokeWidth={1.75} />
+    </button>
   );
 }

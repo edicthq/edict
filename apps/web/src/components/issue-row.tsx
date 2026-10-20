@@ -11,8 +11,12 @@ import { NoAssignee } from "./issue-fields.js";
 // people on it and how long ago it changed, with the delegate's latest words
 // on a second line. The 3px bar on the leading edge turns the agent color
 // while its run is live.
+//
+// On a phone the same cells fall into two lines: the status and a title that
+// wraps, then priority, identifier, two labels and the people under it, with
+// the agent line below that. The age goes.
 export const issueRowClass =
-  "relative grid min-h-10 w-full grid-cols-[16px_58px_16px_minmax(0,1fr)_auto_auto_30px] items-center gap-x-3 gap-y-1 rounded-sm py-2 ps-4 pe-3 text-start transition-[background-color] duration-[140ms] ease-standard hover:bg-hover";
+  "relative grid min-h-10 w-full grid-cols-[16px_58px_16px_minmax(0,1fr)_auto_auto_30px] items-center gap-x-3 gap-y-1 rounded-sm py-2 ps-4 pe-3 text-start transition-[background-color] duration-[140ms] ease-standard hover:bg-hover max-sm:grid-cols-[14px_16px_auto_minmax(0,1fr)_auto] max-sm:gap-x-2 max-sm:gap-y-1.5 max-sm:rounded-none max-sm:border-b max-sm:border-line max-sm:py-3 max-sm:pe-4";
 
 export function liveClass(issue: Issue, agents: Agent[]): string | false {
   return (
@@ -40,22 +44,31 @@ export function IssueRowCells({ issue, statuses, labels, orgMembers, agents, lea
   const status = statuses.find((s) => s.id === issue.statusId);
   return (
     <>
-      {lead ?? (
-        <span className="flex size-4 items-center justify-center">
-          <PriorityIcon priority={issue.priority} />
-        </span>
-      )}
-      <span className="text-sm font-medium whitespace-nowrap text-ink-2 tabular-nums">{issue.identifier}</span>
-      <span title={status?.name}>
+      <span className="flex size-4 items-center justify-center max-sm:col-start-2 max-sm:row-start-2">
+        {lead ?? <PriorityIcon priority={issue.priority} />}
+      </span>
+      <span className="text-sm font-medium whitespace-nowrap text-ink-2 tabular-nums max-sm:col-start-3 max-sm:row-start-2">
+        {issue.identifier}
+      </span>
+      <span title={status?.name} className="max-sm:col-start-1 max-sm:row-start-1 max-sm:mt-[3px] max-sm:self-start">
         {status ? <StatusIcon category={status.category} fill={statusFill(statuses, status)} /> : <span className="block size-3.5" />}
       </span>
-      <span className="flex min-w-0 items-baseline gap-2">
-        <span className={cn("truncate text-body tracking-[-0.005em]", emphasis && "font-semibold")}>{issue.title}</span>
+      <span className="flex min-w-0 items-baseline gap-2 max-sm:col-span-4 max-sm:col-start-2 max-sm:row-start-1">
+        <span
+          className={cn(
+            "truncate text-body tracking-[-0.005em] max-sm:line-clamp-2 max-sm:whitespace-normal",
+            emphasis && "font-semibold",
+          )}
+        >
+          {issue.title}
+        </span>
         {titleAside}
       </span>
-      <IssueLabels issue={issue} labels={labels} />
-      <IssuePeople issue={issue} orgMembers={orgMembers} agents={agents} />
-      <time dateTime={issue.updatedAt} className="text-end text-sm text-ink-2">
+      <IssueLabels issue={issue} labels={labels} className="max-sm:col-start-4 max-sm:row-start-2" />
+      <span className="max-sm:col-start-5 max-sm:row-start-2">
+        <IssuePeople issue={issue} orgMembers={orgMembers} agents={agents} />
+      </span>
+      <time dateTime={issue.updatedAt} className="text-end text-sm text-ink-2 max-sm:hidden">
         {ago(issue.updatedAt)}
       </time>
       <AgentLine issue={issue} agents={agents} />
@@ -115,7 +128,7 @@ export function AgentLine({ issue, agents }: { issue: Issue; agents: Agent[] }) 
   const state = agentState(issue, agent);
   const latest = issue.latestProgress?.agentId === agent.id ? issue.latestProgress : null;
   return (
-    <span className="col-span-4 col-start-4 flex min-w-0 items-center gap-2 text-sm">
+    <span className="col-span-4 col-start-4 flex min-w-0 items-center gap-2 text-sm max-sm:col-start-2 max-sm:row-start-3">
       <span className="shrink-0 font-medium text-agent-ink">{agent.name}</span>
       <ProgressBadge state={state} />
       <span className="min-w-0 truncate text-ink-2">
@@ -125,13 +138,19 @@ export function AgentLine({ issue, agents }: { issue: Issue; agents: Agent[] }) 
   );
 }
 
-export function IssueLabels({ issue, labels }: { issue: Issue; labels: Label[] }) {
+// On a phone, two labels as plain dots and names, no outline.
+export function IssueLabels({ issue, labels, className }: { issue: Issue; labels: Label[]; className?: string }) {
   const own = labels.filter((label) => issue.labelIds.includes(label.id));
-  if (own.length === 0) return <span />;
+  if (own.length === 0) return <span className={className} />;
   return (
-    <span className="flex flex-wrap justify-end gap-1">
+    <span
+      className={cn(
+        "flex flex-wrap justify-end gap-1 max-sm:min-w-0 max-sm:flex-nowrap max-sm:justify-start max-sm:gap-2 max-sm:overflow-hidden max-sm:[&>*:nth-child(n+3)]:hidden",
+        className,
+      )}
+    >
       {own.map((label) => (
-        <LabelPill key={label.id} name={label.name} hue={label.hue} />
+        <LabelPill key={label.id} name={label.name} hue={label.hue} className="max-sm:p-0 max-sm:shadow-none" />
       ))}
     </span>
   );

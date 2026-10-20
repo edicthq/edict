@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router";
 import type { Agent, Issue, Label, Member, Priority, SavedViewQuery, Status, Team } from "@edicthq/client";
-import { Avatar, Button, Kbd, LabelPill, Menu, PriorityIcon, ProgressBadge, StatusIcon, TeamKey, cn } from "@edicthq/ui";
+import { Avatar, Button, Dialog, Kbd, LabelPill, Menu, PriorityIcon, ProgressBadge, StatusIcon, TeamKey, cn } from "@edicthq/ui";
 import type { MenuItem } from "@edicthq/ui";
-import { ArrowDown, ArrowUp, Bookmark, Columns3, ListFilter, Rows3, Search, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Bookmark, Columns3, ListFilter, Rows3, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { CreateIssueDialog } from "../components/create-issue-dialog.js";
 import { AssigneePicker, DelegatePicker, NoAssignee, PriorityPicker, StatusPicker } from "../components/issue-fields.js";
 import { IssuePeek, type PeekMenu } from "../components/issue-peek.js";
 import { desktopShell, openSwitcher } from "../lib/desktop.js";
+import { useNarrow } from "../lib/narrow.js";
 import { rememberIssue } from "../lib/recent.js";
 import { EmptyState, Loading, PageBody, PageHeader } from "../components/shell.js";
 import { IssuePeople, IssueRowCells, issueRowClass, liveClass } from "../components/issue-row.js";
@@ -94,6 +95,8 @@ function TeamIssues({ team }: { team: Team }) {
   const issueView = useMemo(() => parseView(params), [params]);
   // The create dialog, and the issue it makes a sub-issue of.
   const [creating, setCreating] = useState<{ parent?: Issue } | null>(null);
+  const narrow = useNarrow();
+  const [viewSheet, setViewSheet] = useState(false);
   // ?create=1 opens the new-issue dialog: the desktop app's quick-create
   // hotkey lands here.
   useEffect(() => {
@@ -483,24 +486,8 @@ function TeamIssues({ team }: { team: Team }) {
     }
   };
 
-  return (
-    <div className="relative flex h-full min-h-0 flex-col">
-      <PageHeader
-        lead={<TeamKey>{team.key}</TeamKey>}
-        title={team.name}
-        status={<LiveAgents issues={issues.data ?? []} agents={agents.data ?? []} />}
-        actions={
-          <>
-            <Button variant="ghost" className="h-8 text-ui" onClick={() => navigate(`/${slug}/teams/${team.id}/members`)}>
-              Members
-            </Button>
-            <Button variant="primary" onClick={() => setCreating({})}>
-              New issue <Kbd>C</Kbd>
-            </Button>
-          </>
-        }
-      />
-      <div role="toolbar" aria-label="View options" className="flex min-h-11 shrink-0 flex-wrap items-center gap-1 border-b border-line px-6 py-1.5">
+  const viewControls = (
+    <>
         <div role="group" aria-label="View" className="me-2 inline-flex gap-0.5 rounded-sm bg-hover p-0.5">
           {(["list", "board"] as const).map((v) => (
             <button
@@ -646,9 +633,10 @@ function TeamIssues({ team }: { team: Team }) {
             </button>
           </>
         ) : null}
-
-        <div className="ms-auto" />
-        <div className="relative me-2">
+    </>
+  );
+  const searchField = (className: string) => (
+        <div className={cn("relative", className)}>
           <Search aria-hidden="true" className="pointer-events-none absolute start-2 top-1/2 size-3.5 -translate-y-1/2 text-ink-3" />
           <input
             ref={searchRef}
@@ -662,10 +650,12 @@ function TeamIssues({ team }: { team: Team }) {
             }}
             placeholder="Search"
             aria-label="Search issues"
-            className="h-7 w-44 rounded-md bg-surface ps-7 pe-2 text-ui text-ink placeholder:text-ink-3 shadow-[inset_0_0_0_1px_var(--line)] focus-visible:shadow-[inset_0_0_0_1.5px_var(--line-strong)] focus-visible:outline-none"
+            className="h-7 w-full rounded-md bg-surface ps-7 pe-2 text-ui text-ink placeholder:text-ink-3 shadow-[inset_0_0_0_1px_var(--line)] focus-visible:shadow-[inset_0_0_0_1.5px_var(--line-strong)] focus-visible:outline-none"
           />
         </div>
-
+  );
+  const issueCount = (
+    <>
         {issues.data ? (
           <span className="text-sm text-ink-2 tabular-nums">
             {hasFilters(issueView)
@@ -673,7 +663,63 @@ function TeamIssues({ team }: { team: Team }) {
               : `${issues.data.length} ${issues.data.length === 1 ? "issue" : "issues"}`}
           </span>
         ) : null}
-      </div>
+    </>
+  );
+
+  return (
+    <div className="relative flex h-full min-h-0 flex-col">
+      <PageHeader
+        lead={<TeamKey>{team.key}</TeamKey>}
+        title={team.name}
+        status={narrow ? null : <LiveAgents issues={issues.data ?? []} agents={agents.data ?? []} />}
+        actions={
+          narrow ? (
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              onClick={() => setViewSheet(true)}
+              className="inline-flex h-8 items-center gap-1.5 rounded-sm px-2.5 text-ui font-medium text-ink shadow-[inset_0_0_0_1px_var(--line-strong)] hover:bg-hover"
+            >
+              <SlidersHorizontal aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+              View
+              {filterKeys(issueView).length > 0 ? (
+                <span className="rounded-full bg-hover px-1.5 text-sm tabular-nums">{filterKeys(issueView).length}</span>
+              ) : null}
+            </button>
+          ) : (
+            <>
+              <Button variant="ghost" className="h-8 text-ui" onClick={() => navigate(`/${slug}/teams/${team.id}/members`)}>
+                Members
+              </Button>
+              <Button variant="primary" onClick={() => setCreating({})}>
+                New issue <Kbd>C</Kbd>
+              </Button>
+            </>
+          )
+        }
+      />
+      {narrow ? null : (
+        <div role="toolbar" aria-label="View options" className="flex min-h-11 shrink-0 flex-wrap items-center gap-1 border-b border-line px-6 py-1.5">
+          {viewControls}
+          <div className="ms-auto" />
+          {searchField("me-2 w-44")}
+          {issueCount}
+        </div>
+      )}
+      {/* On a phone the toolbar folds into one View sheet. */}
+      <Dialog
+        open={viewSheet}
+        onClose={() => setViewSheet(false)}
+        title="View"
+        className="mx-0 mt-auto mb-0 max-w-none w-full! rounded-b-none"
+      >
+        <div role="toolbar" aria-label="View options" className="flex flex-col gap-3 px-4 pt-3 pb-6">
+          {/* Controls first, so opening the sheet doesn't raise the keyboard. */}
+          <div className="flex flex-wrap items-center gap-1">{viewControls}</div>
+          {searchField("w-full")}
+          {issueCount}
+        </div>
+      </Dialog>
 
       {filterKeys(issueView).length > 0 ? (
         <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-line px-6 py-2">
