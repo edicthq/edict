@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { Agent, Attachment, Comment, Issue, Label, LinkedIssue, Member, RelationType, Status, Team } from "@edicthq/client";
 import { Avatar, Button, Dialog, Kbd, Menu, PriorityIcon, Select, StatusIcon, TeamKey } from "@edicthq/ui";
 import { CornerLeftUp, Link2, Paperclip, Plus, Trash2, X } from "lucide-react";
@@ -128,8 +128,28 @@ export function IssuePeek({
       },
     );
 
+  // A click on the page outside the peek closes it. Menus and dialogs render
+  // in portals or <dialog>, outside the page, and a click on another issue row
+  // opens that issue instead, so neither counts. It listens for click rather
+  // than pointerdown, so a field being edited has blurred and saved first.
+  const panel = useRef<HTMLElement>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      const target = event.target as Element | null;
+      if (!target?.isConnected || panel.current?.contains(target)) return;
+      if (!target.closest("#main, nav")) return;
+      if (target.closest('dialog, [role="dialog"], [role="toolbar"], [id^="issue-"], [data-opens-issue]')) return;
+      close.current();
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, []);
+
   return (
     <aside
+      ref={panel}
       aria-label={`${issue.identifier} ${issue.title}`}
       className="absolute inset-2 z-20 flex flex-col overflow-hidden rounded-md bg-surface shadow-overlay outline outline-line md:start-auto md:w-[min(760px,calc(100%-96px))] lg:w-[min(1100px,calc(100%-96px))] motion-safe:animate-[peek-slide_220ms_cubic-bezier(0.2,0,0,1)]"
     >
@@ -296,9 +316,33 @@ export function IssuePeek({
   );
 }
 
+function growToText(element: HTMLTextAreaElement) {
+  element.style.height = "auto";
+  element.style.height = `${element.scrollHeight}px`;
+}
+
 function TitleField({ issue, onSave }: { issue: Issue; onSave: (title: string) => void }) {
   const [draft, setDraft] = useState(issue.title);
   useEffect(() => setDraft(issue.title), [issue.title]);
+  // Grows with the title. WebKit has no field-sizing, so the height is set
+  // here: when the text changes, and when the peek's width does.
+  const field = useRef<HTMLTextAreaElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the height follows the text, which the field holds rather than this closure
+  useLayoutEffect(() => {
+    if (field.current) growToText(field.current);
+  }, [draft]);
+  useEffect(() => {
+    const element = field.current;
+    if (!element) return;
+    let width = element.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (element.clientWidth === width) return;
+      width = element.clientWidth;
+      growToText(element);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
   const commit = () => {
     const title = draft.trim();
     if (!title) setDraft(issue.title);
@@ -310,6 +354,7 @@ function TitleField({ issue, onSave }: { issue: Issue; onSave: (title: string) =
         Title
       </label>
       <textarea
+        ref={field}
         id="peek-title"
         value={draft}
         rows={1}
@@ -328,7 +373,7 @@ function TitleField({ issue, onSave }: { issue: Issue; onSave: (title: string) =
             requestAnimationFrame(() => field.blur());
           }
         }}
-        className="field-sizing-content w-full resize-none bg-transparent text-2xl font-semibold text-ink text-balance focus-visible:outline-none"
+        className="block w-full resize-none overflow-hidden bg-transparent text-2xl font-semibold text-ink text-balance focus-visible:outline-none"
       />
     </>
   );

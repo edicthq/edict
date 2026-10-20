@@ -1301,6 +1301,7 @@ function ArchivedIssues({ orgId, team, onOpen }: { orgId: string; team: Team; on
                 <li key={issue.id}>
                   <button
                     type="button"
+                    data-opens-issue
                     onClick={() => onOpen(issue)}
                     className="flex min-h-9 w-full items-center gap-3 rounded-sm px-4 text-start text-ink-2 hover:bg-hover hover:text-ink"
                   >
