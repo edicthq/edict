@@ -330,7 +330,9 @@ function AgentCard({ agent, members, slug, orgId }: { agent: Agent; members: Mem
               <ProgressBadge state="working" className="ms-auto" />
             ) : null}
           </span>
-          <span className="block text-sm text-ink-2 text-pretty">{connectionLine(agent, members)}</span>
+          <span title={connectionLine(agent, members)} className="block truncate text-sm text-ink-2">
+            {connectionLine(agent, members)}
+          </span>
         </span>
       </NavLink>
       {queue.length ? (
