@@ -3,17 +3,19 @@ import { MarkdownEditor } from "../components/markdown-editor.js";
 import { Markdown, plainText } from "../components/markdown.js";
 import { Link, useNavigate, useParams } from "react-router";
 import type { ProjectStatus } from "@edicthq/client";
-import { Avatar, Button, ProgressBar, ProjectStatusBadge, PriorityIcon, StatusIcon, Tabs, TeamKey, cn } from "@edicthq/ui";
+import { Avatar, Button, ProgressBar, ProjectStatusBadge, StatusIcon, Tabs, cn } from "@edicthq/ui";
 import { ArrowLeft, Calendar, FolderKanban, Plus, Trash2 } from "lucide-react";
 import { CreateProjectDialog } from "../components/create-project-dialog.js";
-import { EmptyState, GroupHeader, Loading, PageBody, PageHeader, rowClass } from "../components/shell.js";
+import { IssueRowLink } from "../components/issue-row.js";
+import { EmptyState, GroupHeader, Loading, PageBody, PageHeader } from "../components/shell.js";
 import {
+  useAgents,
   useDeleteProject,
   useMembers,
+  useOrgIssueContext,
   useProject,
   useProjectIssues,
   useProjects,
-  useTeams,
   useUpdateProject,
 } from "../lib/queries.js";
 import { useOrg } from "./org.js";
@@ -165,7 +167,8 @@ export function ProjectDetailPage() {
   const projectQuery = useProject(orgId, projectRef);
   const issuesQuery = useProjectIssues(orgId, projectRef);
   const members = useMembers(orgId);
-  const teams = useTeams(orgId);
+  const agents = useAgents(orgId);
+  const issueContext = useOrgIssueContext(orgId);
   const updateProject = useUpdateProject(orgId, projectRef);
   const deleteProject = useDeleteProject(orgId);
 
@@ -175,8 +178,6 @@ export function ProjectDetailPage() {
   const project = projectQuery.data;
   const issues = issuesQuery.data ?? [];
   const humans = (members.data ?? []).filter((m) => m.kind === "human");
-  const memberMap = new Map((members.data ?? []).map((m) => [m.id, m]));
-  const teamMap = new Map((teams.data ?? []).map((t) => [t.id, t]));
 
   if (projectQuery.isPending) return <Loading label="Loading project" />;
   if (!project) {
@@ -407,44 +408,18 @@ export function ProjectDetailPage() {
             <Loading label="Loading issues" />
           ) : issues.length ? (
             <ul className="flex flex-col gap-px">
-              {issues.map((issue) => {
-                const team = teamMap.get(issue.teamId);
-                const assignee = issue.assigneeId ? memberMap.get(issue.assigneeId) : null;
-                return (
-                  <li key={issue.id}>
-                    <Link
-                      to={`/${slug}/teams/${issue.teamId}?issue=${issue.identifier}`}
-                      className={cn(rowClass, "grid grid-cols-[auto_16px_minmax(0,1fr)_auto_auto] items-center gap-3")}
-                    >
-                      <div className="flex items-center gap-2">
-                        {team ? <TeamKey>{team.key}</TeamKey> : null}
-                        <span className="text-sm font-medium text-ink-2 tabular-nums">
-                          {issue.identifier}
-                        </span>
-                      </div>
-
-                      <PriorityIcon priority={issue.priority} />
-
-                      <span className="truncate text-body tracking-[-0.005em] text-ink font-medium">
-                        {issue.title}
-                      </span>
-
-                      {assignee ? (
-                        <div className="flex items-center gap-1.5 text-sm text-ink-2" title={`Assignee: ${assignee.name}`}>
-                          <Avatar name={assignee.name} />
-                          <span className="truncate max-w-[100px] hidden sm:inline">{assignee.name}</span>
-                        </div>
-                      ) : null}
-
-                      {issue.estimate !== null ? (
-                        <span className="text-xs text-ink-3 tabular-nums font-mono">
-                          {issue.estimate} pts
-                        </span>
-                      ) : null}
-                    </Link>
-                  </li>
-                );
-              })}
+              {issues.map((issue) => (
+                <li key={issue.id}>
+                  <IssueRowLink
+                    to={`/${slug}/teams/${issue.teamId}?issue=${issue.identifier}`}
+                    issue={issue}
+                    statuses={issueContext.statuses.filter((s) => s.teamId === issue.teamId)}
+                    labels={issueContext.labels}
+                    orgMembers={members.data ?? []}
+                    agents={agents.data ?? []}
+                  />
+                </li>
+              ))}
             </ul>
           ) : (
             <EmptyState

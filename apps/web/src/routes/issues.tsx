@@ -9,6 +9,7 @@ import { AssigneePicker, DelegatePicker, NoAssignee, PriorityPicker, StatusPicke
 import { IssuePeek, type PeekMenu } from "../components/issue-peek.js";
 import { desktopShell, openSwitcher } from "../lib/desktop.js";
 import { EmptyState, Loading, PageBody, PageHeader } from "../components/shell.js";
+import { IssuePeople, IssueRowCells, issueRowClass, liveClass } from "../components/issue-row.js";
 import { useToast } from "../components/toast.js";
 import { useOfferUndo } from "../components/undo.js";
 import { agentState, plainLine, waitingLine } from "../lib/agents.js";
@@ -945,59 +946,6 @@ function FilterPill({ name, onRemove }: { name: string; onRemove: () => void }) 
   );
 }
 
-// The assignee, then the delegate beside it. They sit apart rather than
-// overlapping, so the human's initials stay readable.
-function Assignee({
-  issue,
-  orgMembers,
-  agents,
-  size = 22,
-}: {
-  issue: Issue;
-  orgMembers: Member[];
-  agents: Agent[];
-  size?: 18 | 22;
-}) {
-  const assignee = orgMembers.find((m) => m.id === issue.assigneeId);
-  const delegate = agents.find((a) => a.id === issue.delegateId);
-  return (
-    <span className="flex items-center gap-[3px]">
-      {assignee ? (
-        <span title={assignee.name}>
-          <Avatar name={assignee.name} size={size} />
-        </span>
-      ) : (
-        <span title="No assignee">
-          <NoAssignee size={size} />
-        </span>
-      )}
-      {delegate ? (
-        <span title={`Delegated to ${delegate.name}`}>
-          <Avatar name={delegate.name} kind="agent" size={size} />
-        </span>
-      ) : null}
-    </span>
-  );
-}
-
-// The delegate's latest words under the title: its name, its state and what
-// it last said, or that it has not picked the issue up yet.
-function AgentLine({ issue, agents }: { issue: Issue; agents: Agent[] }) {
-  const agent = agents.find((a) => a.id === issue.delegateId);
-  if (!agent) return null;
-  const state = agentState(issue, agent);
-  const latest = issue.latestProgress?.agentId === agent.id ? issue.latestProgress : null;
-  return (
-    <span className="col-span-4 col-start-4 flex min-w-0 items-center gap-2 text-sm">
-      <span className="shrink-0 font-medium text-agent-ink">{agent.name}</span>
-      <ProgressBadge state={state} />
-      <span className="min-w-0 truncate text-ink-2">
-        {latest ? plainLine(latest.message) : state === "waiting" ? waitingLine(agent) : null}
-      </span>
-    </span>
-  );
-}
-
 // On a board card: the delegate's name and state, then the first two lines of
 // what it last said.
 function BoardAgentLine({ issue, agents }: { issue: Issue; agents: Agent[] }) {
@@ -1013,18 +961,6 @@ function BoardAgentLine({ issue, agents }: { issue: Issue; agents: Agent[] }) {
         <ProgressBadge state={state} />
       </span>
       {line ? <span className="line-clamp-2 text-ink-2">{line}</span> : null}
-    </span>
-  );
-}
-
-function IssueLabels({ issue, labels }: { issue: Issue; labels: Label[] }) {
-  const own = labels.filter((label) => issue.labelIds.includes(label.id));
-  if (own.length === 0) return <span />;
-  return (
-    <span className="flex flex-wrap justify-end gap-1">
-      {own.map((label) => (
-        <LabelPill key={label.id} name={label.name} hue={label.hue} />
-      ))}
     </span>
   );
 }
@@ -1066,7 +1002,6 @@ function IssueList({
           </div>
           <ul className="flex flex-col gap-px">
             {group.issues.map((issue) => {
-              const status = statuses.find((s) => s.id === issue.statusId)!;
               const isSelected = selectedIds.has(issue.id);
               return (
                 <li key={issue.id} className="group/row">
@@ -1086,56 +1021,44 @@ function IssueList({
                     data-focused={focusId === issue.id || undefined}
                     data-selected={isSelected || undefined}
                     className={cn(
-                      "relative grid min-h-10 w-full grid-cols-[16px_58px_16px_minmax(0,1fr)_auto_auto_30px] items-center gap-x-3 gap-y-1 rounded-sm py-2 ps-4 pe-3 text-start",
-                      agentState(issue, agents.find((a) => a.id === issue.delegateId)) === "working" &&
-                        "before:absolute before:inset-y-1.5 before:start-0 before:w-[3px] before:rounded-full before:bg-agent",
-                      "transition-[background-color] duration-[140ms] ease-standard hover:bg-hover",
+                      issueRowClass,
+                      liveClass(issue, agents),
                       isSelected && "bg-hover shadow-[inset_2px_0_0_0_var(--ink)]",
                       "data-focused:bg-hover focus-visible:shadow-[inset_0_0_0_1.5px_var(--ink)] focus-visible:outline-none",
                     )}
                   >
-                    <span
-                      title={isSelected ? "Deselect" : "Select"}
-                      className="relative flex size-4 items-center justify-center cursor-pointer"
-                    >
-                      <span className={cn("transition-opacity", isSelected || selectedIds.size > 0 ? "opacity-0 pointer-events-none" : "group-hover/row:opacity-0")}>
-                        <PriorityIcon priority={issue.priority} />
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => onToggleSelect(issue.id, (e.nativeEvent as MouseEvent).shiftKey)}
-                        className={cn(
-                          "absolute inset-0 size-4 accent-[var(--ink)] cursor-pointer transition-opacity",
-                          isSelected || selectedIds.size > 0 ? "opacity-100" : "opacity-0 group-hover/row:opacity-100",
-                        )}
-                        aria-label={`Select ${issue.identifier}`}
-                      />
-                    </span>
-                    <span className="text-sm font-medium whitespace-nowrap text-ink-2 tabular-nums">{issue.identifier}</span>
-                    <span title={status.name}>
-                      <StatusIcon category={status.category} fill={statusFill(statuses, status)} />
-                    </span>
-                    <span className="flex min-w-0 items-baseline gap-2">
-                      <span
-                        className={cn(
-                          "truncate text-body tracking-[-0.005em]",
-                          openId === issue.id && "font-semibold",
-                        )}
-                      >
-                        {issue.title}
-                      </span>
-                      {parentOf(issue) ? (
-                        <span className="shrink-0 text-sm text-ink-2">↳ {parentOf(issue)}</span>
-                      ) : null}
-                    </span>
-                    <IssueLabels issue={issue} labels={labels} />
-                    <Assignee issue={issue} orgMembers={orgMembers} agents={agents} />
-                    <time dateTime={issue.updatedAt} className="text-end text-sm text-ink-2">
-                      {ago(issue.updatedAt)}
-                    </time>
-                    <AgentLine issue={issue} agents={agents} />
+                    <IssueRowCells
+                      issue={issue}
+                      statuses={statuses}
+                      labels={labels}
+                      orgMembers={orgMembers}
+                      agents={agents}
+                      emphasis={openId === issue.id}
+                      titleAside={
+                        parentOf(issue) ? <span className="shrink-0 text-sm text-ink-2">↳ {parentOf(issue)}</span> : null
+                      }
+                      lead={
+                        <span
+                          title={isSelected ? "Deselect" : "Select"}
+                          className="relative flex size-4 items-center justify-center cursor-pointer"
+                        >
+                          <span className={cn("transition-opacity", isSelected || selectedIds.size > 0 ? "opacity-0 pointer-events-none" : "group-hover/row:opacity-0")}>
+                            <PriorityIcon priority={issue.priority} />
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => onToggleSelect(issue.id, (e.nativeEvent as MouseEvent).shiftKey)}
+                            className={cn(
+                              "absolute inset-0 size-4 accent-[var(--ink)] cursor-pointer transition-opacity",
+                              isSelected || selectedIds.size > 0 ? "opacity-100" : "opacity-0 group-hover/row:opacity-100",
+                            )}
+                            aria-label={`Select ${issue.identifier}`}
+                          />
+                        </span>
+                      }
+                    />
                   </button>
                 </li>
               );
@@ -1251,7 +1174,7 @@ function IssueBoard({
                       />
                     </span>
                     <span className="flex-1 text-sm font-medium text-ink-2 tabular-nums">{issue.identifier}</span>
-                    <Assignee issue={issue} orgMembers={orgMembers} agents={agents} size={18} />
+                    <IssuePeople issue={issue} orgMembers={orgMembers} agents={agents} size={18} />
                   </span>
                   <span className="text-body leading-[1.4] tracking-[-0.005em] text-pretty">{issue.title}</span>
                   {issue.labelIds.length > 0 ? (

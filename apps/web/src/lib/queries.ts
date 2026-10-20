@@ -1,5 +1,5 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Accent, Agent, AgentPower, Attachment, Comment, InboxItem, InstanceStatus, Issue, Label, paths, ProjectStatus, RelationType, Role, SavedView, SavedViewQuery, SignUpMode, Webhook, WebLink } from "@edicthq/client";
+import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { Accent, Agent, AgentPower, Attachment, Comment, InboxItem, InstanceStatus, Issue, Label, paths, ProjectStatus, RelationType, Role, SavedView, SavedViewQuery, SignUpMode, Status, Webhook, WebLink } from "@edicthq/client";
 import { ApiFailure, api, unwrap } from "./api.js";
 
 export const keys = {
@@ -275,6 +275,32 @@ export function useStatuses(orgId: string, teamId: string) {
       unwrap(api.GET("/organizations/{orgId}/teams/{teamId}/statuses", { params: { path: { orgId, teamId } } })),
     staleTime: 5 * 60_000,
   });
+}
+
+// Every team's statuses and labels at once, for lists that mix teams like My
+// issues and a project. Each team's query is the one its own page uses, so
+// they share one cache.
+export function useOrgIssueContext(orgId: string): { statuses: Status[]; labels: Label[] } {
+  const teams = useTeams(orgId).data ?? [];
+  const statuses = useQueries({
+    queries: teams.map((team) => ({
+      queryKey: keys.statuses(orgId, team.id),
+      queryFn: () =>
+        unwrap(api.GET("/organizations/{orgId}/teams/{teamId}/statuses", { params: { path: { orgId, teamId: team.id } } })),
+      staleTime: 5 * 60_000,
+    })),
+  });
+  const labels = useQueries({
+    queries: teams.map((team) => ({
+      queryKey: keys.teamLabels(orgId, team.id),
+      queryFn: () =>
+        unwrap(api.GET("/organizations/{orgId}/teams/{teamId}/labels", { params: { path: { orgId, teamId: team.id } } })),
+      staleTime: 5 * 60_000,
+    })),
+  });
+  const byId = new Map<string, Label>();
+  for (const result of labels) for (const label of result.data ?? []) byId.set(label.id, label);
+  return { statuses: statuses.flatMap((result) => result.data ?? []), labels: [...byId.values()] };
 }
 
 // One issue by id or any identifier it has had. Used to resolve links; the
