@@ -7,6 +7,7 @@ import { ArrowDown, ArrowUp, Bookmark, Columns3, ListFilter, Rows3, Search, Tras
 import { CreateIssueDialog } from "../components/create-issue-dialog.js";
 import { AssigneePicker, DelegatePicker, NoAssignee, PriorityPicker, StatusPicker } from "../components/issue-fields.js";
 import { IssuePeek, type PeekMenu } from "../components/issue-peek.js";
+import { desktopShell, openSwitcher } from "../lib/desktop.js";
 import { EmptyState, Loading, PageBody, PageHeader } from "../components/shell.js";
 import { useToast } from "../components/toast.js";
 import { useOfferUndo } from "../components/undo.js";
@@ -1289,9 +1290,17 @@ export function IssueLink() {
           title="Issue not found"
           body={`There's no issue ${issueRef.toUpperCase()}, or it's in a team you can't see.`}
           action={
-            <Link to={`/${slug}`} className="text-ui font-medium underline decoration-line-strong underline-offset-4">
-              Go to teams
-            </Link>
+            <div className="flex items-center gap-4">
+              <Link to={`/${slug}`} className="text-ui font-medium underline decoration-line-strong underline-offset-4">
+                Go to teams
+              </Link>
+              {/* A link names no instance (ADR 0028): it may live on another one. */}
+              {desktopShell() ? (
+                <Button variant="secondary" onClick={openSwitcher}>
+                  Look on another instance
+                </Button>
+              ) : null}
+            </div>
           }
         />
       </PageBody>
