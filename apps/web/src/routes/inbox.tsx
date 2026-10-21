@@ -86,7 +86,8 @@ export function InboxPage() {
                   aria-current={item.readAt ? undefined : "true"}
                 >
                   {item.actor && item.issue ? <Avatar name={item.actor.name} kind={item.actor.kind === "agent" ? "agent" : "human"} /> : null}
-                  <span className="min-w-0 flex-1 truncate text-body font-medium text-ink">
+                  {/* A phone gives the line two rows, so the issue's title stays readable. */}
+                  <span className="min-w-0 flex-1 text-body font-medium text-ink max-sm:line-clamp-2 sm:truncate">
                     {item.issue ? (
                       <>
                         <span className={cn("font-semibold", item.actor?.kind === "agent" && "text-agent-ink")}>{item.actor?.name ?? "Someone"}</span>{" "}
@@ -103,8 +104,9 @@ export function InboxPage() {
                       </>
                     )}
                   </span>
-                  {!item.readAt ? <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-ink" /> : null}
-                  <time dateTime={item.createdAt} className="shrink-0 text-end text-sm text-ink-3">
+                  {/* The dot keeps its place when read, and the time a fixed width, so both line up down the list. */}
+                  <span aria-hidden="true" className={cn("size-1.5 shrink-0 rounded-full bg-ink", item.readAt && "invisible")} />
+                  <time dateTime={item.createdAt} className="w-8 shrink-0 text-end text-sm text-ink-2 tabular-nums">
                     {ago(item.createdAt)}
                   </time>
                 </Link>
