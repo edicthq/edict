@@ -420,7 +420,7 @@ async function revokeGrants(tx: Transaction, agent: MemberRow): Promise<number> 
   const clients = await tx
     .select({ clientId: oauthClient.clientId })
     .from(oauthClient)
-    .where(sql`coalesce(nullif(trim(${oauthClient.name}), ''), 'MCP client') = ${agent.clientName}`);
+    .where(sql`coalesce(nullif(trim(regexp_replace(${oauthClient.name}, '\\s*\\([^()]*\\)\\s*$', '')), ''), 'MCP client') = ${agent.clientName}`);
   const clientIds = clients.map((client) => client.clientId);
   if (clientIds.length === 0) {
     return 0;

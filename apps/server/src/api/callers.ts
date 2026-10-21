@@ -157,9 +157,13 @@ async function grantByHash(tx: Transaction, hash: string): Promise<Grant> {
   return { orgId: token.orgId, userId: token.userId, clientName: clientNameOf(token.clientName) };
 }
 
-// What a connected agent is called after. Keep in step with revokeGrants.
+// What a connected agent is called after: the client's registered name,
+// without a trailing parenthesis. Claude Code registers as "Claude Code
+// (<server name>)", which would name the agent "Claude Code (edict)
+// (Amirali)" and make each server name a different client. Keep in step with
+// revokeGrants.
 export function clientNameOf(name: string | null): string {
-  return name?.trim() || "MCP client";
+  return name?.replace(/\s*\([^()]*\)\s*$/, "").trim() || "MCP client";
 }
 
 // A connected agent can never be more than a Member (ADR 0021).

@@ -61,6 +61,27 @@ describe("connecting an MCP client", () => {
     ]);
   });
 
+  it("names the agent after the client, without the server name Claude Code adds to its own", async () => {
+    const t = await startTestServer();
+    const { owner, org, orgId } = await orgWithOwner(t.baseUrl, "Amirali");
+
+    // Claude Code registers as "Claude Code (<server name>)".
+    const first = bearer(t.baseUrl, (await connect(t.baseUrl, owner, orgId, "Claude Code (edict)")).accessToken);
+    const agent = (await first.get("/organizations")).body[0].member;
+    expect(agent.name).toBe("Claude Code (Amirali)");
+    expect((await owner.get(`${org}/agents`)).body).toEqual([expect.objectContaining({ id: agent.id, clientName: "Claude Code" })]);
+
+    // Under any server name, or none, it is the same client and the same agent.
+    const again = bearer(t.baseUrl, (await connect(t.baseUrl, owner, orgId, "Claude Code (work)")).accessToken);
+    expect((await again.get("/organizations")).body[0].member.id).toBe(agent.id);
+    const plain = bearer(t.baseUrl, (await connect(t.baseUrl, owner, orgId, "Claude Code")).accessToken);
+    expect((await plain.get("/organizations")).body[0].member.id).toBe(agent.id);
+
+    // Pausing it revokes the grants of every one of those registrations.
+    expect((await owner.post(`${org}/agents/${agent.id}/pause`)).status).toBe(200);
+    for (const client of [first, again, plain]) expect((await client.get(`${org}/teams`)).status).toBe(401);
+  });
+
   it("needs an organization chosen on the consent page", async () => {
     const t = await startTestServer();
     const { owner } = await orgWithOwner(t.baseUrl);
