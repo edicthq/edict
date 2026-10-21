@@ -1,8 +1,8 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { Avatar, Button, SelectMenu, Tabs, cn } from "@edicthq/ui";
-import { Check, Copy, Minus } from "lucide-react";
+import { Avatar, Button, SelectMenu, cn } from "@edicthq/ui";
+import { Check, ChevronRight, Copy, Minus, Plus } from "lucide-react";
 import { AuthShell, FormError, Loading, MarkTile, PageColumn, PageHeader } from "../components/shell.js";
 import { connectionLine, firstName } from "../lib/agents.js";
 import { useAgents, useChooseConnectionOrganization, useMembers, useMemberships } from "../lib/queries.js";
@@ -40,7 +40,15 @@ function clientSteps(client: Client, url: string, first: string): { lead?: React
       return {
         steps: [
           { title: "Add the server", body: "Run this once. --scope user makes it available in every project.", code: `claude mcp add --transport http --scope user edict ${url}` },
-          { title: "Sign in", body: <>Start <Code>claude</Code>, type <Code>/mcp</Code>, pick <Code>edict</Code> and choose Authenticate.</> },
+          {
+            title: "Sign in",
+            body: (
+              <>
+                Run this, and Claude Code opens the browser. Inside Claude Code, <Code>/mcp</Code> → <Code>edict</Code> → Authenticate does the same.
+              </>
+            ),
+            code: "claude mcp login edict",
+          },
           approve,
           use,
         ],
@@ -50,7 +58,7 @@ function clientSteps(client: Client, url: string, first: string): { lead?: React
         lead: "T3 Code runs Claude Code and Codex, so connect the one your threads use and every thread can reach Edict. For Claude Code:",
         steps: [
           { title: "Add the server", body: "Run this once in a terminal.", code: `claude mcp add --transport http --scope user edict ${url}` },
-          { title: "Sign in", body: <>Run <Code>claude</Code> once, type <Code>/mcp</Code>, pick <Code>edict</Code> and authenticate. T3 Code threads share that sign-in.</> },
+          { title: "Sign in", body: "Run this in a terminal, and the browser opens. T3 Code threads share that sign-in; new threads get Edict's tools.", code: "claude mcp login edict" },
           approve,
           { title: "Use it", body: <>In any T3 Code thread: <q className="font-medium text-ink">do my Edict work</q>.</> },
         ],
@@ -102,16 +110,18 @@ function clientSteps(client: Client, url: string, first: string): { lead?: React
   }
 }
 
-const clients: { value: Client; label: string }[] = [
-  { value: "claude", label: "Claude Code" },
-  { value: "t3", label: "T3 Code" },
-  { value: "codex", label: "Codex" },
-  { value: "cursor", label: "Cursor" },
-  { value: "opencode", label: "OpenCode" },
-  { value: "other", label: "Other" },
+const clients: { value: Client; label: string; initials: string; kind: string }[] = [
+  { value: "claude", label: "Claude Code", initials: "CC", kind: "Terminal" },
+  { value: "t3", label: "T3 Code", initials: "T3", kind: "Desktop app" },
+  { value: "codex", label: "Codex", initials: "CX", kind: "Terminal" },
+  { value: "cursor", label: "Cursor", initials: "CU", kind: "Editor" },
+  { value: "opencode", label: "OpenCode", initials: "OC", kind: "Terminal" },
+  { value: "other", label: "Other", initials: "…", kind: "Any MCP client" },
 ];
 
-// /:slug/connect: how to connect an MCP client, or an agent runner.
+// /:slug/connect: how to connect an MCP client, in the order you do it: the
+// URL, your client, its steps, and then the agent it made, which shows up
+// here live once you approve it. Runners and powers are quiet notes at the end.
 export function ConnectPage() {
   const { orgId, slug, membership } = useOrg();
   const url = `${location.origin}/mcp`;
@@ -121,45 +131,84 @@ export function ConnectPage() {
   const mine = (agents.data ?? []).filter((agent) => agent.connectedBy === membership.member.id);
   const first = firstName(membership.member.name);
   const { lead, steps } = clientSteps(client, url, first);
+  const chosen = clients.find((c) => c.value === client)!;
 
   return (
     <>
       <PageHeader title="Connect an agent" />
-      <PageColumn className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_260px]">
-        <div className="flex min-w-0 flex-col gap-8">
-          <p className="max-w-[64ch] text-body text-ink-2 text-pretty">
-            Every Edict has an MCP server at one URL. Add it to your client, approve it, and Edict adds an agent named
-            after the client and you, which acts on your behalf.
+      <PageColumn className="flex max-w-[760px] flex-col gap-10">
+        <section aria-labelledby="mcp-url" className="flex flex-col gap-3">
+          <p className="max-w-[60ch] text-body text-ink-2 text-pretty">
+            Point your MCP client at this instance and approve it in the browser. Edict adds an agent named after the
+            client and you, like <span className="font-medium text-agent-ink">{chosen.value === "other" ? "Claude Code" : chosen.label} ({first})</span>,
+            that works on your behalf.
           </p>
+          <h2 id="mcp-url" className="sr-only">
+            MCP server URL
+          </h2>
+          <div className="flex h-12 items-center gap-3 rounded-md border border-line bg-surface ps-4 pe-1.5">
+            <span className="shrink-0 text-sm font-medium text-ink-2 max-sm:hidden">MCP URL</span>
+            <code className="min-w-0 flex-1 truncate font-code text-body text-ink">{url}</code>
+            <CopyButton text={url} label="Copy URL" />
+          </div>
+        </section>
 
-          <section aria-labelledby="mcp-url" className="flex flex-col gap-2">
-            <h2 id="mcp-url" className="text-sm font-semibold text-ink-2">
-              MCP server URL
-            </h2>
-            <div className="flex items-center gap-2 rounded-md border border-line bg-surface p-1.5 ps-3">
-              <code className="min-w-0 flex-1 truncate font-code text-body">{url}</code>
-              <CopyButton text={url} label="Copy URL" />
-            </div>
-          </section>
+        <section aria-labelledby="your-client" className="flex flex-col gap-3">
+          <h2 id="your-client" className="text-sm font-semibold text-ink-2">
+            Your client
+          </h2>
+          <div role="radiogroup" aria-labelledby="your-client" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {clients.map((c) => {
+              const active = c.value === client;
+              return (
+                <button
+                  key={c.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setClient(c.value)}
+                  className={cn(
+                    "flex min-h-14 items-center gap-3 rounded-md bg-surface px-3 text-start transition-[box-shadow,background-color] duration-(--duration-fast) ease-standard",
+                    active
+                      ? "shadow-[inset_0_0_0_1.5px_var(--ink)]"
+                      : "shadow-[inset_0_0_0_1px_var(--line)] hover:bg-hover hover:shadow-[inset_0_0_0_1px_var(--line-strong)]",
+                  )}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "grid size-8 shrink-0 place-items-center rounded-[9px] text-sm font-semibold transition-colors duration-(--duration-fast)",
+                      active ? "bg-ink text-on-human" : "bg-hover text-ink-2",
+                    )}
+                  >
+                    {c.initials}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-ui font-medium">{c.label}</span>
+                    <span className="block truncate text-sm text-ink-2">{c.kind}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
-          <section aria-labelledby="your-client" className="flex flex-col gap-4">
-            <h2 id="your-client" className="text-sm font-semibold text-ink-2">
-              Your client
-            </h2>
-            {/* Six tabs don't fit a phone: there it is a menu. */}
-            <Tabs label="MCP client" value={client} onChange={setClient} items={clients} className="max-sm:hidden" />
-            <SelectMenu label="MCP client" value={client} onChange={setClient} options={clients} className="self-start sm:hidden" />
-            {lead ? <p className="max-w-[64ch] text-ui text-ink-2 text-pretty">{lead}</p> : null}
+        <section aria-labelledby="steps" className="flex flex-col gap-3">
+          <h2 id="steps" className="text-sm font-semibold text-ink-2">
+            Connect {chosen.value === "other" ? "your client" : chosen.label}
+          </h2>
+          <div key={client} className="motion-fade rounded-md border border-line bg-surface p-5">
+            {lead ? <p className="mb-5 max-w-[64ch] text-ui text-ink-2 text-pretty">{lead}</p> : null}
             <ol className="flex flex-col">
               {steps.map((step, index) => (
-                <li key={step.title} className="grid grid-cols-[28px_minmax(0,1fr)] gap-x-3">
+                <li key={step.title} className="grid grid-cols-[24px_minmax(0,1fr)] gap-x-4">
                   <span className="flex flex-col items-center">
                     <span aria-hidden="true" className="grid size-6 place-items-center rounded-full bg-hover text-sm font-semibold tabular-nums">
                       {index + 1}
                     </span>
-                    {index < steps.length - 1 ? <span aria-hidden="true" className="w-px flex-1 bg-line" /> : null}
+                    {index < steps.length - 1 ? <span aria-hidden="true" className="my-1 w-px flex-1 bg-line" /> : null}
                   </span>
-                  <div className="flex min-w-0 flex-col gap-2 pb-6">
+                  <div className={cn("flex min-w-0 flex-col gap-1.5", index < steps.length - 1 && "pb-6")}>
                     <h3 className="pt-0.5 text-ui font-semibold">{step.title}</h3>
                     <p className="text-ui text-ink-2 text-pretty">{step.body}</p>
                     {step.code ? <CodeBlock text={step.code} /> : null}
@@ -167,74 +216,67 @@ export function ConnectPage() {
                 </li>
               ))}
             </ol>
-            <div className="rounded-md bg-hover p-4">
-              <h3 className="text-ui font-semibold">No browser on that machine?</h3>
-              <p className="mt-1 text-ui text-ink-2 text-pretty">
-                An admin can create a runner agent under{" "}
-                <Link to={`/${slug}/agents`} className="underline decoration-line-strong underline-offset-2 hover:text-ink">
-                  Agents
-                </Link>{" "}
-                and give it an API key. The client then sends it with every request instead of signing in:
-              </p>
-              <div className="mt-3">
-                <CodeBlock text={`--header "Authorization: Bearer edict_ak_…"`} />
-              </div>
+          </div>
+        </section>
+
+        <section aria-labelledby="your-connections" className="flex flex-col gap-3">
+          <h2 id="your-connections" className="flex items-baseline gap-2 text-sm font-semibold text-ink-2">
+            Your agents <span className="font-normal tabular-nums">{mine.length}</span>
+          </h2>
+          {mine.length ? (
+            <ul className="flex flex-col divide-y divide-line rounded-md border border-line bg-surface">
+              {mine.map((agent) => (
+                <li key={agent.id}>
+                  <Link
+                    to={`/${slug}/agents?agent=${agent.id}`}
+                    className="hover-fade flex min-h-14 items-center gap-3 px-4 hover:bg-hover"
+                  >
+                    <Avatar name={agent.name} kind="agent" size={32} />
+                    <span className="min-w-0">
+                      <span className="block truncate text-ui font-medium text-agent-ink">{agent.name}</span>
+                      <span className="block truncate text-sm text-ink-2">{connectionLine(agent, members.data ?? [])}</span>
+                    </span>
+                    <ChevronRight aria-hidden="true" className="ms-auto size-4 text-ink-3" strokeWidth={1.75} />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="flex items-center gap-3 rounded-md border border-dashed border-line-strong px-4 py-4">
+              <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-[9px] border border-dashed border-line-strong text-ink-3">
+                <Plus className="size-3.5" strokeWidth={2} />
+              </span>
+              <p className="text-ui text-ink-2 text-pretty">Once you approve a client, its agent shows up here and in the sidebar.</p>
             </div>
-          </section>
+          )}
+        </section>
 
-          <section aria-labelledby="your-connections" className="flex flex-col gap-2">
-            <h2 id="your-connections" className="text-sm font-semibold text-ink-2">
-              Your connections
-            </h2>
-            {mine.length ? (
-              <ul className="flex flex-col gap-px rounded-md border border-line bg-surface p-1">
-                {mine.map((agent) => (
-                  <li key={agent.id}>
-                    <Link to={`/${slug}/agents?agent=${agent.id}`} className="flex min-h-11 items-center gap-3 rounded-sm px-2.5 hover:bg-hover">
-                      <Avatar name={agent.name} kind="agent" />
-                      <span className="min-w-0">
-                        <span className="block truncate text-ui font-medium text-agent-ink">{agent.name}</span>
-                        <span className="block truncate text-sm text-ink-2">{connectionLine(agent, members.data ?? [])}</span>
-                      </span>
-                      <span className="ms-auto text-sm text-ink-2">Open</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="rounded-md border border-dashed border-line-strong px-4 py-3 text-ui text-ink-2">
-                No client connected yet. Once you approve one, it shows up here.
-              </p>
-            )}
-          </section>
-        </div>
-
-        <aside className="flex flex-col gap-4 lg:pt-1">
-          <div className="rounded-md border border-line bg-surface p-4">
-            <h2 className="text-ui font-semibold">Agent runners</h2>
-            <p className="mt-1 text-sm text-ink-2 text-pretty">
-              A server running Claude Code headless, the Agent SDK or CI uses an API key, and a webhook wakes it the
-              moment an issue is delegated to it.
+        <section aria-label="More ways in" className="grid gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5 rounded-md bg-hover p-4">
+            <h2 className="text-ui font-semibold">No browser on that machine?</h2>
+            <p className="text-sm text-ink-2 text-pretty">
+              Servers, CI and headless Claude Code run as a runner: an agent with an API key, woken by a webhook the
+              moment work is delegated to it.
             </p>
-            <Link to={`/${slug}/agents`} className="mt-3 inline-block text-sm font-medium underline decoration-line-strong underline-offset-4 hover:decoration-ink">
-              Manage agents
+            <Link to={`/${slug}/agents`} className="mt-1 text-sm font-medium underline decoration-line-strong underline-offset-4 hover:decoration-ink">
+              Set up a runner under Agents
             </Link>
           </div>
-          <div className="rounded-md border border-line bg-surface p-4">
+          <div className="flex flex-col gap-1.5 rounded-md bg-hover p-4">
             <h2 className="text-ui font-semibold">What an agent can do</h2>
-            <p className="mt-1 text-sm text-ink-2 text-pretty">
-              Read and update issues, comment and post progress in your teams. It can't delete, change settings, manage
-              members or create agents unless an admin grants it.
+            <p className="text-sm text-ink-2 text-pretty">
+              Read and update issues, comment and post progress in the teams you can see. It can't delete, change
+              settings, manage members or create agents unless an admin allows it.
             </p>
           </div>
-        </aside>
+        </section>
       </PageColumn>
     </>
   );
 }
 
 function Code({ children }: { children: ReactNode }) {
-  return <code className="rounded-xs bg-hover px-1 font-code text-[0.88em] font-medium text-ink">{children}</code>;
+  return <code className="rounded-xs bg-hover px-1 font-code text-code font-medium text-ink">{children}</code>;
 }
 
 function CopyButton({ text, label }: { text: string; label: string }) {
@@ -258,7 +300,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
 
 function CodeBlock({ text }: { text: string }) {
   return (
-    <div className="flex items-start gap-2 rounded-md border border-line bg-surface p-1.5 ps-3">
+    <div className="mt-1 flex items-start gap-2 rounded-sm bg-bg p-1.5 ps-3 shadow-[inset_0_0_0_1px_var(--line)]">
       <pre className="min-w-0 flex-1 overflow-x-auto py-1.5 font-code text-code text-ink">{text}</pre>
       <CopyButton text={text} label="Copy" />
     </div>

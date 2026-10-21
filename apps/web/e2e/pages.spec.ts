@@ -60,3 +60,25 @@ test("roles are set from a menu, a project shows open work first, and the rail m
   await page.getByRole("button", { name: "Add an organization webhook" }).click();
   await expect(page.getByLabel("URL")).toBeFocused();
 });
+
+// Connect an agent: pick your client from the tiles and its steps follow;
+// until you approve one, the page says where its agent will appear.
+test("Connect an agent shows the steps for the client you pick", async ({ page, baseURL }) => {
+  const headers = { origin: baseURL! };
+  await page.request.post("/api/auth/sign-up/email", {
+    headers,
+    data: { name: "Cy Connect", email: "cy-connect@example.com", password: "correct-horse-battery" },
+  });
+  await page.request.post("/api/v1/organizations", { headers, data: { name: "Connect", slug: "connect-co" } });
+
+  await page.goto("/connect-co/connect");
+  await expect(page.getByText(`${baseURL}/mcp`, { exact: true })).toBeVisible();
+  const picker = page.getByRole("radiogroup", { name: "Your client" });
+  await expect(picker.getByRole("radio", { name: /Claude Code/ })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByText("claude mcp login edict")).toBeVisible();
+
+  await picker.getByRole("radio", { name: /Codex/ }).click();
+  await expect(page.getByRole("heading", { name: "Connect Codex" })).toBeVisible();
+  await expect(page.getByText("codex mcp login edict")).toBeVisible();
+  await expect(page.getByText("Once you approve a client, its agent shows up here and in the sidebar.")).toBeVisible();
+});
