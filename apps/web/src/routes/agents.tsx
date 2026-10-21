@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router";
 import type { Agent, AgentPower, Issue, Member, Webhook, WebhookDelivery } from "@edicthq/client";
-import { type AgentState, Avatar, Badge, Button, Dialog, Field, Input, ProgressBadge, Tabs, buttonClass, cn } from "@edicthq/ui";
-import { X } from "lucide-react";
+import { type AgentState, Avatar, Badge, Button, Checkbox, Dialog, Field, Input, ProgressBadge, Tabs, buttonClass, cn, usePresence } from "@edicthq/ui";
+import { Plus, X } from "lucide-react";
 import { EmptyState, FormError, GroupHeader, Loading, PageBody, PageHeader } from "../components/shell.js";
 import { useToast } from "../components/toast.js";
 import { agentState, connectionLine, firstName, plainLine } from "../lib/agents.js";
@@ -55,6 +55,8 @@ export function AgentsPage() {
   const selectedId = params.get("agent") ?? (location.hash ? location.hash.slice(1) : null);
   const list = agents.data ?? [];
   const selected = list.find((agent) => agent.id === selectedId);
+  // The panel slides out after it closes.
+  const panel = usePresence(selected, 140);
   const select = (id: string | null) => {
     const next = new URLSearchParams(params);
     if (id) next.set("agent", id);
@@ -111,7 +113,7 @@ export function AgentsPage() {
         <Loading label="Loading agents" />
       ) : shown.length ? (
         <div className="px-3 pt-1">
-          <div aria-hidden="true" className="grid h-9 grid-cols-[minmax(0,1.4fr)_120px_64px_minmax(0,1.3fr)_72px] items-center gap-4 px-3 text-sm font-medium text-ink-2">
+          <div aria-hidden="true" className="grid h-9 grid-cols-[minmax(0,1.4fr)_120px_64px_minmax(0,1.3fr)_72px] items-center gap-4 px-3 text-sm font-medium text-ink-2 max-md:hidden">
             <span>Agent</span>
             <span>State</span>
             <span className="text-end">Queue</span>
@@ -151,12 +153,13 @@ export function AgentsPage() {
         </div>
       ) : null}
 
-      {selected ? (
+      {panel.shown ? (
         <AgentPanel
-          key={selected.id}
-          agent={selected}
+          key={panel.shown.id}
+          agent={panel.shown}
+          leaving={panel.leaving}
           members={members.data ?? []}
-          webhooks={(webhooks.data ?? []).filter((hook) => hook.agentId === selected.id)}
+          webhooks={(webhooks.data ?? []).filter((hook) => hook.agentId === panel.shown?.id)}
           onClose={() => select(null)}
         />
       ) : null}
@@ -199,7 +202,8 @@ function RosterRow({ agent, members, selected, onSelect }: { agent: Agent; membe
       aria-current={selected ? "true" : undefined}
       onClick={onSelect}
       className={cn(
-        "relative grid min-h-12 w-full grid-cols-[minmax(0,1.4fr)_120px_64px_minmax(0,1.3fr)_72px] items-center gap-4 rounded-sm px-3 py-1.5 text-start transition-[background-color] duration-[140ms] ease-standard hover:bg-hover",
+        // On a narrow screen: the agent and its state, then what it works on.
+        "hover-fade relative grid min-h-12 w-full grid-cols-[minmax(0,1.4fr)_120px_64px_minmax(0,1.3fr)_72px] items-center gap-4 rounded-sm px-3 py-1.5 text-start hover:bg-hover max-md:grid-cols-[minmax(0,1fr)_auto] max-md:gap-x-3 max-md:gap-y-1 max-md:py-2.5",
         selected && "bg-hover shadow-[inset_2px_0_0_0_var(--ink)]",
         agent.pausedAt && "opacity-60",
       )}
@@ -214,20 +218,20 @@ function RosterRow({ agent, members, selected, onSelect }: { agent: Agent; membe
       <span>
         {state === "idle" ? <span className="text-sm text-ink-2">Idle</span> : <ProgressBadge state={state} />}
       </span>
-      <span className="text-end text-ui tabular-nums">
+      <span className="text-end text-ui tabular-nums max-md:hidden">
         {queue.length}
       </span>
-      <span className="flex min-w-0 items-baseline gap-1.5 text-ui">
+      <span className="flex min-w-0 items-baseline gap-1.5 text-ui max-md:col-span-2 max-md:ps-[34px] max-md:text-sm">
         {current ? (
           <>
             <span className="shrink-0 text-sm font-medium text-ink-2 tabular-nums">{current.identifier}</span>
             <span className="truncate">{current.title}</span>
           </>
         ) : (
-          <span className="text-ink-3">—</span>
+          <span className="text-ink-3 max-md:hidden">—</span>
         )}
       </span>
-      <span className="text-end text-sm text-ink-2 tabular-nums">
+      <span className="text-end text-sm text-ink-2 tabular-nums max-md:hidden">
         {active ? ago(active) : "—"}
       </span>
     </button>
@@ -235,7 +239,19 @@ function RosterRow({ agent, members, selected, onSelect }: { agent: Agent; membe
 }
 
 // One agent's panel: what it does now and next, then its powers and access.
-function AgentPanel({ agent, members, webhooks, onClose }: { agent: Agent; members: Member[]; webhooks: Webhook[]; onClose: () => void }) {
+function AgentPanel({
+  agent,
+  members,
+  webhooks,
+  onClose,
+  leaving = false,
+}: {
+  agent: Agent;
+  members: Member[];
+  webhooks: Webhook[];
+  onClose: () => void;
+  leaving?: boolean;
+}) {
   const { orgId, slug, canManage, membership } = useOrg();
   const queue = useAgentQueue(orgId, agent.id).data ?? [];
   const pause = usePauseAgent(orgId);
@@ -257,7 +273,10 @@ function AgentPanel({ agent, members, webhooks, onClose }: { agent: Agent; membe
   return (
     <aside
       aria-label={`${agent.name} details`}
-      className="fixed inset-y-2 end-2 z-20 flex w-[min(440px,calc(100vw-16px))] flex-col overflow-hidden rounded-md bg-surface shadow-overlay outline outline-line motion-safe:animate-[peek-slide_220ms_cubic-bezier(0.2,0,0,1)]"
+      data-leaving={leaving || undefined}
+      inert={leaving || undefined}
+      aria-hidden={leaving || undefined}
+      className="motion-slide fixed inset-y-2 end-2 z-20 flex w-[min(440px,calc(100vw-16px))] flex-col overflow-hidden rounded-md bg-raised shadow-overlay"
     >
       <header className="flex items-start gap-3 border-b border-line p-4">
         <span className={cn("rounded-[9px]", live && "outline-2 outline-offset-2 outline-agent-edge")}>
@@ -393,9 +412,8 @@ function AgentSettings({ agent, webhooks }: { agent: Agent; webhooks: Webhook[] 
         <legend className="mb-1 text-sm font-semibold text-ink-2">Powers beyond issues, comments and progress</legend>
         {powers.map((power) => (
           <label key={power.value} className="flex items-start gap-2 text-ui">
-            <input
-              type="checkbox"
-              className="mt-0.5 size-4 accent-[var(--ink)]"
+            <Checkbox
+              className="mt-0.5"
               checked={grants.includes(power.value)}
               disabled={update.isPending}
               onChange={(event) => {
@@ -535,12 +553,33 @@ function OrganizationWebhooks({ webhooks }: { webhooks: Webhook[] }) {
   const [url, setUrl] = useState("");
   const [types, setTypes] = useState("");
   const [secret, setSecret] = useState<string | null>(null);
+  // With none yet, the section is one quiet action that opens the form.
+  const [adding, setAdding] = useState(false);
+  const formOpen = adding || webhooks.length > 0;
+  // Opening the form puts you in its first field.
+  const urlRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (adding) urlRef.current?.focus();
+  }, [adding]);
   return (
     <section aria-labelledby="org-webhooks" className="flex flex-col gap-2">
-      <GroupHeader count={webhooks.length}>
-        <span id="org-webhooks">Organization webhooks</span>
-      </GroupHeader>
-      <div className="flex flex-col gap-2 px-3">
+      {formOpen ? (
+        <GroupHeader count={webhooks.length}>
+          <span id="org-webhooks">Organization webhooks</span>
+        </GroupHeader>
+      ) : (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3">
+          <h2 id="org-webhooks" className="sr-only">
+            Organization webhooks
+          </h2>
+          <Button variant="ghost" onClick={() => setAdding(true)}>
+            <Plus aria-hidden="true" className="size-3.5" strokeWidth={2} />
+            Add an organization webhook
+          </Button>
+          <p className="text-sm text-ink-2">Sends every event in the organization to a URL you run.</p>
+        </div>
+      )}
+      <div className={cn("flex flex-col gap-2 px-3", !formOpen && "hidden")}>
         {webhooks.map((webhook) => (
           <WebhookRow key={webhook.id} webhook={webhook} />
         ))}
@@ -556,6 +595,7 @@ function OrganizationWebhooks({ webhooks }: { webhooks: Webhook[] }) {
                   setSecret(created.secret);
                   setUrl("");
                   setTypes("");
+                  setAdding(false);
                 },
                 onError: (error) => toast(error.message),
               },
@@ -563,7 +603,9 @@ function OrganizationWebhooks({ webhooks }: { webhooks: Webhook[] }) {
           }}
         >
           <Field label="URL">
-            {(control) => <Input {...control} type="url" required placeholder="https://example.com/hooks/edict" value={url} onChange={(event) => setUrl(event.target.value)} />}
+            {(control) => (
+              <Input {...control} ref={urlRef} type="url" required placeholder="https://example.com/hooks/edict" value={url} onChange={(event) => setUrl(event.target.value)} />
+            )}
           </Field>
           <Field label="Event types">
             {(control) => <Input {...control} placeholder="Every type" value={types} onChange={(event) => setTypes(event.target.value)} />}
@@ -761,9 +803,7 @@ function NewAgentDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
           <p className="text-sm text-ink-2">Like a Member, it sees every public team. Add it to private ones here.</p>
           {(teams.data ?? []).map((team) => (
             <label key={team.id} className="flex items-center gap-2 text-ui">
-              <input
-                type="checkbox"
-                className="size-4 accent-[var(--ink)]"
+              <Checkbox
                 checked={teamIds.includes(team.id)}
                 onChange={(e) => setTeamIds(e.target.checked ? [...teamIds, team.id] : teamIds.filter((id) => id !== team.id))}
               />
