@@ -44,9 +44,9 @@ function Stack({ names, kind, label, className }: { names: string[]; kind: "huma
           <span className="sr-only">
             {names.length} {label[names.length === 1 ? 0 : 1]}: {names.join(", ")}
           </span>
-          <span className="flex -space-x-1">
+          <span className="flex gap-1">
             {shown.map((name) => (
-              <Avatar key={name} name={name} kind={kind} className="ring-2 ring-bg" />
+              <Avatar key={name} name={name} kind={kind} />
             ))}
           </span>
           {names.length > shown.length ? (

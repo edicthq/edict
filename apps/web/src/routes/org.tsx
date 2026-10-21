@@ -115,9 +115,11 @@ export function OrgLayout() {
         title="Organization not found"
         lead="It doesn't exist, or you aren't a member. Ask one of its admins for an invite."
       >
-        <Link to="/" className="text-ui font-medium underline decoration-line-strong underline-offset-4">
-          Go to your organizations
-        </Link>
+        <p>
+          <Link to="/" className="text-ui font-medium underline decoration-line-strong underline-offset-4">
+            Go to your organizations
+          </Link>
+        </p>
       </AuthShell>
     );
   }
@@ -191,7 +193,8 @@ function RailSection({ title, aside, children }: { title: string; aside?: ReactN
 
 const railItem = "hover-fade flex h-[30px] items-center gap-2 rounded-sm px-2 text-ui";
 const railLink = ({ isActive }: { isActive: boolean }) =>
-  cn(railItem, isActive ? "bg-surface font-medium text-ink shadow-[inset_0_0_0_1px_var(--line)]" : "text-ink hover:bg-hover");
+  // The current page takes the selected-row fill, as team pages do.
+  cn(railItem, isActive ? "bg-hover font-medium text-ink" : "text-ink hover:bg-hover");
 
 // Unread inbox count in the rail, in ink: a count of things for a human.
 function InboxBadge({ orgId }: { orgId: string }) {
@@ -427,6 +430,11 @@ function TeamItem({ slug, team, current }: { slug: string; team: Team; current: 
 // much is waiting for it, and the issue it works on now.
 function AgentRow({ agent, members, slug, orgId }: { agent: Agent; members: Member[]; slug: string; orgId: string }) {
   const queue = useAgentQueue(orgId, agent.id).data ?? [];
+  // Lit while the Agents page shows this agent's panel, not for every agent.
+  const location = useLocation();
+  const open =
+    location.pathname === `/${slug}/agents` &&
+    (new URLSearchParams(location.search).get("agent") ?? location.hash.slice(1)) === agent.id;
   const now = useNow();
   const states = queue.map((issue) => agentState(issue, agent, now));
   const live = queue.find((_, index) => states[index] === "working");
@@ -441,19 +449,20 @@ function AgentRow({ agent, members, slug, orgId }: { agent: Agent; members: Memb
           : null;
   return (
     <div className="flex flex-col">
-      <NavLink
-        to={`/${slug}/agents#${agent.id}`}
+      <Link
+        to={`/${slug}/agents?agent=${agent.id}`}
         title={connectionLine(agent, members)}
-        className={({ isActive }) => cn(railItem, isActive ? "bg-hover" : "hover:bg-hover")}
+        aria-current={open ? "page" : undefined}
+        className={cn(railItem, open ? "bg-hover" : "hover:bg-hover")}
       >
         <Avatar name={agent.name} kind="agent" size={18} />
         <span className="min-w-0 truncate font-medium text-agent-ink">{agent.name}</span>
         {state ? (
           <ProgressBadge state={state} className="ms-auto h-[18px] px-1.5" />
         ) : (
-          <span className="ms-auto text-sm text-ink-2 tabular-nums">{queue.length || "idle"}</span>
+          <span className="ms-auto text-sm text-ink-2 tabular-nums">{queue.length || "Idle"}</span>
         )}
-      </NavLink>
+      </Link>
       {live ? (
         <Link
           to={`/${slug}/issue/${live.identifier}`}

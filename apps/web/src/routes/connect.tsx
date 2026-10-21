@@ -170,8 +170,10 @@ export function ConnectPage() {
                   onClick={() => setClient(c.value)}
                   className={cn(
                     "flex min-h-14 items-center gap-3 rounded-md bg-surface px-3 text-start transition-[box-shadow,background-color] duration-(--duration-fast) ease-standard",
+                    // The chosen tile is told by its ink initials and a firmer
+                    // edge, not a bright outline (tokens.md).
                     active
-                      ? "shadow-[inset_0_0_0_1.5px_var(--ink)]"
+                      ? "bg-hover shadow-[inset_0_0_0_1px_var(--line-strong)]"
                       : "shadow-[inset_0_0_0_1px_var(--line)] hover:bg-hover hover:shadow-[inset_0_0_0_1px_var(--line-strong)]",
                   )}
                 >
@@ -404,7 +406,15 @@ function CopyButton({ text, label }: { text: string; label: string }) {
 function CodeBlock({ text, tall = false }: { text: string; tall?: boolean }) {
   return (
     <div className="mt-1 flex items-start gap-2 rounded-sm bg-bg p-1.5 ps-3 shadow-[inset_0_0_0_1px_var(--line)]">
-      <pre className={cn("min-w-0 flex-1 overflow-x-auto py-1.5 font-code text-code text-ink", tall && "max-h-64 overflow-y-auto")}>{text}</pre>
+      {/* On a phone a command wraps rather than hide under the Copy button. */}
+      <pre
+        className={cn(
+          "min-w-0 flex-1 overflow-x-auto py-1.5 font-code text-code text-ink max-sm:break-all max-sm:whitespace-pre-wrap",
+          tall && "max-h-64 overflow-y-auto",
+        )}
+      >
+        {text}
+      </pre>
       <CopyButton text={text} label="Copy" />
     </div>
   );

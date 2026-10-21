@@ -215,7 +215,7 @@ function PaletteBody({ context, others, onClose }: { context: OrgContext; others
           placeholder="Search issues or type a command…"
           className="h-12 flex-1 bg-transparent text-lg tracking-[-0.01em] outline-none placeholder:text-ink-2"
         />
-        <Kbd>esc</Kbd>
+        <Kbd>Esc</Kbd>
       </div>
       {/* biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: the ARIA combobox pattern; focus stays in the input, which points here with aria-activedescendant */}
       <ul id="palette-list" role="listbox" aria-label="Commands" className="max-h-[min(420px,60dvh)] overflow-y-auto p-2">

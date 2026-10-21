@@ -50,7 +50,8 @@ export function Kbd({ className, children }: { className?: string; children: str
   return (
     <kbd
       className={cn(
-        "inline-block min-w-[18px] rounded-xs bg-hover px-[5px] py-[3px] text-center font-sans text-[10px] leading-none font-medium text-ink-2",
+        // A touch screen has no keys to hint at.
+        "inline-block min-w-[18px] rounded-xs bg-hover px-[5px] py-[3px] text-center font-sans text-[10px] leading-none font-medium text-ink-2 pointer-coarse:hidden",
         "in-[.bg-ink]:bg-on-human/18 in-[.bg-ink]:text-on-human",
         "in-[.bg-ink:disabled]:bg-line in-[.bg-ink:disabled]:text-ink-2",
         className,
