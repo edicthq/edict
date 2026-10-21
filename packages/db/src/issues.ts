@@ -363,13 +363,17 @@ export const attachments = pgTable(
 
 export const progressState = pgEnum("progress_state", ["working", "blocked", "needs_input", "done"]);
 
+// ADR 0029. agent: posted by the agent. activity: written from what the
+// delegate did on the issue. hook: posted by the agent's client from a hook.
+export const progressSource = pgEnum("progress_source", ["agent", "activity", "hook"]);
+
 export interface ProgressLink {
   url: string;
   title?: string;
 }
 
-// A structured report an agent posts on an issue: a state, a markdown message
-// and optional links. Reports are a record of what happened, so they are never
+// A structured report on an agent's work on an issue: a state, a markdown
+// message and optional links. Reports are a record of what happened, so they are never
 // edited; they go when their issue is purged.
 export const progressUpdates = pgTable(
   "progress_updates",
@@ -379,6 +383,7 @@ export const progressUpdates = pgTable(
     issueId: uuid("issue_id").notNull(),
     agentId: uuid("agent_id").notNull(),
     state: progressState("state").notNull(),
+    source: progressSource("source").notNull().default("agent"),
     // Markdown (ADR 0009).
     message: text("message").notNull(),
     links: jsonb("links").$type<ProgressLink[]>().notNull().default([]),
@@ -423,5 +428,33 @@ export const issueLinks = pgTable(
       columns: [table.orgId, table.creatorId],
       foreignColumns: [members.orgId, members.id],
     }),
+  ],
+);
+
+// ADR 0029. The issue each of an agent's client sessions is working, so its
+// hooks know where to report. Bookkeeping, like an API key's last use: tying a
+// session writes no event.
+export const agentSessions = pgTable(
+  "agent_sessions",
+  {
+    orgId: uuid("org_id").notNull(),
+    agentId: uuid("agent_id").notNull(),
+    // The client's own session id.
+    sessionId: text("session_id").notNull(),
+    issueId: uuid("issue_id"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (table) => [
+    primaryKey({ columns: [table.agentId, table.sessionId] }),
+    foreignKey({
+      name: "agent_sessions_agent_fk",
+      columns: [table.orgId, table.agentId],
+      foreignColumns: [members.orgId, members.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "agent_sessions_issue_fk",
+      columns: [table.orgId, table.issueId],
+      foreignColumns: [issues.orgId, issues.id],
+    }).onDelete("cascade"),
   ],
 );

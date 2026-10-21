@@ -1,11 +1,12 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import type { Agent } from "@edicthq/client";
 import { Link } from "react-router";
 import { Avatar, Button, SelectMenu, cn } from "@edicthq/ui";
 import { Check, ChevronRight, Copy, Minus, Plus } from "lucide-react";
 import { AuthShell, FormError, Loading, MarkTile, PageColumn, PageHeader } from "../components/shell.js";
 import { connectionLine, firstName } from "../lib/agents.js";
-import { useAgents, useChooseConnectionOrganization, useMembers, useMemberships } from "../lib/queries.js";
+import { useAgents, useApiKeys, useChooseConnectionOrganization, useCreateApiKey, useMembers, useMemberships } from "../lib/queries.js";
 import { useOrg } from "./org.js";
 
 type Client = "claude" | "t3" | "codex" | "cursor" | "opencode" | "other";
@@ -217,6 +218,9 @@ export function ConnectPage() {
               ))}
             </ol>
           </div>
+          {client === "claude" || client === "t3" ? (
+            <HookSetup orgId={orgId} agent={mine.find((agent) => agent.clientName === "Claude Code")} />
+          ) : null}
         </section>
 
         <section aria-labelledby="your-connections" className="flex flex-col gap-3">
@@ -275,6 +279,105 @@ export function ConnectPage() {
   );
 }
 
+// Claude Code's HTTP hooks (ADR 0029): the session's work shows on its issue,
+// and the agent spends no tokens saying so. Each hook sends the hook key from
+// the shell, never from the settings file.
+function hooksConfig(orgId: string): string {
+  const hook = {
+    type: "http",
+    url: `${location.origin}/api/v1/organizations/${orgId}/agent-hooks/claude-code`,
+    headers: { Authorization: "Bearer $EDICT_HOOK_KEY" },
+    allowedEnvVars: ["EDICT_HOOK_KEY"],
+    timeout: 5,
+  };
+  return JSON.stringify(
+    {
+      hooks: {
+        PostToolUse: [
+          { matcher: "mcp__edict__.*", hooks: [hook] },
+          { matcher: "Bash", hooks: [{ ...hook, if: "Bash(git commit *)" }, { ...hook, if: "Bash(gh pr create *)" }] },
+        ],
+        SessionStart: [{ matcher: "resume|compact", hooks: [hook] }],
+        Stop: [{ hooks: [hook] }],
+      },
+    },
+    null,
+    2,
+  );
+}
+
+function HookSetup({ orgId, agent }: { orgId: string; agent: Agent | undefined }) {
+  return (
+    <section aria-labelledby="hooks" className="rounded-md border border-line bg-surface p-5">
+      <h3 id="hooks" className="text-ui font-semibold">
+        Progress at no token cost
+      </h3>
+      <p className="mt-1 max-w-[64ch] text-ui text-ink-2 text-pretty">
+        Claude Code's hooks tell Edict when it picks up an issue, commits, opens a pull request and finishes a turn. The
+        agent never spends tokens on it.
+      </p>
+      <div className="mt-4 flex flex-col gap-5">
+        <div className="flex flex-col gap-1.5">
+          <h4 className="text-ui font-medium">Create a hook key</h4>
+          {agent ? (
+            <HookKey orgId={orgId} agent={agent} />
+          ) : (
+            <p className="text-ui text-ink-2 text-pretty">Connect Claude Code first. The key belongs to the agent it adds.</p>
+          )}
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <h4 className="text-ui font-medium">Add the hooks</h4>
+          <p className="text-ui text-ink-2 text-pretty">
+            Merge this into <Code>~/.claude/settings.json</Code>, or a project's <Code>.claude/settings.local.json</Code>.
+          </p>
+          <CodeBlock text={hooksConfig(orgId)} tall />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// A hook key can only post hooks, so a leaked settings file or shell profile
+// lets someone post progress as the agent and nothing more.
+function HookKey({ orgId, agent }: { orgId: string; agent: Agent }) {
+  const keys = useApiKeys(orgId, agent.id);
+  const create = useCreateApiKey(orgId, agent.id);
+  const [secret, setSecret] = useState<string | null>(null);
+  const hookKeys = (keys.data ?? []).filter((key) => key.scope === "hooks");
+  if (secret) {
+    return (
+      <>
+        <p className="text-ui text-ink-2 text-pretty">
+          Add this to your shell profile, like <Code>~/.zshrc</Code>, and start Claude Code again. It is shown only now.
+        </p>
+        <CodeBlock text={`export EDICT_HOOK_KEY=${secret}`} />
+      </>
+    );
+  }
+  return (
+    <>
+      <p className="text-ui text-ink-2 text-pretty">
+        It can post progress for {agent.name} and nothing else.
+        {hookKeys.length ? ` You have ${hookKeys.length === 1 ? "one" : hookKeys.length}; a new one works alongside.` : ""}
+      </p>
+      <FormError message={create.error?.message ?? null} />
+      <Button
+        variant="secondary"
+        className="mt-1 self-start"
+        disabled={create.isPending || !!agent.pausedAt}
+        onClick={() =>
+          create.mutate(
+            { name: `Hooks ${hookKeys.length + 1}`, teamIds: null, scope: "hooks" },
+            { onSuccess: (created) => setSecret(created.secret) },
+          )
+        }
+      >
+        Create hook key
+      </Button>
+    </>
+  );
+}
+
 function Code({ children }: { children: ReactNode }) {
   return <code className="rounded-xs bg-hover px-1 font-code text-code font-medium text-ink">{children}</code>;
 }
@@ -298,10 +401,10 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   );
 }
 
-function CodeBlock({ text }: { text: string }) {
+function CodeBlock({ text, tall = false }: { text: string; tall?: boolean }) {
   return (
     <div className="mt-1 flex items-start gap-2 rounded-sm bg-bg p-1.5 ps-3 shadow-[inset_0_0_0_1px_var(--line)]">
-      <pre className="min-w-0 flex-1 overflow-x-auto py-1.5 font-code text-code text-ink">{text}</pre>
+      <pre className={cn("min-w-0 flex-1 overflow-x-auto py-1.5 font-code text-code text-ink", tall && "max-h-64 overflow-y-auto")}>{text}</pre>
       <CopyButton text={text} label="Copy" />
     </div>
   );

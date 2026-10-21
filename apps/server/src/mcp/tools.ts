@@ -1,6 +1,7 @@
 // The MCP tools (ADR 0011): shaped around tasks, taking human values and
 // answering in markdown an agent can read. Each may call several endpoints.
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import type { Issue, Link, ProgressUpdate } from "@edicthq/client";
 import { handleOf, ok, ToolError, type Session } from "./session.js";
@@ -21,11 +22,10 @@ function tool<A>(run: (args: A) => Promise<string>) {
   };
 }
 
-const issueArg = z.string().describe("The issue's identifier, like ENG-123");
+// An identifier, like ENG-123. The instructions say so once for every tool.
+const issueArg = z.string();
 const priorityArg = z.enum(["urgent", "high", "medium", "low", "none"]);
-const stateArg = z
-  .enum(["working", "blocked", "needs_input", "done"])
-  .describe("working: under way. blocked: you cannot go on. needs_input: you are waiting on a person. done: finished.");
+const stateArg = z.enum(["working", "blocked", "needs_input", "done"]);
 const linkArg = z.object({ url: z.string().url(), title: z.string().optional() });
 
 // One line per issue, for lists.
@@ -128,14 +128,43 @@ export async function renderProject(session: Session, ref: string): Promise<stri
   return out.join("\n");
 }
 
-export function registerTools(server: McpServer, session: Session): void {
+// ADR 0029: every session pays for tools/list, so it carries the names,
+// descriptions and argument shapes, and none of the SDK's boilerplate: no
+// $schema or execution per tool, and no safe-integer bounds.
+function leanToolList(server: McpServer, tools: { name: string; description: string; shape: z.ZodRawShape }[]): void {
+  server.server.setRequestHandler(ListToolsRequestSchema, () => ({
+    tools: tools.map(({ name, description, shape }) => ({ name, description, inputSchema: leanSchema(shape) })),
+  }));
+}
+
+function leanSchema(shape: z.ZodRawShape) {
+  const schema = z.toJSONSchema(z.object(shape), { io: "input", unrepresentable: "any" }) as Record<string, unknown>;
+  return JSON.parse(JSON.stringify(schema, (key, value) => {
+    if (key === "$schema" || key === "additionalProperties") return undefined;
+    if ((key === "maximum" || key === "minimum") && Math.abs(value) === Number.MAX_SAFE_INTEGER) return undefined;
+    return value;
+  })) as { type: "object"; properties?: Record<string, object>; required?: string[] };
+}
+
+export function registerTools(mcp: McpServer, session: Session): void {
+  const listed: { name: string; description: string; shape: z.ZodRawShape }[] = [];
+  // McpServer.registerTool, noting each tool for leanToolList.
+  const server = {
+    registerTool: ((name: string, config: { description: string; inputSchema: z.ZodRawShape }, cb: never) => {
+      listed.push({ name, description: config.description, shape: config.inputSchema });
+      return mcp.registerTool(name, config, cb);
+    }) as McpServer["registerTool"],
+  };
+  registerAll(server, session);
+  leanToolList(mcp, listed);
+}
+
+function registerAll(server: Pick<McpServer, "registerTool">, session: Session): void {
   server.registerTool(
     "my_work",
     {
-      title: "My work",
-      description:
-        "The issues in your queue: delegated to you, most pressing first. Start here when asked to do your Edict work, then get_issue each one before working it.",
-      inputSchema: { include_done: z.boolean().default(false).describe("Also list issues already done or canceled") },
+      description: "Your queue: issues delegated to you, most pressing first.",
+      inputSchema: { include_done: z.boolean().default(false).describe("Also list closed issues") },
     },
     tool(async ({ include_done }) => {
       const issues = await ok(
@@ -150,17 +179,16 @@ export function registerTools(server: McpServer, session: Session): void {
   server.registerTool(
     "search_issues",
     {
-      title: "Search issues",
-      description: "Find issues across the teams you can see, by words, part of a title or an identifier, and filters.",
+      description: "Find issues by words or identifier, with filters.",
       inputSchema: {
         query: z.string().optional(),
-        team: z.string().optional().describe("Team key or name"),
-        status: z.string().optional().describe("Status name, or a category: backlog, todo, in progress, done, canceled"),
-        assignee: z.string().optional().describe("@handle or name"),
-        delegate: z.string().optional().describe("@handle or name of an agent, or me"),
+        team: z.string().optional().describe("Team key"),
+        status: z.string().optional().describe("Status name or category"),
+        assignee: z.string().optional().describe("@handle"),
+        delegate: z.string().optional().describe("@handle or me"),
         label: z.string().optional(),
         priority: priorityArg.optional(),
-        project: z.string().optional().describe("Project slug, name or ID"),
+        project: z.string().optional().describe("Project slug or name"),
         include_closed: z.boolean().default(false),
         limit: z.number().int().min(1).max(100).default(25),
       },
@@ -197,8 +225,7 @@ export function registerTools(server: McpServer, session: Session): void {
   server.registerTool(
     "get_issue",
     {
-      title: "Get an issue",
-      description: "One issue with its description, comments, relations, sub-issues, links and recent progress updates, and the version update_issue needs.",
+      description: "An issue with comments, links, relations, recent progress and its version.",
       inputSchema: { issue: issueArg },
     },
     tool(({ issue }) => renderIssue(session, issue)),
@@ -207,21 +234,20 @@ export function registerTools(server: McpServer, session: Session): void {
   server.registerTool(
     "create_issue",
     {
-      title: "Create an issue",
-      description: "Create an issue in a team. Values are names: status, labels and people resolve to the team's. A team template name prefills the title, description and labels; anything you pass explicitly wins.",
+      description: "Create an issue in a team. A template prefills title, description and labels.",
       inputSchema: {
-        team: z.string().describe("Team key or name"),
-        template: z.string().optional().describe("A template's name; get_team_context lists them"),
+        team: z.string().describe("Team key"),
+        template: z.string().optional(),
         title: z.string().optional(),
         description: z.string().optional().describe("Markdown"),
-        status: z.string().optional().describe("Defaults to the team's default status"),
+        status: z.string().optional(),
         priority: priorityArg.optional(),
-        estimate: z.number().int().min(0).optional(),
-        assignee: z.string().optional().describe("The person who answers for it: @handle or name"),
-        delegate: z.string().optional().describe("The agent who does it: @handle, name, or me"),
+        estimate: z.number().int().optional(),
+        assignee: z.string().optional().describe("Accountable person"),
+        delegate: z.string().optional().describe("Agent doing it, or me"),
         labels: z.array(z.string()).optional(),
-        project: z.string().optional().describe("Project slug, name or ID"),
-        parent: z.string().optional().describe("Identifier of the parent issue, to make a sub-issue"),
+        project: z.string().optional(),
+        parent: z.string().optional().describe("Parent identifier"),
       },
     },
     tool(async (args) => {
@@ -269,25 +295,24 @@ export function registerTools(server: McpServer, session: Session): void {
   server.registerTool(
     "update_issue",
     {
-      title: "Update an issue",
       description:
-        "Change an issue's status, people, labels, priority, estimate, team or parent. Send the version from get_issue; if someone changed the same fields since, call get_issue again and retry. Report your work with post_progress and comment, not by rewriting the description.",
+        "Change an issue; send get_issue's version. Set delegate to me to take one on. Status moves, links and comments show as your progress.",
       inputSchema: {
         issue: issueArg,
-        version: z.number().int().min(1).describe("The version get_issue showed"),
+        version: z.number().int().min(1),
         title: z.string().optional(),
-        description: z.string().optional().describe("Markdown. Replaces the whole description; rarely what you want."),
-        status: z.string().optional().describe("Status name, or a category: backlog, todo, in progress, done, canceled"),
+        description: z.string().optional().describe("Replaces it all"),
+        status: z.string().optional().describe("Status name or category"),
         priority: priorityArg.optional(),
-        estimate: z.number().int().min(0).nullable().optional(),
-        assignee: z.string().nullable().optional().describe("@handle or name; null to clear"),
-        delegate: z.string().nullable().optional().describe("@handle, name or me; null to clear"),
-        labels: z.array(z.string()).optional().describe("Replaces all labels"),
+        estimate: z.number().int().nullable().optional(),
+        assignee: z.string().nullable().optional(),
+        delegate: z.string().nullable().optional(),
+        labels: z.array(z.string()).optional().describe("Replaces all"),
         add_labels: z.array(z.string()).optional(),
         remove_labels: z.array(z.string()).optional(),
-        team: z.string().optional().describe("Move to this team; the issue gets a new identifier"),
-        project: z.string().nullable().optional().describe("Project slug, name or ID; null to clear"),
-        parent: z.string().nullable().optional().describe("Parent identifier; null to clear"),
+        team: z.string().optional().describe("Moves it; new identifier"),
+        project: z.string().nullable().optional(),
+        parent: z.string().nullable().optional(),
       },
     },
     tool(async (args) => {
@@ -330,8 +355,7 @@ export function registerTools(server: McpServer, session: Session): void {
   server.registerTool(
     "comment",
     {
-      title: "Comment",
-      description: "Add a markdown comment to an issue, for findings, questions and answers people should read.",
+      description: "Add a markdown comment people should read.",
       inputSchema: { issue: issueArg, body: z.string().describe("Markdown") },
     },
     tool(async ({ issue, body }) => {
@@ -348,14 +372,13 @@ export function registerTools(server: McpServer, session: Session): void {
   server.registerTool(
     "post_progress",
     {
-      title: "Post progress",
       description:
-        "Report how your work on an issue is going, so the people on it see it live. Post when you start, when you are blocked or need input, and when you finish. It does not change the issue's status: use update_issue for that.",
+        "Only when you are blocked, need a person, or sum up at the end. Edict already shows your status moves, links and comments.",
       inputSchema: {
         issue: issueArg,
         state: stateArg,
-        message: z.string().describe("Markdown, a sentence or two"),
-        links: z.array(linkArg).max(10).optional().describe("Pull requests or other URLs"),
+        message: z.string().describe("Markdown"),
+        links: z.array(linkArg).max(10).optional(),
       },
     },
     tool(async ({ issue, state, message, links }) => {
@@ -372,8 +395,7 @@ export function registerTools(server: McpServer, session: Session): void {
   server.registerTool(
     "link",
     {
-      title: "Link a URL",
-      description: "Attach a pull request or other URL to an issue. Attaching the same URL twice keeps one link.",
+      description: "Attach a pull request or URL to an issue.",
       inputSchema: { issue: issueArg, url: z.string().url(), title: z.string().optional() },
     },
     tool(async ({ issue, url, title }) => {
@@ -390,12 +412,11 @@ export function registerTools(server: McpServer, session: Session): void {
   server.registerTool(
     "relate_issues",
     {
-      title: "Relate issues",
-      description: "Record that one issue blocks, is blocked by, relates to or duplicates another.",
+      description: "Record that an issue blocks, relates to or duplicates another.",
       inputSchema: {
         issue: issueArg,
         relation: z.enum(["blocks", "blocked_by", "related", "duplicate_of", "duplicated_by"]),
-        other: z.string().describe("The other issue's identifier"),
+        other: z.string(),
       },
     },
     tool(async ({ issue, relation, other }) => {
@@ -411,7 +432,7 @@ export function registerTools(server: McpServer, session: Session): void {
 
   server.registerTool(
     "list_teams",
-    { title: "List teams", description: "The teams you can see, with their keys.", inputSchema: {} },
+    { description: "Teams you can see, with keys.", inputSchema: {} },
     tool(async () => {
       const teams = await session.teams();
       return teams.map((team) => `- ${team.key} ${team.name}${team.private ? " (private)" : ""}`).join("\n") || "You can see no teams.";
@@ -421,9 +442,8 @@ export function registerTools(server: McpServer, session: Session): void {
   server.registerTool(
     "get_team_context",
     {
-      title: "Get a team's context",
-      description: "A team's statuses with their categories, its labels, and its people and agents with their handles. Use it before creating or updating issues there.",
-      inputSchema: { team: z.string().describe("Team key or name") },
+      description: "A team's statuses, labels, templates, and members with @handles.",
+      inputSchema: { team: z.string().describe("Team key") },
     },
     tool(async ({ team: value }) => {
       const team = await session.team(value);
@@ -463,8 +483,7 @@ export function registerTools(server: McpServer, session: Session): void {
   server.registerTool(
     "get_inbox",
     {
-      title: "Get inbox",
-      description: "List unread notifications for the caller in this organization.",
+      description: "Your unread notifications.",
       inputSchema: {},
     },
     tool(async () => {
@@ -488,9 +507,8 @@ export function registerTools(server: McpServer, session: Session): void {
   server.registerTool(
     "get_project",
     {
-      title: "Get project",
-      description: "Read a project by slug or ID with its progress and issues.",
-      inputSchema: { project: z.string().describe("Project slug or ID") },
+      description: "A project with its progress and issues.",
+      inputSchema: { project: z.string().describe("Project slug or name") },
     },
     tool(async ({ project }) => renderProject(session, project)),
   );

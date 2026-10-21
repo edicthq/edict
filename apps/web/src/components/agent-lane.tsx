@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Agent, Issue, Member, ProgressUpdate } from "@edicthq/client";
-import { Avatar, Button, ProgressBadge } from "@edicthq/ui";
+import { Avatar, Button, ProgressBadge, cn } from "@edicthq/ui";
 import { GitPullRequest } from "lucide-react";
 import { Link } from "react-router";
 import { connectionLine, firstName, progressState, waitingLine, workOnPhrase } from "../lib/agents.js";
@@ -120,16 +120,22 @@ function AgentLaneBody({
   );
 }
 
+// What the agent said sits on the agent's rule. What Edict saw it do, and what
+// its client's hooks reported, read more quietly (ADR 0029).
 function ProgressEntry({ update }: { update: ProgressUpdate }) {
+  const said = update.source === "agent";
   return (
-    <li className="grid grid-cols-[44px_minmax(0,1fr)] gap-x-2">
+    <li className="grid grid-cols-[44px_minmax(0,1fr)] gap-x-2" data-source={update.source}>
       <time dateTime={update.createdAt} title={new Date(update.createdAt).toLocaleString()} className="pt-0.5 text-sm text-ink-2 tabular-nums">
         {ago(update.createdAt)}
       </time>
-      <div className="min-w-0 border-s-2 border-agent-edge ps-3">
+      <div className={cn("min-w-0 border-s-2 ps-3", said ? "border-agent-edge" : "border-line-strong")}>
         {update.state !== "working" ? <ProgressBadge state={update.state} className="mb-1.5" /> : null}
         {/* Inline code in an agent's words sits on the agent wash (tokens.md). */}
-        <Markdown text={update.message} className="text-ui [&_code]:bg-agent-wash!" />
+        <Markdown
+          text={update.message}
+          className={cn("text-ui [&_code]:bg-agent-wash!", !said && "text-ink-2! line-clamp-4")}
+        />
         {update.links.length ? (
           <ul className="mt-2 flex flex-wrap gap-1.5">
             {update.links.map((link) => (

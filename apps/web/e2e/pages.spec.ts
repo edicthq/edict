@@ -76,9 +76,14 @@ test("Connect an agent shows the steps for the client you pick", async ({ page, 
   const picker = page.getByRole("radiogroup", { name: "Your client" });
   await expect(picker.getByRole("radio", { name: /Claude Code/ })).toHaveAttribute("aria-checked", "true");
   await expect(page.getByText("claude mcp login edict")).toBeVisible();
+  // Claude Code's hooks come after its steps; the key needs its agent first.
+  const hooks = page.getByRole("region", { name: "Progress at no token cost" });
+  await expect(hooks.getByText("Connect Claude Code first.", { exact: false })).toBeVisible();
+  await expect(hooks.getByText('"if": "Bash(git commit *)"', { exact: false })).toBeVisible();
 
   await picker.getByRole("radio", { name: /Codex/ }).click();
   await expect(page.getByRole("heading", { name: "Connect Codex" })).toBeVisible();
   await expect(page.getByText("codex mcp login edict")).toBeVisible();
+  await expect(hooks).toBeHidden();
   await expect(page.getByText("Once you approve a client, its agent shows up here and in the sidebar.")).toBeVisible();
 });

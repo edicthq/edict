@@ -158,11 +158,18 @@ export const UpdateAgent = z
   })
   .meta({ id: "UpdateAgent" });
 
+// ADR 0029. full: the API, as the agent. hooks: only the agent's client hooks.
+export const ApiKeyScope = z
+  .enum(["full", "hooks"])
+  .meta({ id: "ApiKeyScope", description: "full: the API, as the agent. hooks: only posting the agent's client hooks." });
+export type ApiKeyScope = z.infer<typeof ApiKeyScope>;
+
 export const ApiKey = z
   .object({
     id: Id,
     agentId: Id,
     name: z.string(),
+    scope: ApiKeyScope,
     // The secret's first characters.
     prefix: z.string(),
     // The teams the key narrows the agent to. Null: all of the agent's teams.
@@ -177,6 +184,9 @@ export const CreateApiKey = z
   .object({
     name: z.string().trim().min(1).max(80),
     teamIds: z.array(Id).max(50).nullable().default(null),
+    // A hook key is the only kind a connected agent can have, and the person
+    // who connected it can create one.
+    scope: ApiKeyScope.default("full"),
   })
   .meta({ id: "CreateApiKey" });
 
@@ -673,13 +683,22 @@ export const WebLink = z
   })
   .meta({ id: "WebLink" });
 
-// A structured report an agent posts on an issue.
+// ADR 0029: who wrote a progress update.
+export const ProgressSource = z.enum(["agent", "activity", "hook"]).meta({
+  id: "ProgressSource",
+  description:
+    "agent: the agent posted it. activity: Edict wrote it from the delegate moving, linking or commenting on the issue. hook: the agent's client posted it from a hook.",
+});
+export type ProgressSource = z.infer<typeof ProgressSource>;
+
+// A structured report on an agent's work on an issue.
 export const ProgressUpdate = z
   .object({
     id: Id,
     issueId: Id,
     agentId: Id,
     state: ProgressState,
+    source: ProgressSource,
     // Markdown.
     message: z.string(),
     links: z.array(WebLink),
@@ -695,6 +714,24 @@ export const PostProgress = z
     links: z.array(WebLink).max(10).default([]),
   })
   .meta({ id: "PostProgress" });
+
+// What Claude Code's HTTP hooks send (ADR 0029), taken as it is. Edict reads
+// these fields and ignores the rest.
+export const ClaudeCodeHook = z
+  .looseObject({
+    session_id: z.string().min(1).max(200),
+    hook_event_name: z.string().max(100),
+    // SessionStart: startup, resume, clear, compact or fork.
+    source: z.string().max(100).optional(),
+    // PostToolUse.
+    tool_name: z.string().max(300).optional(),
+    tool_input: z.record(z.string(), z.unknown()).optional(),
+    tool_response: z.unknown().optional(),
+    // Stop.
+    last_assistant_message: z.string().optional(),
+  })
+  .meta({ id: "ClaudeCodeHook" });
+export type ClaudeCodeHook = z.infer<typeof ClaudeCodeHook>;
 
 // A URL attached to an issue, such as a pull request.
 export const Link = z

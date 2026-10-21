@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Accent, Agent, AgentPower, Attachment, Comment, InboxItem, InstanceStatus, Issue, Label, paths, ProjectStatus, RelationType, Role, SavedView, SavedViewQuery, SignUpMode, Status, Webhook, WebLink } from "@edicthq/client";
+import type { Accent, Agent, AgentPower, ApiKeyScope, Attachment, Comment, InboxItem, InstanceStatus, Issue, Label, paths, ProjectStatus, RelationType, Role, SavedView, SavedViewQuery, SignUpMode, Status, Webhook, WebLink } from "@edicthq/client";
 import { ApiFailure, api, unwrap } from "./api.js";
 import { usePollWhileDown } from "./live.js";
 
@@ -796,7 +796,7 @@ export function useApiKeys(orgId: string, agentId: string, enabled = true) {
 export function useCreateApiKey(orgId: string, agentId: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (body: { name: string; teamIds: string[] | null }) =>
+    mutationFn: (body: { name: string; teamIds: string[] | null; scope?: ApiKeyScope }) =>
       unwrap(api.POST("/organizations/{orgId}/agents/{agentId}/api-keys", { params: { path: { orgId, agentId } }, body })),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.apiKeys(orgId, agentId) }),
   });

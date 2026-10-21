@@ -479,6 +479,7 @@ function ApiKeys({ agent }: { agent: Agent }) {
             <li key={key.id} className="flex min-h-9 items-center gap-3 rounded-sm px-2 text-ui hover:bg-hover">
               <code className="font-code text-code">{key.prefix}…</code>
               <span className="truncate">{key.name}</span>
+              {key.scope === "hooks" ? <Badge>hooks only</Badge> : null}
               <span className="ms-auto text-sm text-ink-2">{key.lastUsedAt ? (ago(key.lastUsedAt) === "now" ? "used just now" : `used ${ago(key.lastUsedAt)} ago`) : "never used"}</span>
               <Button variant="ghost" onClick={() => revoke.mutate(key.id, { onError: (error) => toast(error.message) })}>
                 Revoke

@@ -2397,7 +2397,7 @@ export interface paths {
         put?: never;
         /**
          * Post a progress update on an issue
-         * @description Agents report how their work on an issue is going: working, blocked, needs input or done, with a markdown message and links such as pull requests. People comment instead. Posting does not change the issue's status.
+         * @description Agents report how their work on an issue is going: working, blocked, needs input or done, with a markdown message and links such as pull requests. People comment instead. Posting does not change the issue's status. Edict already writes progress when the delegate moves the issue, links a URL or comments (ADR 0029), so agents post mainly when blocked, waiting on a person, or summing up.
          */
         post: {
             parameters: {
@@ -4793,7 +4793,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** An agent's API keys that are not revoked */
+        /**
+         * An agent's API keys that are not revoked
+         * @description Admins see every agent's keys. The person who connected an agent sees its hook keys.
+         */
         get: {
             parameters: {
                 query?: never;
@@ -4847,7 +4850,7 @@ export interface paths {
         put?: never;
         /**
          * Give an agent an API key
-         * @description The secret is in this response only. Send it as `Authorization: Bearer <secret>`.
+         * @description The secret is in this response only. Send it as `Authorization: Bearer <secret>`. Admins give agent runners full keys. A hook key (scope hooks) can only post the agent's client hooks; it is the only kind a connected agent has, and the person who connected it can create one (ADR 0029).
          */
         post: {
             parameters: {
@@ -4987,6 +4990,85 @@ export interface paths {
                 };
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{orgId}/agent-hooks/claude-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Take a Claude Code hook
+         * @description Point Claude Code's HTTP hooks here with an agent's hook key. The first Edict tool call naming an issue delegated to the agent ties the session to it and posts working. A `git commit` posts what it committed, `gh pr create` links the pull request, a resumed or compacted session posts working, and Stop posts done with the turn's last message. Anything else is ignored. Answers 204 with no body.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    orgId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ClaudeCodeHook"];
+                };
+            };
+            responses: {
+                /** @description Done */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The request does not match the schema */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The caller's role does not allow this */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found, or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -7478,6 +7560,7 @@ export interface components {
             /** Format: uuid */
             agentId: string;
             state: components["schemas"]["ProgressState"];
+            source: components["schemas"]["ProgressSource"];
             message: string;
             links: components["schemas"]["WebLink"][];
             /** Format: date-time */
@@ -7488,6 +7571,11 @@ export interface components {
          * @enum {string}
          */
         ProgressState: "working" | "blocked" | "needs_input" | "done";
+        /**
+         * @description agent: the agent posted it. activity: Edict wrote it from the delegate moving, linking or commenting on the issue. hook: the agent's client posted it from a hook.
+         * @enum {string}
+         */
+        ProgressSource: "agent" | "activity" | "hook";
         WebLink: {
             /** Format: uri */
             url: string;
@@ -7785,6 +7873,7 @@ export interface components {
             /** Format: uuid */
             agentId: string;
             name: string;
+            scope: components["schemas"]["ApiKeyScope"];
             prefix: string;
             teamIds: string[] | null;
             /** Format: date-time */
@@ -7792,6 +7881,11 @@ export interface components {
             /** Format: date-time */
             lastUsedAt: string | null;
         };
+        /**
+         * @description full: the API, as the agent. hooks: only posting the agent's client hooks.
+         * @enum {string}
+         */
+        ApiKeyScope: "full" | "hooks";
         CreatedApiKey: {
             apiKey: components["schemas"]["ApiKey"];
             secret: string;
@@ -7800,6 +7894,20 @@ export interface components {
             name: string;
             /** @default null */
             teamIds: string[] | null;
+            scope?: components["schemas"]["ApiKeyScope"];
+        };
+        ClaudeCodeHook: {
+            session_id: string;
+            hook_event_name: string;
+            source?: string;
+            tool_name?: string;
+            tool_input?: {
+                [key: string]: unknown;
+            };
+            tool_response?: unknown;
+            last_assistant_message?: string;
+        } & {
+            [key: string]: unknown;
         };
         ConnectionOrganization: {
             /** Format: uuid */

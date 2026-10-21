@@ -43,6 +43,12 @@ export interface Caller extends MemberRow {
   keyTeamIds: string[] | null;
 }
 
+// What a request may do with a hook key (ADR 0029): only the agent hooks
+// endpoint takes one.
+export interface CallerOptions {
+  hooks?: boolean;
+}
+
 export const API_KEY_PREFIX = "edict_ak_";
 
 // The credential a request carries: a bearer API key, else the session.
@@ -71,7 +77,7 @@ export function scopeFor(credential: Credential): Scope {
 
 // The caller in the scoped organization. Outsiders get 404, so they cannot tell
 // whether the organization exists.
-export async function callerIn(tx: Transaction, orgId: string, credential: Credential): Promise<Caller> {
+export async function callerIn(tx: Transaction, orgId: string, credential: Credential, options: CallerOptions = {}): Promise<Caller> {
   if (credential.kind === "session") {
     const member = await callerMember(tx, orgId, credential.user.id);
     return { ...member, access: member, keyTeamIds: null };
@@ -86,6 +92,9 @@ export async function callerIn(tx: Transaction, orgId: string, credential: Crede
   const key = await keyByHash(tx, credential.hash);
   if (key.orgId !== orgId) {
     throw notFound("organization");
+  }
+  if (key.scope === "hooks" && !options.hooks) {
+    throw forbidden("This is a hook key: it can only post the agent's client hooks to /agent-hooks. Use a full API key or OAuth for the rest of the API.");
   }
   return agentCaller(tx, key);
 }
@@ -134,6 +143,20 @@ async function agentCaller(tx: Transaction, key: ApiKeyRow): Promise<Caller> {
         or(isNull(apiKeys.lastUsedAt), lt(apiKeys.lastUsedAt, new Date(Date.now() - 60_000))),
       ),
     );
+  // A connected agent's hook key acts as its OAuth token does: with its
+  // human's access, on their behalf.
+  if (agent.connectedBy) {
+    const [human] = await tx
+      .select()
+      .from(members)
+      .where(and(eq(members.orgId, key.orgId), eq(members.id, agent.connectedBy), isNull(members.removedAt)));
+    if (!human) {
+      throw invalidKey();
+    }
+    await onBehalfOf(tx, human.id);
+    const role = connectedRole(human.role);
+    return { ...agent, role: atLeast(agent.role, role) ? role : agent.role, access: human, keyTeamIds: key.teamIds };
+  }
   return { ...agent, access: agent, keyTeamIds: key.teamIds };
 }
 

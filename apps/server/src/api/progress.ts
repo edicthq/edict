@@ -1,11 +1,11 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { and, desc, eq, isNull, notInArray, or, sql } from "drizzle-orm";
-import { emit, issues, progressUpdates, statuses, teams } from "@edicthq/db";
-import { Issue, IssueRef, PostProgress, ProgressUpdate } from "@edicthq/schema";
+import { comments, consumeEvents, emit, issues, progressUpdates, statuses, teams, type EventRow, type ProgressLink, type Transaction } from "@edicthq/db";
+import { Issue, IssueRef, PostProgress, ProgressUpdate, type ProgressSource, type ProgressState } from "@edicthq/schema";
 import { teamVisibility } from "./access.js";
 import { body, errors, inOrg, json, OrgParams, router, type ApiDeps } from "./context.js";
 import { forbidden } from "./errors.js";
-import { toIssues, toProgress, visibleIssue } from "./issue-data.js";
+import { toIssues, toProgress, visibleIssue, type ProgressRow } from "./issue-data.js";
 
 const IssueParams = OrgParams.extend({ issueRef: IssueRef });
 
@@ -15,7 +15,7 @@ const postProgress = createRoute({
   tags: ["Progress"],
   summary: "Post a progress update on an issue",
   description:
-    "Agents report how their work on an issue is going: working, blocked, needs input or done, with a markdown message and links such as pull requests. People comment instead. Posting does not change the issue's status.",
+    "Agents report how their work on an issue is going: working, blocked, needs input or done, with a markdown message and links such as pull requests. People comment instead. Posting does not change the issue's status. Edict already writes progress when the delegate moves the issue, links a URL or comments (ADR 0029), so agents post mainly when blocked, waiting on a person, or summing up.",
   request: { params: IssueParams, ...body(PostProgress) },
   responses: {
     201: json(ProgressUpdate, "The progress update"),
@@ -66,17 +66,7 @@ export function progressRoutes(deps: ApiDeps) {
         throw forbidden("Progress updates come from agents. Comment on the issue instead.");
       }
       const { issue } = await visibleIssue(tx, caller, issueRef);
-      const [row] = await tx
-        .insert(progressUpdates)
-        .values({ orgId, issueId: issue.id, agentId: caller.id, state: input.state, message: input.message, links: input.links })
-        .returning();
-      await emit(tx, orgId, {
-        type: "progress.posted",
-        actorId: caller.id,
-        subjectId: row!.id,
-        data: { issueId: issue.id, state: input.state },
-      });
-      return toProgress(row!);
+      return toProgress(await writeProgress(tx, caller.orgId, { issueId: issue.id, agentId: caller.id, source: "agent", ...input }));
     });
     return c.json(created, 201);
   });
@@ -124,3 +114,98 @@ export function progressRoutes(deps: ApiDeps) {
 
   return app;
 }
+
+// Writes a progress update and its event in the caller's change.
+export async function writeProgress(
+  tx: Transaction,
+  orgId: string,
+  update: { issueId: string; agentId: string; source: ProgressSource; state: ProgressState; message: string; links?: ProgressLink[] },
+): Promise<ProgressRow> {
+  const [row] = await tx
+    .insert(progressUpdates)
+    .values({ orgId, issueId: update.issueId, agentId: update.agentId, source: update.source, state: update.state, message: update.message, links: update.links ?? [] })
+    .returning();
+  await emit(tx, orgId, {
+    type: "progress.posted",
+    actorId: update.agentId,
+    subjectId: row!.id,
+    data: { issueId: update.issueId, state: update.state, source: update.source },
+  });
+  return row!;
+}
+
+// The agent's newest progress update on an issue.
+export async function latestByAgent(tx: Transaction, issueId: string, agentId: string): Promise<ProgressRow | undefined> {
+  const [row] = await tx
+    .select()
+    .from(progressUpdates)
+    .where(and(eq(progressUpdates.issueId, issueId), eq(progressUpdates.agentId, agentId)))
+    .orderBy(desc(progressUpdates.id))
+    .limit(1);
+  return row;
+}
+
+// A link or comment keeps a question open: the agent often asks it in a
+// comment. Anything else says working.
+export function carriedState(latest: ProgressRow | undefined): ProgressState {
+  return latest?.state === "blocked" || latest?.state === "needs_input" ? latest.state : "working";
+}
+
+const MESSAGE_LINE = 200;
+
+// The first line of a markdown text, short enough for the lane.
+function firstLine(text: string): string {
+  const line = text.split("\n").map((part) => part.trim()).find(Boolean) ?? "";
+  return line.length > MESSAGE_LINE ? `${line.slice(0, MESSAGE_LINE - 1)}…` : line;
+}
+
+type Changes = Record<string, { from: unknown; to: unknown } | undefined>;
+
+// ADR 0029: what the delegate does on its issue is progress. The status move,
+// link or comment writes an activity update in its own change. Undoing a
+// change writes none.
+async function activityFromEvent(tx: Transaction, event: EventRow): Promise<void> {
+  const data = event.data as Record<string, unknown>;
+  if (data.undoes) return;
+  let issueId: string;
+  if (event.type === "issue.updated" && (data.changes as Changes | undefined)?.statusId) {
+    issueId = event.subjectId;
+  } else if ((event.type === "link.created" || event.type === "comment.created") && typeof data.issueId === "string") {
+    issueId = data.issueId;
+  } else {
+    return;
+  }
+  const [issue] = await tx.select({ delegateId: issues.delegateId }).from(issues).where(eq(issues.id, issueId));
+  if (!issue || issue.delegateId !== event.actorId) return;
+  const agentId = event.actorId;
+  const source: ProgressSource = data.via === "hook" ? "hook" : "activity";
+
+  if (event.type === "issue.updated") {
+    const to = (data.changes as Changes).statusId!.to as string;
+    const [status] = await tx.select({ name: statuses.name, category: statuses.category }).from(statuses).where(eq(statuses.id, to));
+    if (!status) return;
+    const closed = status.category === "done" || status.category === "canceled";
+    await writeProgress(tx, event.orgId, { issueId, agentId, source, state: closed ? "done" : "working", message: `Moved to ${status.name}` });
+    return;
+  }
+  const state = carriedState(await latestByAgent(tx, issueId, agentId));
+  if (event.type === "link.created") {
+    const url = data.url as string;
+    const title = typeof data.title === "string" && data.title ? data.title : undefined;
+    await writeProgress(tx, event.orgId, {
+      issueId,
+      agentId,
+      source,
+      state,
+      message: `Linked ${title ?? url}`,
+      links: [title ? { url, title } : { url }],
+    });
+    return;
+  }
+  const [comment] = await tx.select({ body: comments.body }).from(comments).where(eq(comments.id, event.subjectId));
+  const message = firstLine(comment?.body ?? "");
+  if (!message) return;
+  await writeProgress(tx, event.orgId, { issueId, agentId, source, state, message });
+}
+
+consumeEvents(activityFromEvent);

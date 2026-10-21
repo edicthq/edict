@@ -281,6 +281,13 @@
       "when": 1792398992849,
       "tag": "0040_telemetry",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1792561596631,
+      "tag": "0041_agent_activity",
+      "breakpoints": true
     }
   ]
 }

@@ -84,6 +84,27 @@ describe("/mcp", () => {
     expect(prompts).toEqual(["plan_issues", "plan_project", "triage_inbox", "work_my_queue"]);
   });
 
+  // ADR 0029: every session pays for the tool definitions, so they stay lean.
+  // Measured on 2026-10-20 at 8,637 characters (about 2.2k tokens).
+  it("keeps the tool definitions small and post_progress optional", async () => {
+    const { t, owner, orgId } = await seed();
+    const { client } = await mcpClient(t.baseUrl, (await connect(t.baseUrl, owner, orgId)).accessToken);
+    const { tools } = await client.listTools();
+    const size = JSON.stringify(tools).length;
+    expect(size).toBeLessThanOrEqual(5000);
+    expect(JSON.stringify(tools)).not.toContain("$schema");
+    expect(JSON.stringify(tools)).not.toContain("9007199254740991");
+    const progress = tools.find((tool) => tool.name === "post_progress")!;
+    expect(progress.description).toMatch(/blocked/);
+    expect(progress.inputSchema.required).toEqual(["issue", "state", "message"]);
+    const update = tools.find((tool) => tool.name === "update_issue")!;
+    expect(update.inputSchema.required).toEqual(["issue", "version"]);
+    expect(Object.keys(update.inputSchema.properties ?? {})).toContain("add_labels");
+    const instructions = client.getInstructions() ?? "";
+    expect(instructions).not.toMatch(/post_progress with state working/);
+    expect(instructions).toMatch(/post_progress/);
+  });
+
   it("names itself edict at the version the server ships as", async () => {
     const { t, owner, orgId } = await seed();
     const { client } = await mcpClient(t.baseUrl, (await connect(t.baseUrl, owner, orgId)).accessToken);

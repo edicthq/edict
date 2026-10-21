@@ -118,12 +118,14 @@ test("an MCP client connects by URL and works a delegated issue", async ({ page,
   expect(await call("my_work")).toContain("ENG-1 Fix the login redirect");
   const read = await call("get_issue", { issue: "ENG-1" });
   const version = Number(/Version: (\d+)/.exec(read)![1]);
+  // Moving the issue is the agent's progress (ADR 0029): no post_progress.
   await call("update_issue", { issue: "ENG-1", version, status: "In Progress" });
-  await call("post_progress", { issue: "ENG-1", state: "working", message: "Tracing the `next` parameter through sign-in." });
 
   // The person sees it working, live.
   await expect(peek.getByRole("button", { name: /Status: In Progress/ })).toBeVisible({ timeout: 15_000 });
-  await expect(peek.getByText("Tracing the")).toBeVisible({ timeout: 15_000 });
+  const lane = peek.getByRole("region", { name: "Agent lane" });
+  await expect(lane.getByText("Moved to In Progress")).toBeVisible({ timeout: 15_000 });
+  await expect(lane.locator('li[data-source="activity"]')).toHaveCount(1);
   await expect(peek.getByText("Claude Code (Maya) is working")).toBeVisible();
 
   await call("link", { issue: "ENG-1", url: "https://github.com/edicthq/edict/pull/42", title: "Keep next through sign-in" });
@@ -153,12 +155,44 @@ test("an MCP client connects by URL and works a delegated issue", async ({ page,
   // And so does the web app.
   await page.reload();
   await expect(peek.getByRole("button", { name: /Status: Done/ })).toBeVisible();
-  await expect(peek.getByRole("link", { name: "Keep next through sign-in", exact: true })).toBeVisible();
-  await expect(peek.getByRole("link", { name: "#42 Keep next through sign-in" })).toBeVisible();
+  const links = peek.getByRole("region", { name: "Links" });
+  await expect(links.getByRole("link", { name: "Keep next through sign-in", exact: true })).toBeVisible();
+  // The lane shows the link as the agent's activity, and its own summary.
+  await expect(lane.getByText("Linked Keep next through sign-in")).toBeVisible();
+  await expect(lane.getByRole("link", { name: "#42 Keep next through sign-in" })).toBeVisible();
   if (process.env.E2E_SCREENSHOTS) await page.screenshot({ path: `${process.env.E2E_SCREENSHOTS}/m3-peek-${test.info().project.name}.png` });
   await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: /ENG-1 Fix the login redirect.*Merged\./ })).toBeVisible();
   if (process.env.E2E_SCREENSHOTS) await page.screenshot({ path: `${process.env.E2E_SCREENSHOTS}/m3-list-${test.info().project.name}.png` });
+
+  // Maya makes a hook key for her agent, and Claude Code's hooks report the
+  // next session's work at no token cost (ADR 0029).
+  await page.goto("/agents-co/connect");
+  const hooks = page.getByRole("region", { name: "Progress at no token cost" });
+  await expect(hooks.getByText("/agent-hooks/claude-code")).toBeVisible();
+  await hooks.getByRole("button", { name: "Create hook key" }).click();
+  const exported = (await hooks.getByText(/^export EDICT_HOOK_KEY=/).textContent())!;
+  const hookKey = exported.replace("export EDICT_HOOK_KEY=", "").trim();
+  const hook = (input: Record<string, unknown>) =>
+    fetch(`${baseURL}/api/v1/organizations/${orgId}/agent-hooks/claude-code`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${hookKey}`, "content-type": "application/json" },
+      body: JSON.stringify({ session_id: "e2e", ...input }),
+    });
+  expect((await hook({ hook_event_name: "PostToolUse", tool_name: "mcp__edict__get_issue", tool_input: { issue: "ENG-1" } })).status).toBe(204);
+  await hook({
+    hook_event_name: "PostToolUse",
+    tool_name: "Bash",
+    tool_input: { command: "git commit -m 'Follow-up'" },
+    tool_response: { stdout: "[main 9f8e7d6] Follow-up", stderr: "" },
+  });
+  const reported = (await api("/issues/ENG-1/progress")) as { source: string; message: string }[];
+  expect(reported.slice(0, 2).map((p) => [p.source, p.message])).toEqual([
+    ["hook", "Committed `9f8e7d6` Follow-up"],
+    ["hook", "Picked up"],
+  ]);
+  // A hook key reaches nothing else.
+  expect((await fetch(`${baseURL}/api/v1/organizations/${orgId}/teams`, { headers: { authorization: `Bearer ${hookKey}` } })).status).toBe(403);
 });
 
 test("an admin adds a runner agent with an API key and a webhook, then pauses it", async ({ page, baseURL }) => {

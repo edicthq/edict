@@ -15,6 +15,7 @@ import {
 import {
   Agent,
   ApiKey,
+  type ApiKeyScope,
   CreateAgent,
   CreateApiKey,
   CreatedApiKey,
@@ -52,6 +53,7 @@ function toApiKey(row: typeof apiKeys.$inferSelect): ApiKey {
     agentId: row.agentId,
     name: row.name,
     prefix: row.prefix,
+    scope: row.scope,
     teamIds: row.teamIds,
     createdAt: row.createdAt.toISOString(),
     lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
@@ -139,6 +141,7 @@ const listApiKeys = createRoute({
   path: "/organizations/{orgId}/agents/{agentId}/api-keys",
   tags: ["Agents"],
   summary: "An agent's API keys that are not revoked",
+  description: "Admins see every agent's keys. The person who connected an agent sees its hook keys.",
   request: { params: AgentParams },
   responses: {
     200: json(z.array(ApiKey), "API keys, without their secrets"),
@@ -151,7 +154,8 @@ const createApiKey = createRoute({
   path: "/organizations/{orgId}/agents/{agentId}/api-keys",
   tags: ["Agents"],
   summary: "Give an agent an API key",
-  description: "The secret is in this response only. Send it as `Authorization: Bearer <secret>`.",
+  description:
+    "The secret is in this response only. Send it as `Authorization: Bearer <secret>`. Admins give agent runners full keys. A hook key (scope hooks) can only post the agent's client hooks; it is the only kind a connected agent has, and the person who connected it can create one (ADR 0029).",
   request: { params: AgentParams, ...body(CreateApiKey) },
   responses: {
     201: json(CreatedApiKey, "The key and its secret"),
@@ -288,8 +292,8 @@ export function agentRoutes(deps: ApiDeps) {
   app.openapi(listApiKeys, async (c) => {
     const { orgId, agentId } = c.req.valid("param");
     const rows = await inOrg(deps, c, orgId, async (tx, caller) => {
-      await agentRow(tx, orgId, agentId);
-      requireRole(caller, "admin", "see API keys", "agents");
+      const agent = await agentRow(tx, orgId, agentId);
+      requireKeyRights(caller, agent, "hooks", "see API keys");
       return tx
         .select()
         .from(apiKeys)
@@ -305,24 +309,24 @@ export function agentRoutes(deps: ApiDeps) {
     const key = newApiKey();
     const row = await inOrg(deps, c, orgId, async (tx, caller) => {
       const agent = await agentRow(tx, orgId, agentId);
-      requireRole(caller, "admin", "give agents API keys", "agents");
+      requireKeyRights(caller, agent, input.scope, "give agents API keys");
       if (agent.pausedAt) {
         throw conflict("The agent is paused. Resume it first.");
       }
-      if (agent.connectedBy) {
-        throw invalid("A connected agent acts through its MCP client's OAuth connection, not API keys.");
+      if (agent.connectedBy && input.scope !== "hooks") {
+        throw invalid("A connected agent acts through its MCP client's OAuth connection. It can have hook keys only (scope hooks).");
       }
       const teamIds = input.teamIds ? [...new Set(input.teamIds)] : null;
       await requireVisibleTeams(tx, caller, teamIds ?? []);
       const [created] = await tx
         .insert(apiKeys)
-        .values({ orgId, agentId, name: input.name, prefix: key.prefix, tokenHash: key.hash, teamIds, createdBy: caller.id })
+        .values({ orgId, agentId, name: input.name, prefix: key.prefix, tokenHash: key.hash, teamIds, scope: input.scope, createdBy: caller.id })
         .returning();
       await emit(tx, orgId, {
         type: "api_key.created",
         actorId: caller.id,
         subjectId: created!.id,
-        data: { agentId, name: input.name, prefix: key.prefix, teamIds },
+        data: { agentId, name: input.name, prefix: key.prefix, teamIds, scope: input.scope },
       });
       return created!;
     });
@@ -332,8 +336,8 @@ export function agentRoutes(deps: ApiDeps) {
   app.openapi(revokeApiKey, async (c) => {
     const { orgId, agentId, keyId } = c.req.valid("param");
     await inOrg(deps, c, orgId, async (tx, caller) => {
-      await agentRow(tx, orgId, agentId);
-      requireRole(caller, "admin", "revoke API keys", "agents");
+      const agent = await agentRow(tx, orgId, agentId);
+      requireKeyRights(caller, agent, "hooks", "revoke API keys");
       const [revoked] = await tx
         .update(apiKeys)
         .set({ revokedAt: new Date() })
@@ -369,6 +373,15 @@ async function agentRow(tx: Transaction, orgId: string, agentId: string, options
     throw notFound("agent");
   }
   return row;
+}
+
+// Admins manage any agent's keys. The human who connected an agent manages its
+// hook keys, which are the only keys it can have (ADR 0029).
+function requireKeyRights(caller: Caller, agent: MemberRow, scope: ApiKeyScope, action: string): void {
+  if (scope === "hooks" && caller.kind === "human" && agent.connectedBy === caller.id) {
+    return;
+  }
+  requireRole(caller, "admin", action, "agents");
 }
 
 // Admins pause any agent. The human who connected an agent can pause it too.

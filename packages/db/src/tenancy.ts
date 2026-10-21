@@ -116,6 +116,8 @@ export const apiKeys = pgTable(
     tokenHash: text("token_hash").notNull().unique(),
     // Narrows the agent's team access. Null: the agent's own access.
     teamIds: uuid("team_ids").array(),
+    // ADR 0029. full: the API. hooks: only the agent's client hooks.
+    scope: text("scope", { enum: ["full", "hooks"] }).notNull().default("full"),
     createdBy: uuid("created_by").notNull(),
     createdAt: createdAt(),
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),

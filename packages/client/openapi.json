@@ -900,6 +900,9 @@
           "state": {
             "$ref": "#/components/schemas/ProgressState"
           },
+          "source": {
+            "$ref": "#/components/schemas/ProgressSource"
+          },
           "message": {
             "type": "string"
           },
@@ -919,6 +922,7 @@
           "issueId",
           "agentId",
           "state",
+          "source",
           "message",
           "links",
           "createdAt"
@@ -933,6 +937,15 @@
           "done"
         ],
         "description": "working: under way. blocked: cannot go on. needs_input: waiting on a person. done: finished."
+      },
+      "ProgressSource": {
+        "type": "string",
+        "enum": [
+          "agent",
+          "activity",
+          "hook"
+        ],
+        "description": "agent: the agent posted it. activity: Edict wrote it from the delegate moving, linking or commenting on the issue. hook: the agent's client posted it from a hook."
       },
       "WebLink": {
         "type": "object",
@@ -1944,6 +1957,9 @@
           "name": {
             "type": "string"
           },
+          "scope": {
+            "$ref": "#/components/schemas/ApiKeyScope"
+          },
           "prefix": {
             "type": "string"
           },
@@ -1973,11 +1989,20 @@
           "id",
           "agentId",
           "name",
+          "scope",
           "prefix",
           "teamIds",
           "createdAt",
           "lastUsedAt"
         ]
+      },
+      "ApiKeyScope": {
+        "type": "string",
+        "enum": [
+          "full",
+          "hooks"
+        ],
+        "description": "full: the API, as the agent. hooks: only posting the agent's client hooks."
       },
       "CreatedApiKey": {
         "type": "object",
@@ -2013,11 +2038,49 @@
             },
             "maxItems": 50,
             "default": null
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ApiKeyScope"
           }
         },
         "required": [
           "name"
         ]
+      },
+      "ClaudeCodeHook": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "hook_event_name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "tool_name": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "tool_input": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "tool_response": {},
+          "last_assistant_message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "hook_event_name"
+        ],
+        "additionalProperties": {}
       },
       "ConnectionOrganization": {
         "type": "object",
@@ -5880,7 +5943,7 @@
           "Progress"
         ],
         "summary": "Post a progress update on an issue",
-        "description": "Agents report how their work on an issue is going: working, blocked, needs input or done, with a markdown message and links such as pull requests. People comment instead. Posting does not change the issue's status.",
+        "description": "Agents report how their work on an issue is going: working, blocked, needs input or done, with a markdown message and links such as pull requests. People comment instead. Posting does not change the issue's status. Edict already writes progress when the delegate moves the issue, links a URL or comments (ADR 0029), so agents post mainly when blocked, waiting on a person, or summing up.",
         "parameters": [
           {
             "schema": {
@@ -8777,6 +8840,7 @@
           "Agents"
         ],
         "summary": "An agent's API keys that are not revoked",
+        "description": "Admins see every agent's keys. The person who connected an agent sees its hook keys.",
         "parameters": [
           {
             "schema": {
@@ -8848,7 +8912,7 @@
           "Agents"
         ],
         "summary": "Give an agent an API key",
-        "description": "The secret is in this response only. Send it as `Authorization: Bearer <secret>`.",
+        "description": "The secret is in this response only. Send it as `Authorization: Bearer <secret>`. Admins give agent runners full keys. A hook key (scope hooks) can only post the agent's client hooks; it is the only kind a connected agent has, and the person who connected it can create one (ADR 0029).",
         "parameters": [
           {
             "schema": {
@@ -8981,6 +9045,81 @@
         "responses": {
           "204": {
             "description": "Done"
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller's role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{orgId}/agent-hooks/claude-code": {
+      "post": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Take a Claude Code hook",
+        "description": "Point Claude Code's HTTP hooks here with an agent's hook key. The first Edict tool call naming an issue delegated to the agent ties the session to it and posts working. A `git commit` posts what it committed, `gh pr create` links the pull request, a resumed or compacted session posts working, and Stop posts done with the turn's last message. Anything else is ignored. Answers 204 with no body.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaudeCodeHook"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "400": {
+            "description": "The request does not match the schema",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "401": {
             "description": "Not signed in",

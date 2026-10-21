@@ -99,6 +99,7 @@ export function toProgress(row: ProgressRow): ProgressUpdate {
     issueId: row.issueId,
     agentId: row.agentId,
     state: row.state,
+    source: row.source,
     message: row.message,
     links: row.links,
     createdAt: row.createdAt.toISOString(),

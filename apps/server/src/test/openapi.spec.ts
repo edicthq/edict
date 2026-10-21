@@ -98,6 +98,7 @@ describe("OpenAPI document", () => {
       "POST /invites/{token}/accept",
       "POST /oauth/organization",
       "POST /organizations",
+      "POST /organizations/{orgId}/agent-hooks/claude-code",
       "POST /organizations/{orgId}/agents",
       "POST /organizations/{orgId}/agents/{agentId}/api-keys",
       "POST /organizations/{orgId}/agents/{agentId}/pause",
