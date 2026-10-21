@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { MarkdownEditor } from "./markdown-editor.js";
 import { useNavigate } from "react-router";
 import type { ProjectStatus } from "@edicthq/client";
-import { Button, Dialog, Field, Input, Select } from "@edicthq/ui";
+import { Button, Dialog, Field, Input, SelectMenu } from "@edicthq/ui";
+import { Calendar } from "lucide-react";
+import { DateMenu, formatDay } from "./date-menu.js";
 import { ApiFailure } from "../lib/api.js";
 import { useCreateProject, useMembers } from "../lib/queries.js";
 import { FormError } from "./shell.js";
@@ -135,49 +137,44 @@ function CreateProjectForm({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="Status">
-          {(control) => (
-            <Select
-              {...control}
-              value={status}
-              onChange={(e) => setStatus(e.target.value as ProjectStatus)}
-            >
-              <option value="planned">Planned</option>
-              <option value="in_progress">In Progress</option>
-              <option value="paused">Paused</option>
-              <option value="completed">Completed</option>
-              <option value="canceled">Canceled</option>
-            </Select>
-          )}
-        </Field>
+        <FieldMenu label="Status">
+          <SelectMenu
+            label="Status"
+            value={status}
+            onChange={setStatus}
+            options={projectStatuses}
+            className="h-9 w-full"
+          />
+        </FieldMenu>
 
-        <Field label="Lead">
-          {(control) => (
-            <Select
-              {...control}
-              value={leadId}
-              onChange={(e) => setLeadId(e.target.value)}
-            >
-              <option value="">No lead</option>
-              {humans.map((h) => (
-                <option key={h.id} value={h.id}>
-                  {h.name}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
+        <FieldMenu label="Lead">
+          <SelectMenu
+            label="Lead"
+            value={leadId}
+            onChange={setLeadId}
+            options={[{ value: "", label: "No lead" }, ...humans.map((h) => ({ value: h.id, label: h.name }))]}
+            className="h-9 w-full"
+          />
+        </FieldMenu>
 
-        <Field label="Target date">
-          {(control) => (
-            <Input
-              {...control}
-              type="date"
-              value={targetDate}
-              onChange={(e) => setTargetDate(e.target.value)}
-            />
-          )}
-        </Field>
+        <FieldMenu label="Target date">
+          <DateMenu
+            label="Target date"
+            value={targetDate || null}
+            onChange={(value) => setTargetDate(value ?? "")}
+            trigger={(props) => (
+              <button
+                {...props}
+                type="button"
+                aria-label={`Target date: ${targetDate ? formatDay(targetDate) : "none"}`}
+                className="hover-fade inline-flex h-9 w-full items-center gap-2 rounded-sm px-2.5 text-ui shadow-[inset_0_0_0_1px_var(--line-strong)] hover:bg-hover aria-expanded:bg-hover"
+              >
+                <Calendar aria-hidden="true" className="size-3.5 text-ink-2" strokeWidth={1.75} />
+                <span className={targetDate ? "text-ink" : "text-ink-2"}>{targetDate ? formatDay(targetDate) : "No date"}</span>
+              </button>
+            )}
+          />
+        </FieldMenu>
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -204,5 +201,24 @@ function CreateProjectForm({
         </Button>
       </div>
     </form>
+  );
+}
+
+const projectStatuses: { value: ProjectStatus; label: string }[] = [
+  { value: "planned", label: "Planned" },
+  { value: "in_progress", label: "In Progress" },
+  { value: "paused", label: "Paused" },
+  { value: "completed", label: "Completed" },
+  { value: "canceled", label: "Canceled" },
+];
+
+// A label over an app menu. Menus are buttons, so the label names them by
+// sitting beside them rather than through htmlFor.
+function FieldMenu({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <span className="text-sm font-semibold text-ink-2">{label}</span>
+      {children}
+    </div>
   );
 }

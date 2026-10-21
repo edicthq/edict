@@ -146,7 +146,7 @@ export function DateMenu({
       aria-label={label}
       onKeyDown={onKeyDown}
       style={{ width: WIDTH, left: placement?.left ?? 0, top: placement?.top ?? 0, visibility: placement ? undefined : "hidden" }}
-      className="fixed z-50 flex flex-col gap-1 rounded-md bg-surface p-2 shadow-overlay"
+      className="motion-pop fixed z-50 flex origin-top-left flex-col gap-1 rounded-md bg-raised p-2 shadow-overlay"
     >
       <div className="flex items-center gap-1 ps-2">
         <p aria-live="polite" className="flex-1 text-ui font-semibold">
@@ -210,7 +210,9 @@ export function DateMenu({
         "aria-haspopup": "dialog",
         "aria-expanded": open,
       })}
-      {panel ? createPortal(panel, document.body) : null}
+      {/* Inside a modal dialog the body is behind its backdrop: portal into
+          the dialog then, as the app's menus do. */}
+      {panel ? createPortal(panel, triggerRef.current?.closest("dialog[open]") ?? document.body) : null}
     </>
   );
 }

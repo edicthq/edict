@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router";
 import type { z } from "zod";
 import { CreateTeam } from "@edicthq/schema";
-import { Button, Dialog, Field, Input } from "@edicthq/ui";
+import { Button, Checkbox, Dialog, Field, Input } from "@edicthq/ui";
 import { ApiFailure } from "../lib/api.js";
 import { useCreateTeam } from "../lib/queries.js";
 import type { OrgContext } from "../routes/org.js";
@@ -92,7 +92,7 @@ function CreateTeamForm({ context, onDone }: { context: OrgContext; onDone: () =
         </Field>
       </div>
       <label className="flex items-start gap-2 text-ui">
-        <input type="checkbox" className="mt-0.5 size-4 accent-[var(--ink)]" {...form.register("private")} />
+        <Checkbox className="mt-0.5" {...form.register("private")} />
         <span>
           <span className="font-medium">Private team</span>
           <span className="block text-ink-2">Only its members and admins can see it.</span>

@@ -1,6 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { Agent, Attachment, Comment, Issue, Label, LinkedIssue, Member, RelationType, Status, Team } from "@edicthq/client";
-import { Avatar, Button, Dialog, Kbd, Menu, PriorityIcon, Select, StatusIcon, TeamKey } from "@edicthq/ui";
+import { Avatar, Button, Dialog, Kbd, Menu, PriorityIcon, StatusIcon, TeamKey, SelectMenu } from "@edicthq/ui";
 import { ArrowLeftRight, CornerDownRight, CornerLeftUp, Link2, Paperclip, Trash2, X } from "lucide-react";
 import { ApiFailure } from "../lib/api.js";
 import { ago, priorityLabel } from "../lib/issues.js";
@@ -638,21 +638,13 @@ function Relations({
             );
           }}
         >
-          <label className="sr-only" htmlFor="relation-type">
-            Relation
-          </label>
-          <Select
-            id="relation-type"
-            className="w-36 sm:h-[30px]"
+          <SelectMenu
+            label="Relation"
+            className="h-[30px] w-36"
             value={type}
-            onChange={(event) => setType(event.target.value as RelationType)}
-          >
-            {relationOrder.map((t) => (
-              <option key={t} value={t}>
-                {relationLabel[t]}
-              </option>
-            ))}
-          </Select>
+            onChange={setType}
+            options={relationOrder.map((t) => ({ value: t, label: relationLabel[t] }))}
+          />
           <label className="sr-only" htmlFor="relation-issue">
             Issue
           </label>

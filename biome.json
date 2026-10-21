@@ -36,9 +36,11 @@
           "level": "error",
           "options": {
             "inputComponents": [
-              "Select",
               "Input",
-              "Textarea"
+              "Textarea",
+              "Checkbox",
+              "Radio",
+              "Switch"
             ]
           }
         }

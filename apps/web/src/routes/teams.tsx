@@ -1,9 +1,9 @@
 import { Lock } from "lucide-react";
-import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import type { Team } from "@edicthq/client";
-import { Avatar, Badge, Button, Select, TeamKey, cn } from "@edicthq/ui";
-import { EmptyState, FormError, GroupHeader, Loading, PageBody, PageHeader, rowClass } from "../components/shell.js";
+import { Avatar, Badge, Button, SelectMenu, TeamKey, cn } from "@edicthq/ui";
+import { SettingRow, SettingsCard } from "../components/settings-frame.js";
+import { EmptyState, FormError, Loading, PageBody, PageColumn, PageHeader } from "../components/shell.js";
 import { roleLabel } from "../lib/labels.js";
 import { useToast } from "../components/toast.js";
 import { useOfferUndo } from "../components/undo.js";
@@ -103,7 +103,7 @@ export function TeamsPage() {
                   <li key={team.id}>
                     <Link
                       to={`/${slug}/teams/${team.id}`}
-                      className={cn(teamGrid, "min-h-12 rounded-sm py-1.5 transition-[background-color] duration-[140ms] ease-standard hover:bg-hover")}
+                      className={cn(teamGrid, "min-h-12 rounded-sm py-1.5 hover-fade hover:bg-hover")}
                     >
                       <span className="flex min-w-0 items-center gap-2.5">
                         <TeamKey>{team.key}</TeamKey>
@@ -156,7 +156,6 @@ export function TeamMembersPage() {
   const orgMembers = useMembers(orgId);
   const add = useAddTeamMember(orgId, teamId);
   const remove = useRemoveTeamMember(orgId, teamId);
-  const [adding, setAdding] = useState("");
 
   const team = teams.data?.find((t) => t.id === teamId);
   if (teams.isPending || teamMembers.isPending) return <Loading />;
@@ -200,52 +199,46 @@ export function TeamMembersPage() {
           </>
         }
       />
-      <PageBody>
-        <GroupHeader count={teamMembers.data?.length ?? 0}>Members</GroupHeader>
+      <PageColumn className="flex max-w-[760px] flex-col gap-8">
+        <SettingsCard
+          title="Members"
+          count={teamMembers.data?.length ?? 0}
+          actions={
+            canManage && candidates.length ? (
+              <SelectMenu
+                label="Add a member"
+                value=""
+                onChange={(id) => {
+                  if (id) add.mutate(id);
+                }}
+                options={[{ value: "", label: "Add a member…" }, ...candidates.map((m) => ({ value: m.id, label: m.name }))]}
+                align="end"
+                className="h-7 w-[160px]"
+              />
+            ) : null
+          }
+        >
+          <ul className="flex flex-col divide-y divide-line">
+            {teamMembers.data?.map((member) => (
+              <li key={member.id} className="flex min-h-14 items-center gap-3 px-4 py-2.5">
+                <Avatar name={member.name} kind={member.kind} size={32} />
+                <span className={cn("min-w-0 flex-1 truncate text-ui font-medium", member.kind === "agent" && "text-agent-ink")}>
+                  {member.name}
+                  {member.id === me ? <span className="font-normal text-ink-2"> (you)</span> : null}
+                </span>
+                <Badge>{roleLabel[member.role]}</Badge>
+                {canManage || member.id === me ? (
+                  <Button variant="ghost" disabled={remove.isPending} onClick={() => remove.mutate(member.id)}>
+                    {member.id === me ? "Leave" : "Remove"}
+                  </Button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </SettingsCard>
         <FormError message={error?.message} />
-        <ul className="flex flex-col gap-px">
-          {teamMembers.data?.map((member) => (
-            <li key={member.id} className={rowClass}>
-              <Avatar name={member.name} kind={member.kind} />
-              <span className="truncate text-body">
-                {member.name}
-                {member.id === me ? <span className="text-ink-2"> (you)</span> : null}
-              </span>
-              <Badge className="ms-auto">{roleLabel[member.role]}</Badge>
-              {canManage || member.id === me ? (
-                <Button variant="ghost" disabled={remove.isPending} onClick={() => remove.mutate(member.id)}>
-                  {member.id === me ? "Leave" : "Remove"}
-                </Button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-        {canManage && candidates.length ? (
-          <form
-            className="mt-3 flex items-center gap-2 px-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (adding) add.mutate(adding, { onSuccess: () => setAdding("") });
-            }}
-          >
-            <label className="flex flex-1 items-center gap-2">
-              <span className="sr-only">Member to add</span>
-              <Select className="max-w-[280px] sm:h-[30px]" value={adding} onChange={(event) => setAdding(event.target.value)}>
-                <option value="">Add a member…</option>
-                {candidates.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            <Button type="submit" disabled={!adding || add.isPending}>
-              Add to team
-            </Button>
-          </form>
-        ) : null}
         {canManage ? <TeamSettings team={team} /> : null}
-      </PageBody>
+      </PageColumn>
     </>
   );
 }
@@ -273,36 +266,29 @@ function TeamSettings({ team }: { team: Team }) {
     : [{ value: current, label: `After ${current} days` }, ...archiveChoices];
 
   return (
-    <section aria-labelledby="team-settings" className="mt-8 flex flex-col gap-4">
-      <GroupHeader>
-        <span id="team-settings">Settings</span>
-      </GroupHeader>
-      <label className="flex flex-wrap items-center gap-3 px-3 text-ui">
-        <span className="min-w-56 text-ink">Archive closed issues</span>
-        <Select
-          className="max-w-[200px] sm:h-[30px]"
+    <SettingsCard title="Settings">
+      <SettingRow id="team-archive" title="Archive closed issues" description="Done and canceled issues leave the team's lists after this long. They stay searchable.">
+        <SelectMenu
+          label="Archive closed issues"
+          className="w-[160px]"
           value={current}
           disabled={update.isPending}
-          onChange={(event) =>
+          options={choices}
+          align="end"
+          onChange={(value) =>
             update.mutate(
-              { teamId: team.id, version: team.version, archiveAfterDays: event.target.value === "never" ? null : Number(event.target.value) },
+              { teamId: team.id, version: team.version, archiveAfterDays: value === "never" ? null : Number(value) },
               { onError: (error) => toast(error.message) },
             )
           }
-        >
-          {choices.map((choice) => (
-            <option key={choice.value} value={choice.value}>
-              {choice.label}
-            </option>
-          ))}
-        </Select>
-      </label>
-      <div className="flex flex-wrap items-center gap-3 px-3 text-ui">
-        <span className="min-w-56 text-ink-2">
-          Deleting the team sends it to the trash with all its issues for 30 days. Its key stays reserved until then.
-        </span>
+        />
+      </SettingRow>
+      <SettingRow
+        id="team-delete"
+        title="Delete team"
+        description="Sends the team to the trash with all its issues for 30 days. Its key stays reserved until then."
+      >
         <Button
-          variant="ghost"
           disabled={remove.isPending}
           onClick={() => {
             if (!window.confirm(`Move ${team.key} ${team.name} and all its issues to the trash?`)) return;
@@ -317,8 +303,7 @@ function TeamSettings({ team }: { team: Team }) {
         >
           Delete team
         </Button>
-      </div>
-    </section>
+      </SettingRow>
+    </SettingsCard>
   );
 }
-

@@ -58,6 +58,7 @@ export function Menu<T extends string>({
   onOpenChange,
   align = "start",
   side = "bottom",
+  filter = true,
   className,
 }: {
   label: string;
@@ -77,6 +78,9 @@ export function Menu<T extends string>({
   onOpenChange?: (open: boolean) => void;
   align?: "start" | "end";
   side?: "top" | "bottom";
+  // A short fixed list, like roles, has no filter field to show. The field
+  // stays, out of sight, to take the arrow keys and type-ahead.
+  filter?: boolean;
   className?: string;
 }) {
   const [ownOpen, setOwnOpen] = useState(false);
@@ -240,7 +244,10 @@ export function Menu<T extends string>({
             close();
           }
         }}
-        className="mb-1 h-8 shrink-0 rounded-sm bg-transparent px-2 text-ui text-ink placeholder:text-ink-2 focus-visible:outline-none"
+        className={cn(
+          "shrink-0 rounded-sm bg-transparent text-ui text-ink placeholder:text-ink-2 focus-visible:outline-none",
+          filter ? "mb-1 h-8 px-2" : "absolute size-px opacity-0",
+        )}
       />
       {/* biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: the ARIA combobox pattern; focus stays in the input, which points here with aria-activedescendant */}
       <ul role="listbox"

@@ -150,7 +150,7 @@ function CreateIssueForm({
                 type="button"
                 title={pick.title || pick.description || undefined}
                 onClick={() => applyTemplate(pick)}
-                className="rounded-full bg-hover px-2 py-0.5 text-sm font-medium text-ink transition-[background-color,color] duration-[140ms] ease-standard hover:bg-line"
+                className="rounded-full bg-hover px-2 py-0.5 text-sm font-medium text-ink transition-[background-color,color] duration-(--duration-fast) ease-standard hover:bg-line"
               >
                 {pick.name}
               </button>

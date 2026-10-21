@@ -280,25 +280,11 @@
   }
 }
 
-@keyframes dialog-rise {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-}
-
 /* Set for one frame while the theme or accent switches, so colors swap at once. */
 .no-transition,
 .no-transition * {
   /* biome-ignore lint/complexity/noImportantStyles: reduced motion must win over every transition */
   transition: none !important;
-}
-
-@keyframes peek-slide {
-  from {
-    opacity: 0;
-    transform: translateX(16px);
-  }
 }
 
 /* Enter and exit. A layer sets the distances it travels; [data-leaving] plays
@@ -329,6 +315,19 @@
   --enter-x: calc(16px * var(--motion));
   --exit-x: calc(10px * var(--motion));
   animation: enter var(--duration-slow) var(--ease-enter);
+}
+
+/* Scrims and quiet layers: a plain fade. */
+.motion-fade {
+  animation: enter var(--duration-base) var(--ease-enter);
+}
+
+/* The rail as a phone's drawer: in from the leading edge. */
+@media (max-width: 767.98px) {
+  .motion-drawer {
+    --enter-x: calc(-24px * var(--motion));
+    animation: enter var(--duration-slow) var(--ease-enter);
+  }
 }
 
 /* Toasts: up from the corner. */

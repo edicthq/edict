@@ -25,7 +25,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 export function buttonClass({ variant = "secondary", size = "md" }: { variant?: Variant; size?: "md" | "lg" } = {}): string {
   return cn(
     "inline-flex shrink-0 select-none items-center justify-center whitespace-nowrap rounded-sm",
-    "transition-[background-color,color,transform] duration-[140ms] ease-standard active:scale-[0.96]",
+    "transition-[background-color,color,transform] duration-(--duration-fast) ease-standard active:scale-[0.96]",
     "disabled:pointer-events-none",
     variants[variant],
     size === "lg" && "h-10 px-4 text-body",

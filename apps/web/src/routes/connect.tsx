@@ -1,9 +1,9 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { Avatar, Button, Select, Tabs } from "@edicthq/ui";
+import { Avatar, Button, SelectMenu, Tabs } from "@edicthq/ui";
 import { Check, Copy } from "lucide-react";
-import { AuthShell, FormError, Loading, PageHeader } from "../components/shell.js";
+import { AuthShell, FormError, Loading, PageColumn, PageHeader } from "../components/shell.js";
 import { connectionLine, firstName } from "../lib/agents.js";
 import { useAgents, useChooseConnectionOrganization, useMembers, useMemberships } from "../lib/queries.js";
 import { useOrg } from "./org.js";
@@ -125,7 +125,7 @@ export function ConnectPage() {
   return (
     <>
       <PageHeader title="Connect an agent" />
-      <div className="grid gap-10 px-6 pt-8 pb-28 lg:grid-cols-[minmax(0,720px)_260px]">
+      <PageColumn className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_260px]">
         <div className="flex min-w-0 flex-col gap-8">
           <p className="max-w-[64ch] text-body text-ink-2 text-pretty">
             Every Edict has an MCP server at one URL. Add it to your client, approve it, and Edict adds an agent named
@@ -146,7 +146,9 @@ export function ConnectPage() {
             <h2 id="your-client" className="text-sm font-semibold text-ink-2">
               Your client
             </h2>
-            <Tabs label="MCP client" value={client} onChange={setClient} items={clients} />
+            {/* Six tabs don't fit a phone: there it is a menu. */}
+            <Tabs label="MCP client" value={client} onChange={setClient} items={clients} className="max-sm:hidden" />
+            <SelectMenu label="MCP client" value={client} onChange={setClient} options={clients} className="self-start sm:hidden" />
             {lead ? <p className="max-w-[64ch] text-ui text-ink-2 text-pretty">{lead}</p> : null}
             <ol className="flex flex-col">
               {steps.map((step, index) => (
@@ -226,7 +228,7 @@ export function ConnectPage() {
             </p>
           </div>
         </aside>
-      </div>
+      </PageColumn>
     </>
   );
 }
@@ -344,16 +346,16 @@ export function ConsentPage() {
     >
       <div className="flex flex-col gap-4">
         {memberships.data.length > 1 ? (
-          <label className="flex flex-col gap-1.5 text-ui font-medium">
+          <div className="flex flex-col gap-1.5 text-ui font-medium">
             Organization
-            <Select value={orgId} onChange={(event) => setOrgId(event.target.value)}>
-              {memberships.data.map((m) => (
-                <option key={m.organization.id} value={m.organization.id}>
-                  {m.organization.name}
-                </option>
-              ))}
-            </Select>
-          </label>
+            <SelectMenu
+              label="Organization"
+              value={orgId}
+              onChange={setOrgId}
+              options={memberships.data.map((m) => ({ value: m.organization.id, label: m.organization.name }))}
+              className="h-9 w-full"
+            />
+          </div>
         ) : (
           <p className="text-ui">
             Organization: <span className="font-medium">{memberships.data[0]!.organization.name}</span>

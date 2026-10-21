@@ -3,7 +3,6 @@ import {
   useId,
   type InputHTMLAttributes,
   type ReactNode,
-  type SelectHTMLAttributes,
 } from "react";
 import { cn } from "./cn.js";
 
@@ -23,13 +22,6 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
   ref,
 ) {
   return <input ref={ref} className={cn(control, className)} {...props} />;
-});
-
-export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(function Select(
-  { className, ...props },
-  ref,
-) {
-  return <select ref={ref} className={cn(control, "appearance-auto pe-2", className)} {...props} />;
 });
 
 export interface FieldProps {

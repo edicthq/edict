@@ -78,7 +78,7 @@ export function Tabs<Value extends string>({
             tabIndex={active ? 0 : -1}
             onClick={() => onChange(item.value)}
             className={cn(
-              "relative inline-flex items-center gap-1.5 whitespace-nowrap font-medium transition-[color,background-color] duration-[140ms] ease-standard",
+              "relative inline-flex items-center gap-1.5 whitespace-nowrap font-medium transition-[color,background-color] duration-(--duration-fast) ease-standard",
               variant === "segmented" && "rounded-xs px-2.5 py-1",
               variant === "underline" && "-mb-px h-8 px-2.5",
               active ? "text-ink" : "text-ink-2 hover:text-ink",

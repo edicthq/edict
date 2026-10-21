@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import type { CreatedInvite, Role } from "@edicthq/client";
 import { z } from "zod";
-import { Button, Dialog, Field, Input, Select } from "@edicthq/ui";
+import { Button, Checkbox, Dialog, Field, Input, SelectMenu } from "@edicthq/ui";
 import { allRoles, roleHint, roleLabel } from "../lib/labels.js";
 import { useCreateInvite, useTeams } from "../lib/queries.js";
 import type { OrgContext } from "../routes/org.js";
@@ -53,17 +53,16 @@ function InviteForm({ context, onDone }: { context: OrgContext; onDone: () => vo
             <Input {...control} type="email" autoFocus autoComplete="off" placeholder="name@example.com" {...form.register("email")} />
           )}
         </Field>
-        <Field label="Role">
-          {(control) => (
-            <Select {...control} {...form.register("role")}>
-              {roles.map((r) => (
-                <option key={r} value={r}>
-                  {roleLabel[r]}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm font-semibold text-ink-2">Role</span>
+          <SelectMenu
+            label="Role"
+            value={role}
+            onChange={(next: Role) => form.setValue("role", next)}
+            options={roles.map((r) => ({ value: r, label: roleLabel[r] }))}
+            className="h-10 w-full sm:h-9"
+          />
+        </div>
       </div>
       <p className="-mt-2 text-sm text-ink-2">{roleHint[role]}</p>
       {teams.data?.length ? (
@@ -74,7 +73,7 @@ function InviteForm({ context, onDone }: { context: OrgContext; onDone: () => vo
           <div className="flex flex-wrap gap-x-5 gap-y-2">
             {teams.data.map((team) => (
               <label key={team.id} className="flex items-center gap-2 text-ui">
-                <input type="checkbox" value={team.id} className="size-4 accent-[var(--ink)]" {...form.register("teamIds")} />
+                <Checkbox value={team.id} {...form.register("teamIds")} />
                 {team.name}
               </label>
             ))}

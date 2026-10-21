@@ -98,6 +98,13 @@ export function PageBody({ children, className }: { children: ReactNode; classNa
   return <div className={cn("px-3 pb-28", className)}>{children}</div>;
 }
 
+// The body of a page that reads as one document, like the trash or how to
+// connect an agent: one centered column, so a wide window doesn't leave it
+// stranded on one side.
+export function PageColumn({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn("mx-auto w-full max-w-[960px] px-4 pt-6 pb-28 sm:px-6 md:pt-8", className)}>{children}</div>;
+}
+
 // A list group's heading row (34 high), like "In Progress 4".
 export function GroupHeader({ children, count, actions }: { children: ReactNode; count?: number; actions?: ReactNode }) {
   return (
@@ -111,7 +118,7 @@ export function GroupHeader({ children, count, actions }: { children: ReactNode;
 
 // One list row: 40 high, 6 radius, hover fill.
 export const rowClass =
-  "flex min-h-10 items-center gap-3 rounded-sm py-2 ps-4 pe-3 transition-[background-color] duration-[140ms] ease-standard hover:bg-hover";
+  "flex min-h-10 items-center gap-3 rounded-sm py-2 ps-4 pe-3 hover-fade hover:bg-hover";
 
 export function SectionLabel({ children, id }: { children: ReactNode; id?: string }) {
   return (

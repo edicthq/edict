@@ -1,6 +1,6 @@
 import type { TrashedIssue, TrashedTeam } from "@edicthq/client";
 import { Avatar, Button, TeamKey } from "@edicthq/ui";
-import { EmptyState, GroupHeader, Loading, PageBody, PageHeader, rowClass } from "../components/shell.js";
+import { EmptyState, GroupHeader, Loading, PageColumn, PageHeader, rowClass } from "../components/shell.js";
 import { useOfferUndo } from "../components/undo.js";
 import { useToast } from "../components/toast.js";
 import { ago } from "../lib/issues.js";
@@ -19,7 +19,8 @@ export function TrashPage() {
   return (
     <>
       <PageHeader title="Trash" />
-      <PageBody>
+      <PageColumn>
+        <p className="mb-4 px-3 text-ui text-ink-2">Deleted issues and teams wait here for 30 days, then go for good.</p>
         {teams.data?.length ? (
           <section aria-label="Trashed teams" className="mb-6">
             <GroupHeader count={teams.data.length}>Teams</GroupHeader>
@@ -33,15 +34,15 @@ export function TrashPage() {
         {trash.isPending ? (
           <Loading label="Loading the trash" />
         ) : trash.data?.length ? (
-          <ul className="flex flex-col gap-px">
+          <ul aria-label="Trashed issues" className="flex flex-col gap-px">
             {trash.data.map((issue) => (
               <TrashRow key={issue.id} issue={issue} by={nameOf(issue.deletedById)} />
             ))}
           </ul>
         ) : (
-          <EmptyState title="The trash is empty" body="Deleted issues wait here for 30 days, then go for good." />
+          <EmptyState title="The trash is empty" body="Nothing has been deleted in the last 30 days." />
         )}
-      </PageBody>
+      </PageColumn>
     </>
   );
 }
@@ -60,7 +61,7 @@ function TeamRow({ team, by }: { team: TrashedTeam; by?: string }) {
         <span className="text-sm text-ink-2 max-sm:hidden">
           {by ?? "Someone"} deleted it{" "}
           <time dateTime={team.deletedAt} title={new Date(team.deletedAt).toLocaleString()}>
-            {ago(team.deletedAt)}
+            {ago(team.deletedAt)} ago
           </time>
         </span>
         <Button
@@ -85,20 +86,17 @@ function TrashRow({ issue, by }: { issue: TrashedIssue; by?: string }) {
   const restore = useRestoreIssue(orgId);
   const offerUndo = useOfferUndo();
   const toast = useToast();
-  const [key] = issue.identifier.split("-");
-
   return (
     <li>
       <div className={rowClass}>
-        <TeamKey>{key!}</TeamKey>
-        <span className="font-code text-sm text-ink-2 tabular-nums">{issue.identifier}</span>
+        <span className="w-[58px] shrink-0 text-sm font-medium text-ink-2 tabular-nums">{issue.identifier}</span>
         <span className="min-w-0 flex-1 truncate text-body">{issue.title}</span>
         <span className="flex items-center gap-1.5 text-sm text-ink-2 max-sm:hidden">
           <Avatar name={by ?? "?"} size={18} />
           <span>
             {by ?? "Someone"} deleted it{" "}
             <time dateTime={issue.deletedAt} title={new Date(issue.deletedAt).toLocaleString()}>
-              {ago(issue.deletedAt)}
+              {ago(issue.deletedAt)} ago
             </time>
           </span>
         </span>
