@@ -154,7 +154,7 @@ async function afterCommand(tx: Transaction, caller: Caller, session: SessionKey
     const summary = /\[[^\]\n]*?\b([0-9a-f]{7,40})\] (.+)$/m.exec(stdout);
     const sha = seen?.sha ?? summary?.[1];
     const subject = (summary?.[2] ?? /\s-m\s*(["'])([^"'\n]+)\1/.exec(command)?.[2])?.trim();
-    if (sha || stdout.trim() === "") {
+    if (sha || !/nothing to commit|no changes added/.test(stdout)) {
       const parts = ["Committed", sha ? `\`${sha.slice(0, 7)}\`` : "", subject ? clip(subject, 200) : ""];
       await post(tx, caller, issueId, { state: "working", message: parts.filter(Boolean).join(" ") });
     }
