@@ -213,6 +213,14 @@ describe("Claude Code hooks", () => {
     expect(inbox.filter((item) => item.type === "progress_posted").map((item) => item.progressState)).toEqual(["done"]);
   });
 
+  it("reports a quiet commit by the subject it was given", async () => {
+    const { tool, issue, progress } = await hooked();
+    await tool("mcp__edict__get_issue", { issue: issue.identifier });
+    await tool("Bash", { command: 'git add . && git commit -q -m "Keep the next param"' }, { stdout: "", stderr: "" });
+    await tool("Bash", { command: "git commit -q -F /tmp/msg" }, { stdout: "", stderr: "" });
+    expect((await progress()).slice(0, 2).map((u) => u.message)).toEqual(["Committed", "Committed Keep the next param"]);
+  });
+
   it("leaves a question standing when the turn ends on it", async () => {
     const { org, ferro, tool, send, issue, progress } = await hooked();
     await tool("mcp__edict__get_issue", { issue: issue.identifier });

@@ -145,8 +145,15 @@ async function afterCommand(tx: Transaction, caller: Caller, session: SessionKey
   if (!issueId) return;
   if (committing) {
     // "[branch 1a2b3c4] Subject", or "[branch (root-commit) 1a2b3c4] Subject".
+    // PostToolUse follows only a command that succeeded, but git commit -q
+    // prints nothing: then the -m subject, if the command gives one plainly.
     const commit = /^\[[^\]\n]*?\b([0-9a-f]{7,40})\] (.+)$/m.exec(stdout);
-    if (commit) await post(tx, caller, issueId, { state: "working", message: `Committed \`${commit[1]}\` ${clip(commit[2]!.trim(), 200)}` });
+    if (commit) {
+      await post(tx, caller, issueId, { state: "working", message: `Committed \`${commit[1]}\` ${clip(commit[2]!.trim(), 200)}` });
+    } else if (!/nothing to commit|no changes added/.test(stdout)) {
+      const subject = /\s-m\s*(["'])([^"'\n]+)\1/.exec(command)?.[2]?.trim();
+      await post(tx, caller, issueId, { state: "working", message: subject ? `Committed ${clip(subject, 200)}` : "Committed" });
+    }
   }
   if (opening) {
     const pull = /https?:\/\/\S+\/pull\/(\d+)/.exec(stdout);
