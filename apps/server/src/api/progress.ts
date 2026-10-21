@@ -175,7 +175,7 @@ async function activityFromEvent(tx: Transaction, event: EventRow): Promise<void
   } else {
     return;
   }
-  const [issue] = await tx.select({ delegateId: issues.delegateId }).from(issues).where(eq(issues.id, issueId));
+  const [issue] = await tx.select({ delegateId: issues.delegateId, closedAt: issues.closedAt }).from(issues).where(eq(issues.id, issueId));
   if (!issue || issue.delegateId !== event.actorId) return;
   const agentId = event.actorId;
   const source: ProgressSource = data.via === "hook" ? "hook" : "activity";
@@ -188,7 +188,8 @@ async function activityFromEvent(tx: Transaction, event: EventRow): Promise<void
     await writeProgress(tx, event.orgId, { issueId, agentId, source, state: closed ? "done" : "working", message: `Moved to ${status.name}` });
     return;
   }
-  const state = carriedState(await latestByAgent(tx, issueId, agentId));
+  // A word on a closed issue does not reopen the work.
+  const state = issue.closedAt ? "done" : carriedState(await latestByAgent(tx, issueId, agentId));
   if (event.type === "link.created") {
     const url = data.url as string;
     const title = typeof data.title === "string" && data.title ? data.title : undefined;

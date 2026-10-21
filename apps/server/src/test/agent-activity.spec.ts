@@ -51,6 +51,13 @@ describe("activity progress", () => {
     expect((await progress())[0]).toMatchObject({ source: "activity", state: "needs_input", message: "Google or GitHub first?" });
   });
 
+  it("stays done when the delegate comments on an issue it closed", async () => {
+    const { org, ferro, issue, status, progress } = await setup();
+    await ferro.client.patch(`${org}/issues/${issue.identifier}`, { version: issue.version, statusId: status("done").id });
+    await ferro.client.post(`${org}/issues/${issue.identifier}/comments`, { body: "Shipped in 1f52e24." });
+    expect((await progress())[0]).toMatchObject({ source: "activity", state: "done", message: "Shipped in 1f52e24." });
+  });
+
   it("is not written for people or agents who are not the delegate", async () => {
     const { t, owner, org, eng, issue, status, progress } = await setup();
     const other = await runner(t.baseUrl, owner, org, [eng.id], "Other");
