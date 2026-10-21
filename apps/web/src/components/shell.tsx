@@ -7,7 +7,18 @@ import { desktopShell, windowCommand } from "../lib/desktop.js";
 // Sign-in, sign-up, onboarding and invite pages: one narrow column, centered,
 // under a soft light from the top of the page. No card: the mark, the
 // heading and the form rise in one after another the first time it shows.
-export function AuthShell({ title, lead, children }: { title: string; lead?: ReactNode; children?: ReactNode }) {
+export function AuthShell({
+  title,
+  lead,
+  mark,
+  children,
+}: {
+  title: string;
+  lead?: ReactNode;
+  // In place of Edict's mark, like the two tiles of a connection.
+  mark?: ReactNode;
+  children?: ReactNode;
+}) {
   return (
     <div className="flex min-h-dvh flex-col bg-[radial-gradient(70%_45%_at_50%_0%,var(--glow),transparent_75%)] px-6">
       {desktopShell() ? (
@@ -16,13 +27,11 @@ export function AuthShell({ title, lead, children }: { title: string; lead?: Rea
         </div>
       ) : null}
       <main id="main" className="stagger mx-auto flex w-full max-w-[360px] flex-1 flex-col justify-center py-14 sm:py-20">
-        <Link
-          to="/"
-          aria-label="Edict"
-          className="mx-auto grid size-11 place-items-center rounded-[12px] bg-ink text-on-human shadow-[0_1px_2px_oklch(0_0_0/0.12)]"
-        >
-          <LogoMark size={24} className="text-on-human" />
-        </Link>
+        {mark ?? (
+          <Link to="/" aria-label="Edict" className="mx-auto">
+            <MarkTile />
+          </Link>
+        )}
         <div className="mt-6 text-center">
           <h1 className="text-2xl font-semibold text-balance">{title}</h1>
           {lead ? <p className="mt-2 text-body text-ink-2 text-pretty">{lead}</p> : null}
@@ -30,6 +39,15 @@ export function AuthShell({ title, lead, children }: { title: string; lead?: Rea
         {children ? <div className="mt-8 [&>p]:text-center">{children}</div> : null}
       </main>
     </div>
+  );
+}
+
+// Edict's mark on an ink tile, as the app icon has it.
+export function MarkTile() {
+  return (
+    <span className="grid size-11 place-items-center rounded-[12px] bg-ink text-on-human shadow-[0_1px_2px_oklch(0_0_0/0.12)]">
+      <LogoMark size={24} className="text-on-human" />
+    </span>
   );
 }
 

@@ -1,9 +1,9 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { Avatar, Button, SelectMenu, Tabs } from "@edicthq/ui";
-import { Check, Copy } from "lucide-react";
-import { AuthShell, FormError, Loading, PageColumn, PageHeader } from "../components/shell.js";
+import { Avatar, Button, SelectMenu, Tabs, cn } from "@edicthq/ui";
+import { Check, Copy, Minus } from "lucide-react";
+import { AuthShell, FormError, Loading, MarkTile, PageColumn, PageHeader } from "../components/shell.js";
 import { connectionLine, firstName } from "../lib/agents.js";
 import { useAgents, useChooseConnectionOrganization, useMembers, useMemberships } from "../lib/queries.js";
 import { useOrg } from "./org.js";
@@ -289,7 +289,8 @@ export function ConsentPage() {
   }, [memberships.data, orgId]);
 
   if (memberships.isPending || client.isPending) return <Loading />;
-  const name = client.data?.client_name ?? client.data?.name ?? "An MCP client";
+  // As the server names agents: without the "(<server name>)" Claude Code adds.
+  const name = (client.data?.client_name ?? client.data?.name ?? "").replace(/\s*\([^()]*\)\s*$/, "").trim() || "An MCP client";
   const me = memberships.data?.find((m) => m.organization.id === orgId)?.member;
 
   const post = async (path: string, body: unknown) => {
@@ -339,38 +340,71 @@ export function ConsentPage() {
       </AuthShell>
     );
   }
+  const agentName = `${name}${me ? ` (${me.name.split(/\s+/)[0]})` : ""}`;
   return (
     <AuthShell
       title={`Connect ${name} to Edict`}
-      lead={`Edict adds ${name}${me ? ` (${me.name.split(/\s+/)[0]})` : ""} as an agent in the organization you choose. It acts on your behalf, sees the teams you see, and can't delete anything or change settings. Pause it any time under Agents.`}
+      lead={
+        <>
+          It joins as the agent <span className="font-medium text-agent-ink">{agentName}</span> and acts on your behalf.
+        </>
+      }
+      mark={
+        <div aria-hidden="true" className="mx-auto flex items-center gap-3">
+          <Avatar name={agentName} kind="agent" size={32} />
+          <span className="w-10 border-t border-dashed border-line-strong" />
+          <MarkTile />
+        </div>
+      }
     >
-      <div className="flex flex-col gap-4">
-        {memberships.data.length > 1 ? (
-          <div className="flex flex-col gap-1.5 text-ui font-medium">
-            Organization
-            <SelectMenu
-              label="Organization"
-              value={orgId}
-              onChange={setOrgId}
-              options={memberships.data.map((m) => ({ value: m.organization.id, label: m.organization.name }))}
-              className="h-9 w-full"
-            />
+      <div className="flex flex-col gap-5">
+        <div className="flex flex-col divide-y divide-line rounded-md border border-line bg-surface text-ui">
+          <div className="flex min-h-12 items-center gap-3 px-4 py-2.5">
+            <span className="text-ink-2">Organization</span>
+            {memberships.data.length > 1 ? (
+              <SelectMenu
+                label="Organization"
+                value={orgId}
+                onChange={setOrgId}
+                options={memberships.data.map((m) => ({ value: m.organization.id, label: m.organization.name }))}
+                align="end"
+                className="ms-auto max-w-[60%]"
+              />
+            ) : (
+              <span className="ms-auto font-medium">{memberships.data[0]!.organization.name}</span>
+            )}
           </div>
-        ) : (
-          <p className="text-ui">
-            Organization: <span className="font-medium">{memberships.data[0]!.organization.name}</span>
-          </p>
-        )}
+          <ul aria-label="What it can do" className="flex flex-col gap-2.5 px-4 py-3.5">
+            <Can>Reads and updates issues, comments and posts progress, in the teams you can see</Can>
+            <Can>Shows as {agentName}, so everyone can tell its work from yours</Can>
+            <Can no>Deletes nothing and changes no settings or members, unless an admin allows it</Can>
+          </ul>
+        </div>
         <FormError message={failure} />
-        <div className="flex gap-2">
-          <Button variant="primary" disabled={busy || !orgId} onClick={() => void allow()}>
-            Allow
-          </Button>
-          <Button variant="ghost" disabled={busy} onClick={() => void deny()}>
+        <div className="grid grid-cols-2 gap-2">
+          <Button size="lg" disabled={busy} onClick={() => void deny()}>
             Deny
           </Button>
+          <Button variant="primary" size="lg" disabled={busy || !orgId} onClick={() => void allow()}>
+            Allow
+          </Button>
         </div>
+        <p className="text-center text-sm text-ink-2 text-pretty">
+          {me?.email ? <>Signed in as {me.email}. </> : null}Pause it any time under Agents.
+        </p>
       </div>
     </AuthShell>
+  );
+}
+
+// One line of what a connected agent may do, or may not.
+function Can({ no = false, children }: { no?: boolean; children: ReactNode }) {
+  return (
+    <li className="flex items-start gap-2.5 text-ink-2">
+      <span className={cn("mt-px grid size-4 shrink-0 place-items-center rounded-full", no ? "bg-hover text-ink-2" : "bg-ink text-on-human")}>
+        {no ? <Minus aria-hidden="true" className="size-2.5" strokeWidth={2.5} /> : <Check aria-hidden="true" className="size-2.5" strokeWidth={3} />}
+      </span>
+      <span className="text-pretty">{children}</span>
+    </li>
   );
 }

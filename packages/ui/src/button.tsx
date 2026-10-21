@@ -9,11 +9,13 @@ type Variant = "primary" | "secondary" | "ghost";
 // block in dark.
 const variants: Record<Variant, string> = {
   primary:
-    "h-8 gap-2 px-3.5 font-semibold bg-ink text-on-human hover:bg-ink/88 has-[kbd]:pe-2 disabled:bg-hover disabled:text-ink-2",
+    "gap-2 px-3.5 font-semibold bg-ink text-on-human hover:bg-ink/88 has-[kbd]:pe-2 disabled:bg-hover disabled:text-ink-2",
   secondary:
-    "h-[30px] gap-1.5 px-3 font-medium text-ink shadow-[inset_0_0_0_1px_var(--line-strong)] hover:bg-hover has-[kbd]:pe-2 disabled:opacity-50",
-  ghost: "h-[26px] gap-1.5 px-2 text-sm text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-50",
+    "gap-1.5 px-3 font-medium text-ink shadow-[inset_0_0_0_1px_var(--line-strong)] hover:bg-hover has-[kbd]:pe-2 disabled:opacity-50",
+  ghost: "gap-1.5 px-2 text-sm text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-50",
 };
+
+const heights: Record<Variant, string> = { primary: "h-8", secondary: "h-[30px]", ghost: "h-[26px]" };
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
@@ -28,7 +30,9 @@ export function buttonClass({ variant = "secondary", size = "md" }: { variant?: 
     "transition-[background-color,color,transform] duration-(--duration-fast) ease-standard active:scale-[0.96]",
     "disabled:pointer-events-none",
     variants[variant],
-    size === "lg" && "h-10 px-4 text-body",
+    // Heights live apart from the variants: cn does not merge classes, so a
+    // size must not compete with a variant's own height.
+    size === "lg" ? "h-10 px-4 text-body" : heights[variant],
   );
 }
 
