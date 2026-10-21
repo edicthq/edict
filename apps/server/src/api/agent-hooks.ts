@@ -138,7 +138,8 @@ async function tie(tx: Transaction, caller: Caller, session: SessionKey, ref: st
 async function afterCommand(tx: Transaction, caller: Caller, session: SessionKey, input: ClaudeCodeHook): Promise<void> {
   const command = typeof input.tool_input?.command === "string" ? input.tool_input.command : "";
   const stdout = outputOf(input.tool_response);
-  const committing = /\bgit\b[^\n|;&]*\bcommit\b/.test(command);
+  // A command line that runs git commit, not one that mentions it in a script.
+  const committing = command.split(/&&|\|\||;|\n/).some((part) => /^\s*(?:\S+=\S*\s+)*git(?:\s+-C\s+\S+)?\s+commit\b/.test(part));
   const opening = /\bgh\s+pr\s+create\b/.test(command);
   if (!committing && !opening) return;
   const issueId = await tiedIssue(tx, session);
@@ -153,7 +154,7 @@ async function afterCommand(tx: Transaction, caller: Caller, session: SessionKey
     const summary = /\[[^\]\n]*?\b([0-9a-f]{7,40})\] (.+)$/m.exec(stdout);
     const sha = seen?.sha ?? summary?.[1];
     const subject = (summary?.[2] ?? /\s-m\s*(["'])([^"'\n]+)\1/.exec(command)?.[2])?.trim();
-    if (sha || (!seen && !/nothing to commit|no changes added/.test(stdout))) {
+    if (sha || stdout.trim() === "") {
       const parts = ["Committed", sha ? `\`${sha.slice(0, 7)}\`` : "", subject ? clip(subject, 200) : ""];
       await post(tx, caller, issueId, { state: "working", message: parts.filter(Boolean).join(" ") });
     }

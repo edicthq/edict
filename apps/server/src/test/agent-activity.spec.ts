@@ -218,6 +218,8 @@ describe("Claude Code hooks", () => {
     await tool("mcp__edict__get_issue", { issue: issue.identifier });
     await tool("Bash", { command: 'git add . && git commit -q -m "Keep the next param"' }, { stdout: "", stderr: "" });
     await tool("Bash", { command: "git commit -q -F /tmp/msg" }, { stdout: "", stderr: "" });
+    // Mentioning git commit in a script is not committing.
+    await tool("Bash", { command: "python3 - <<'EOF'\nprint('git commit -m \"x\"')\nEOF" }, { stdout: "git commit -m \"x\"", stderr: "" });
     expect((await progress()).slice(0, 2).map((u) => u.message)).toEqual(["Committed", "Committed Keep the next param"]);
   });
 
