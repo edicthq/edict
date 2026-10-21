@@ -6,7 +6,7 @@ import { categoryLabel, estimates, priorities, priorityLabel, statusFill } from 
 
 // The prototype's property chip: an outlined pill with an icon and a value.
 export const chipClass =
-  "inline-flex h-7 items-center gap-1.5 rounded-full ps-2 pe-2.5 text-ui font-medium text-ink shadow-[inset_0_0_0_1px_var(--line-strong)] transition-[background-color] duration-[140ms] ease-standard hover:bg-hover";
+  "hover-fade inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-full ps-2 pe-2.5 text-ui font-medium text-ink shadow-[inset_0_0_0_1px_var(--line-strong)] hover:bg-hover aria-expanded:bg-hover";
 
 type TriggerProps = {
   ref: React.Ref<HTMLButtonElement>;

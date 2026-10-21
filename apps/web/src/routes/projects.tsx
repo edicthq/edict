@@ -2,14 +2,14 @@ import { useState } from "react";
 import { MarkdownEditor } from "../components/markdown-editor.js";
 import { Markdown, plainText } from "../components/markdown.js";
 import { Link, useNavigate, useParams } from "react-router";
-import type { ProjectStatus } from "@edicthq/client";
+import type { Agent, Issue, Label, Member, ProjectStatus, Status, StatusCategory } from "@edicthq/client";
 import { Avatar, Button, Menu, ProgressBar, ProjectStatusBadge, StatusIcon, Tabs, cn } from "@edicthq/ui";
 import { Calendar, ChevronRight, FolderKanban, Plus, Trash2 } from "lucide-react";
 import { CreateProjectDialog } from "../components/create-project-dialog.js";
 import { DateMenu, formatDay } from "../components/date-menu.js";
 import { NoAssignee, chipClass } from "../components/issue-fields.js";
 import { IssueRowLink } from "../components/issue-row.js";
-import { EmptyState, GroupHeader, Loading, PageBody, PageHeader } from "../components/shell.js";
+import { EmptyState, Loading, PageBody, PageHeader } from "../components/shell.js";
 import {
   useAgents,
   useDeleteProject,
@@ -239,20 +239,11 @@ export function ProjectDetailPage() {
 
   const { total, completed, percentage, byCategory, estimate } = project.progress;
 
-  return (
+  // The project's own fields, as chips that open app menus. They sit in the
+  // page bar, and on a phone, where the bar has room only for the name, in a
+  // row under it.
+  const fields = (
     <>
-      <PageHeader
-        lead={
-          <>
-            <Link to={`/${slug}/projects`} className="text-body text-ink-2 hover:text-ink">
-              Projects
-            </Link>
-            <ChevronRight aria-hidden="true" className="size-3.5 text-ink-3" strokeWidth={1.75} />
-          </>
-        }
-        title={project.name}
-        actions={
-          <>
             <Menu
               label="Set project status"
               value={project.status}
@@ -295,6 +286,24 @@ export function ProjectDetailPage() {
                 </button>
               )}
             />
+    </>
+  );
+
+  return (
+    <>
+      <PageHeader
+        lead={
+          <>
+            <Link to={`/${slug}/projects`} className="text-body text-ink-2 hover:text-ink">
+              Projects
+            </Link>
+            <ChevronRight aria-hidden="true" className="size-3.5 text-ink-3" strokeWidth={1.75} />
+          </>
+        }
+        title={project.name}
+        actions={
+          <>
+            <div className="flex items-center gap-2 max-sm:hidden">{fields}</div>
             {canManage ? (
               <Button
                 variant="ghost"
@@ -309,6 +318,10 @@ export function ProjectDetailPage() {
           </>
         }
       />
+
+      <div role="toolbar" aria-label="Project fields" className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2.5 sm:hidden">
+        {fields}
+      </div>
 
       <PageBody className="pt-5 flex flex-col gap-6">
         {/* Progress & Metrics Card */}
@@ -398,42 +411,113 @@ export function ProjectDetailPage() {
             <div className="rounded-md border border-line/60 bg-surface/50 p-4">
               <Markdown text={project.description} />
             </div>
-          ) : (
-            <p className="text-ui text-ink-2">No description provided.</p>
-          )}
+          ) : null}
         </section>
 
-        {/* Cross-Team Issues */}
-        <section className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <GroupHeader count={issues.length}>Issues</GroupHeader>
-          </div>
-
-          {issuesQuery.isPending ? (
-            <Loading label="Loading issues" />
-          ) : issues.length ? (
-            <ul className="flex flex-col gap-px">
-              {issues.map((issue) => (
-                <li key={issue.id}>
-                  <IssueRowLink
-                    to={`/${slug}/teams/${issue.teamId}?issue=${issue.identifier}`}
-                    issue={issue}
-                    statuses={issueContext.statuses.filter((s) => s.teamId === issue.teamId)}
-                    labels={issueContext.labels}
-                    orgMembers={members.data ?? []}
-                    agents={agents.data ?? []}
-                  />
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyState
-              title="No issues in this project yet"
-              body="Issues from any team can be linked to this project by selecting it in the issue's project field."
-            />
-          )}
-        </section>
+        {/* Cross-team issues, open ones first. */}
+        {issuesQuery.isPending ? (
+          <Loading label="Loading issues" />
+        ) : issues.length ? (
+          <ProjectIssues
+            issues={issues}
+            slug={slug}
+            statuses={issueContext.statuses}
+            labels={issueContext.labels}
+            orgMembers={members.data ?? []}
+            agents={agents.data ?? []}
+          />
+        ) : (
+          <EmptyState
+            title="No issues in this project yet"
+            body="Issues from any team can be linked to this project by selecting it in the issue's project field."
+          />
+        )}
       </PageBody>
     </>
+  );
+}
+
+const categoryOrder: { category: StatusCategory; name: string }[] = [
+  { category: "in_progress", name: "In Progress" },
+  { category: "todo", name: "Todo" },
+  { category: "backlog", name: "Backlog" },
+  { category: "done", name: "Done" },
+  { category: "canceled", name: "Canceled" },
+];
+
+// A project's issues by status category, like a team's list: what is moving,
+// then what is next, then the backlog. Done and Canceled fold away while
+// anything is still open, so the open work isn't buried under finished work.
+function ProjectIssues({
+  issues,
+  slug,
+  statuses,
+  labels,
+  orgMembers,
+  agents,
+}: {
+  issues: Issue[];
+  slug: string;
+  statuses: Status[];
+  labels: Label[];
+  orgMembers: Member[];
+  agents: Agent[];
+}) {
+  const categoryOf = (issue: Issue) => statuses.find((status) => status.id === issue.statusId)?.category ?? "backlog";
+  const groups = categoryOrder
+    .map((group) => ({ ...group, issues: issues.filter((issue) => categoryOf(issue) === group.category) }))
+    .filter((group) => group.issues.length > 0);
+  const anyOpen = groups.some((group) => group.category !== "done" && group.category !== "canceled");
+  const [unfolded, setUnfolded] = useState<Set<StatusCategory>>(new Set());
+  return (
+    <div className="flex flex-col gap-3">
+      {groups.map((group) => {
+        const closed = group.category === "done" || group.category === "canceled";
+        const folded = closed && anyOpen && !unfolded.has(group.category);
+        return (
+          <section key={group.category} aria-label={group.name}>
+            <button
+              type="button"
+              aria-expanded={!folded}
+              onClick={() => {
+                const next = new Set(unfolded);
+                if (folded) next.add(group.category);
+                else next.delete(group.category);
+                setUnfolded(next);
+              }}
+              disabled={!closed || !anyOpen}
+              className="hover-fade flex h-[34px] w-full items-center gap-2 rounded-sm px-3 text-sm font-semibold enabled:hover:bg-hover"
+            >
+              <StatusIcon category={group.category} />
+              {group.name}
+              <span className="font-normal text-ink-2 tabular-nums">{group.issues.length}</span>
+              {closed && anyOpen ? (
+                <ChevronRight
+                  aria-hidden="true"
+                  className={cn("ms-auto size-3.5 text-ink-2 transition-transform duration-(--duration-fast) ease-standard", !folded && "rotate-90")}
+                  strokeWidth={2}
+                />
+              ) : null}
+            </button>
+            {folded ? null : (
+              <ul className="flex flex-col gap-px">
+                {group.issues.map((issue) => (
+                  <li key={issue.id}>
+                    <IssueRowLink
+                      to={`/${slug}/teams/${issue.teamId}?issue=${issue.identifier}`}
+                      issue={issue}
+                      statuses={statuses.filter((s) => s.teamId === issue.teamId)}
+                      labels={labels}
+                      orgMembers={orgMembers}
+                      agents={agents}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        );
+      })}
+    </div>
   );
 }
