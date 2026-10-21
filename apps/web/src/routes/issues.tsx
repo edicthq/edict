@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router";
 import type { Agent, Issue, Label, Member, Priority, SavedViewQuery, Status, Team } from "@edicthq/client";
-import { Avatar, Button, Dialog, Kbd, LabelPill, Menu, PriorityIcon, ProgressBadge, StatusIcon, TeamKey, cn, usePresence } from "@edicthq/ui";
+import { Avatar, Button, Checkbox, Dialog, Kbd, LabelPill, Menu, PriorityIcon, ProgressBadge, StatusIcon, TeamKey, cn, usePresence } from "@edicthq/ui";
 import type { MenuItem } from "@edicthq/ui";
 import { ArrowDown, ArrowUp, Bookmark, Columns3, ListFilter, Rows3, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { CreateIssueDialog } from "../components/create-issue-dialog.js";
@@ -1121,13 +1121,12 @@ function IssueList({
                           <span className={cn("transition-opacity", isSelected || selectedIds.size > 0 ? "opacity-0 pointer-events-none" : "group-hover/row:opacity-0")}>
                             <PriorityIcon priority={issue.priority} />
                           </span>
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={isSelected}
                             onClick={(e) => e.stopPropagation()}
                             onChange={(e) => onToggleSelect(issue.id, (e.nativeEvent as MouseEvent).shiftKey)}
                             className={cn(
-                              "absolute inset-0 size-4 accent-[var(--ink)] cursor-pointer transition-opacity",
+                              "absolute inset-0 transition-opacity",
                               isSelected || selectedIds.size > 0 ? "opacity-100" : "opacity-0 group-hover/row:opacity-100",
                             )}
                             aria-label={`Select ${issue.identifier}`}
@@ -1181,7 +1180,7 @@ function IssueBoard({
           key={column.status.id}
           aria-label={column.status.name}
           className={cn(
-            "flex min-h-0 w-64 shrink-0 flex-col rounded-md transition-[background-color] duration-[140ms] ease-standard",
+            "flex min-h-0 w-64 shrink-0 flex-col rounded-md hover-fade",
             over === column.status.id && "bg-hover",
           )}
           onDragOver={(event) => {
@@ -1225,10 +1224,10 @@ function IssueBoard({
                   data-focused={focusId === issue.id || undefined}
                   data-selected={isSelected || undefined}
                   className={cn(
-                    "flex w-full flex-col gap-2 rounded-md bg-surface px-3 pt-2.5 pb-3 text-start shadow-[inset_0_0_0_1px_var(--line)]",
+                    "flex w-full flex-col gap-2 rounded-md bg-surface px-3 pt-2.5 pb-3 text-start shadow-[inset_0_0_0_1px_var(--line)] transition-[box-shadow,background-color] duration-(--duration-fast) ease-standard hover:shadow-[inset_0_0_0_1px_var(--line-strong)]",
                     agentState(issue, agents.find((a) => a.id === issue.delegateId), now) === "working" &&
                       "shadow-[inset_0_0_0_1px_var(--agent-edge)]",
-                    "focus-visible:shadow-[inset_0_0_0_2px_var(--ink)] focus-visible:outline-none data-focused:shadow-[inset_0_0_0_1px_var(--line-strong)]",
+                    "focus-visible:shadow-[inset_0_0_0_1.5px_var(--focus)] focus-visible:outline-none data-focused:shadow-[inset_0_0_0_1px_var(--line-strong)]",
                     isSelected && "bg-hover shadow-[inset_0_0_0_2px_var(--ink)]",
                     dragging?.id === issue.id && "opacity-50",
                   )}
@@ -1238,13 +1237,12 @@ function IssueBoard({
                       <span className={cn("transition-opacity", isSelected || selectedIds.size > 0 ? "opacity-0" : "group-hover/card:opacity-0")}>
                         <PriorityIcon priority={issue.priority} />
                       </span>
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={isSelected}
                         onClick={(e) => e.stopPropagation()}
                         onChange={(e) => onToggleSelect(issue.id, (e.nativeEvent as MouseEvent).shiftKey)}
                         className={cn(
-                          "absolute inset-0 size-4 accent-[var(--ink)] cursor-pointer transition-opacity",
+                          "absolute inset-0 transition-opacity",
                           isSelected || selectedIds.size > 0 ? "opacity-100" : "opacity-0 group-hover/card:opacity-100",
                         )}
                         aria-label={`Select ${issue.identifier}`}

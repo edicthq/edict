@@ -150,7 +150,7 @@ export function OrgLayout() {
       </a>
       <Rail context={context} others={memberships.data ?? []} drawer={drawer} />
       {drawer ? (
-        <div aria-hidden="true" className="fixed inset-0 z-30 bg-scrim md:hidden" onClick={() => setDrawer(false)} />
+        <div aria-hidden="true" className="motion-fade fixed inset-0 z-30 bg-scrim md:hidden" onClick={() => setDrawer(false)} />
       ) : null}
       <div className="flex h-dvh min-w-0 flex-1 flex-col">
         <MobileBar context={context} others={memberships.data ?? []} onMenu={() => setDrawer(true)} />
@@ -189,7 +189,7 @@ function RailSection({ title, aside, children }: { title: string; aside?: ReactN
   );
 }
 
-const railItem = "flex h-7 items-center gap-2 rounded-sm px-2 text-ui transition-[background-color,color] duration-[140ms] ease-standard";
+const railItem = "hover-fade flex h-[30px] items-center gap-2 rounded-sm px-2 text-ui";
 const railLink = ({ isActive }: { isActive: boolean }) =>
   cn(railItem, isActive ? "bg-surface font-medium text-ink shadow-[inset_0_0_0_1px_var(--line)]" : "text-ink hover:bg-hover");
 
@@ -236,7 +236,7 @@ function Rail({ context, others, drawer }: { context: OrgContext; others: Member
       aria-label="Organization"
       className={cn(
         "sticky top-0 flex h-dvh w-[240px] shrink-0 flex-col gap-4 overflow-y-auto border-e border-line bg-rail px-2 pt-2.5 pb-2",
-        drawer ? "max-md:fixed max-md:inset-y-0 max-md:start-0 max-md:z-40 max-md:w-[min(280px,85vw)] max-md:shadow-overlay" : "max-md:hidden",
+        drawer ? "motion-drawer max-md:fixed max-md:inset-y-0 max-md:start-0 max-md:z-40 max-md:w-[min(280px,85vw)] max-md:shadow-overlay" : "max-md:hidden",
       )}
     >
       <div className="flex flex-col gap-2">
@@ -258,7 +258,7 @@ function Rail({ context, others, drawer }: { context: OrgContext; others: Member
         <button
           type="button"
           onClick={context.openPalette}
-          className="flex h-[30px] items-center gap-2 rounded-sm bg-surface ps-2 pe-1.5 text-ui text-ink-2 shadow-[inset_0_0_0_1px_var(--line)] transition-[color] duration-[140ms] ease-standard hover:text-ink"
+          className="flex h-[30px] items-center gap-2 rounded-sm bg-surface ps-2 pe-1.5 text-ui text-ink-2 shadow-[inset_0_0_0_1px_var(--line)] transition-[color] duration-(--duration-fast) ease-standard hover:text-ink"
         >
           <Search aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
           <span>Search or command</span>
@@ -371,15 +371,17 @@ function Rail({ context, others, drawer }: { context: OrgContext; others: Member
   );
 }
 
-// A team, with its Issues and Board under it while it is the one on screen or
-// someone opened it.
+// A team, with its Issues, Board and Members under it while it is the one on
+// screen or someone opened it. Only the page you are on is marked.
 function TeamItem({ slug, team, current }: { slug: string; team: Team; current: boolean }) {
   const location = useLocation();
   const [open, setOpen] = useState(current);
   useEffect(() => {
     if (current) setOpen(true);
   }, [current]);
-  const board = current && new URLSearchParams(location.search).get("view") === "board";
+  const onList = current && location.pathname === `/${slug}/teams/${team.id}`;
+  const board = onList && new URLSearchParams(location.search).get("view") === "board";
+  const onMembers = current && location.pathname === `/${slug}/teams/${team.id}/members`;
   const sub = (active: boolean) =>
     cn(railItem, "ps-[34px]", active ? "bg-hover font-medium text-ink" : "text-ink-2 hover:bg-hover hover:text-ink");
   return (
@@ -396,16 +398,24 @@ function TeamItem({ slug, team, current }: { slug: string; team: Team; current: 
           onClick={() => setOpen((o) => !o)}
           className="absolute end-1 grid size-6 place-items-center rounded-xs text-ink-3 hover:text-ink"
         >
-          <ChevronDown aria-hidden="true" className={cn("size-3.5 transition-transform duration-[140ms]", !open && "-rotate-90")} strokeWidth={2} />
+          <ChevronDown aria-hidden="true" className={cn("size-3.5 transition-transform duration-(--duration-fast)", !open && "-rotate-90")} strokeWidth={2} />
         </button>
       </div>
       {open ? (
         <>
-          <Link to={`/${slug}/teams/${team.id}`} className={sub(current && !board)} aria-current={current && !board ? "page" : undefined}>
+          <Link to={`/${slug}/teams/${team.id}`} className={sub(onList && !board)} aria-current={onList && !board ? "page" : undefined}>
             Issues
           </Link>
           <Link to={`/${slug}/teams/${team.id}?view=board`} className={sub(board)} aria-current={board ? "page" : undefined}>
             Board
+          </Link>
+          <Link
+            to={`/${slug}/teams/${team.id}/members`}
+            aria-label={`${team.name} members`}
+            className={sub(onMembers)}
+            aria-current={onMembers ? "page" : undefined}
+          >
+            Members
           </Link>
         </>
       ) : null}
@@ -474,7 +484,7 @@ function Workspace({ context, others }: { context: OrgContext; others: Membershi
         <span className="truncate text-ui font-semibold">{current.organization.name}</span>
         <ChevronDown aria-hidden="true" className="size-3 shrink-0 text-ink-3" strokeWidth={2} />
       </summary>
-      <div className="absolute start-0 top-9 z-20 flex w-60 flex-col gap-0.5 rounded-md bg-surface p-1 shadow-overlay">
+      <div className="motion-pop absolute start-0 top-9 z-20 flex w-60 origin-top-left flex-col gap-0.5 rounded-md bg-raised p-1 shadow-overlay">
         {others.map((m) => (
           <NavLink
             key={m.organization.id}
