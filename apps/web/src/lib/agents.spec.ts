@@ -45,4 +45,15 @@ describe("plainLine", () => {
   it("drops markdown but keeps underscores inside words", () => {
     expect(plainLine("Added `open_switcher`, which is _very_ **small**.")).toBe("Added open_switcher, which is very small.");
   });
+
+  it("reads the first paragraph, not the list after it", () => {
+    expect(plainLine("Built it (`1f52e24`):\n- Progress has a source.\n- Hooks post.")).toBe("Built it (1f52e24):");
+    expect(plainLine("A line that wraps\nonto a second.\n\nAnother paragraph.")).toBe("A line that wraps onto a second.");
+  });
+
+  it("drops a list marker that leads the message", () => {
+    expect(plainLine("- First thing\n- Second")).toBe("First thing");
+    expect(plainLine("1. Step one")).toBe("Step one");
+    expect(plainLine("```\ncode\n```\n\nAfter the code.")).toBe("After the code.");
+  });
 });

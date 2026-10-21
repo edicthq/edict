@@ -47,10 +47,20 @@ export function firstName(name: string): string {
   return name.trim().split(/\s+/)[0] ?? name;
 }
 
-// A progress message as one line of plain text, for list rows.
+const listMarker = /^\s*(?:[-*+]|\d+[.)])\s+/;
+
+// A progress message as one line of plain text, for list rows: its first
+// paragraph, or the first item of a list it opens with.
 export function plainLine(markdown: string): string {
-  return markdown
-    .replace(/```[\s\S]*?```/g, " ")
+  const lines = markdown.replace(/```[\s\S]*?```/g, "\n").split("\n");
+  const start = lines.findIndex((line) => line.trim());
+  const first: string[] = [];
+  for (const line of lines.slice(Math.max(start, 0))) {
+    if (!line.trim() || (first.length > 0 && listMarker.test(line))) break;
+    first.push(first.length === 0 ? line.replace(listMarker, "") : line);
+  }
+  return first
+    .join(" ")
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/[`*>#~]/g, "")
     // Underscores for emphasis go; ones inside words like open_switcher stay.
