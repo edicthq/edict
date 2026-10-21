@@ -173,20 +173,25 @@ test("an MCP client connects by URL and works a delegated issue", async ({ page,
   await hooks.getByRole("button", { name: "Create hook key" }).click();
   const exported = (await hooks.getByText(/^export EDICT_HOOK_KEY=/).textContent())!;
   const hookKey = exported.replace("export EDICT_HOOK_KEY=", "").trim();
+  // ENG-1 is done, so the session's next issue is a new one; a closed issue takes no reports.
+  await page.request.post(`/api/v1/organizations/${orgId}/teams/${team.id}/issues`, {
+    headers,
+    data: { title: "Remember the last team", assigneeId: me, delegateId: agentId },
+  });
   const hook = (input: Record<string, unknown>) =>
     fetch(`${baseURL}/api/v1/organizations/${orgId}/agent-hooks/claude-code`, {
       method: "POST",
       headers: { authorization: `Bearer ${hookKey}`, "content-type": "application/json" },
       body: JSON.stringify({ session_id: "e2e", ...input }),
     });
-  expect((await hook({ hook_event_name: "PostToolUse", tool_name: "mcp__edict__get_issue", tool_input: { issue: "ENG-1" } })).status).toBe(204);
+  expect((await hook({ hook_event_name: "PostToolUse", tool_name: "mcp__edict__get_issue", tool_input: { issue: "ENG-2" } })).status).toBe(204);
   await hook({
     hook_event_name: "PostToolUse",
     tool_name: "Bash",
     tool_input: { command: "git commit -m 'Follow-up'" },
     tool_response: { stdout: "[main 9f8e7d6] Follow-up", stderr: "" },
   });
-  const reported = (await api("/issues/ENG-1/progress")) as { source: string; message: string }[];
+  const reported = (await api("/issues/ENG-2/progress")) as { source: string; message: string }[];
   expect(reported.slice(0, 2).map((p) => [p.source, p.message])).toEqual([
     ["hook", "Committed `9f8e7d6` Follow-up"],
     ["hook", "Picked up"],
