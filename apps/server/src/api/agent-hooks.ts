@@ -145,14 +145,17 @@ async function afterCommand(tx: Transaction, caller: Caller, session: SessionKey
   if (!issueId) return;
   if (committing) {
     // "[branch 1a2b3c4] Subject", or "[branch (root-commit) 1a2b3c4] Subject".
-    // PostToolUse follows only a command that succeeded, but git commit -q
-    // prints nothing: then the -m subject, if the command gives one plainly.
-    const commit = /^\[[^\]\n]*?\b([0-9a-f]{7,40})\] (.+)$/m.exec(stdout);
-    if (commit) {
-      await post(tx, caller, issueId, { state: "working", message: `Committed \`${commit[1]}\` ${clip(commit[2]!.trim(), 200)}` });
-    } else if (!/nothing to commit|no changes added/.test(stdout)) {
-      const subject = /\s-m\s*(["'])([^"'\n]+)\1/.exec(command)?.[2]?.trim();
-      await post(tx, caller, issueId, { state: "working", message: subject ? `Committed ${clip(subject, 200)}` : "Committed" });
+    // Claude Code names the commit it saw in gitOperation. Git prints
+    // "[branch 1a2b3c4] Subject" unless -q; then the -m subject, if the
+    // command gives one plainly. PostToolUse follows only a command that
+    // succeeded.
+    const seen = gitCommit(input.tool_response);
+    const summary = /\[[^\]\n]*?\b([0-9a-f]{7,40})\] (.+)$/m.exec(stdout);
+    const sha = seen?.sha ?? summary?.[1];
+    const subject = (summary?.[2] ?? /\s-m\s*(["'])([^"'\n]+)\1/.exec(command)?.[2])?.trim();
+    if (sha || (!seen && !/nothing to commit|no changes added/.test(stdout))) {
+      const parts = ["Committed", sha ? `\`${sha.slice(0, 7)}\`` : "", subject ? clip(subject, 200) : ""];
+      await post(tx, caller, issueId, { state: "working", message: parts.filter(Boolean).join(" ") });
     }
   }
   if (opening) {
@@ -180,6 +183,12 @@ async function linkPullRequest(tx: Transaction, caller: Caller, issueId: string,
 
 async function post(tx: Transaction, caller: Caller, issueId: string, update: { state: "working" | "done"; message: string }): Promise<void> {
   await writeProgress(tx, caller.orgId, { issueId, agentId: caller.id, source: "hook", ...update });
+}
+
+// Claude Code's Bash answer can say which commit the command made.
+function gitCommit(response: unknown): { sha: string } | null {
+  const commit = (response as { gitOperation?: { commit?: { sha?: unknown; kind?: unknown } } } | null)?.gitOperation?.commit;
+  return typeof commit?.sha === "string" && /^[0-9a-f]{7,40}$/.test(commit.sha) && commit.kind === "committed" ? { sha: commit.sha } : null;
 }
 
 // Bash answers with { stdout, stderr }; take any text it holds.

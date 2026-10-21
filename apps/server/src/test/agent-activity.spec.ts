@@ -221,6 +221,17 @@ describe("Claude Code hooks", () => {
     expect((await progress()).slice(0, 2).map((u) => u.message)).toEqual(["Committed", "Committed Keep the next param"]);
   });
 
+  it("takes the commit Claude Code saw, wherever git printed its summary", async () => {
+    const { tool, issue, progress } = await hooked();
+    await tool("mcp__edict__get_issue", { issue: issue.identifier });
+    await tool(
+      "Bash",
+      { command: 'curl -s localhost/health && git commit -m "Ship it"' },
+      { stdout: '{"ok":true}[main 9f8e7d6] Ship it', stderr: "", gitOperation: { commit: { sha: "9f8e7d6", kind: "committed", branch: "main" } } },
+    );
+    expect((await progress())[0]!.message).toBe("Committed `9f8e7d6` Ship it");
+  });
+
   it("leaves a question standing when the turn ends on it", async () => {
     const { org, ferro, tool, send, issue, progress } = await hooked();
     await tool("mcp__edict__get_issue", { issue: issue.identifier });
