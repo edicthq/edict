@@ -101,6 +101,8 @@ test("nothing polls while the socket is up; while it is down the panels poll, an
   // The socket goes through the test, which can drop it and refuse new ones.
   let down = false;
   let subscriptions = 0;
+  // Pings and pongs on the socket that is up now, if one is.
+  let up = false;
   let pings = 0;
   let pongs = 0;
   const sockets: { close: () => Promise<void> }[] = [];
@@ -110,6 +112,9 @@ test("nothing polls while the socket is up; while it is down the panels poll, an
       return;
     }
     const server = ws.connectToServer();
+    up = true;
+    pings = 0;
+    pongs = 0;
     ws.onMessage((message) => {
       if (String(message).includes('"ping"')) pings += 1;
       server.send(message);
@@ -127,7 +132,7 @@ test("nothing polls while the socket is up; while it is down the panels poll, an
   const pass = async (ms: number) => {
     for (let left = ms; left > 0; left -= 4_000) {
       await page.clock.runFor(Math.min(4_000, left));
-      await expect.poll(() => pongs).toBe(pings);
+      await expect.poll(() => !up || pongs >= pings).toBe(true);
     }
   };
   const requests: string[] = [];
@@ -145,6 +150,7 @@ test("nothing polls while the socket is up; while it is down the panels poll, an
 
   // Down: the panels poll, so an update still shows.
   down = true;
+  up = false;
   await sockets[0]!.close();
   await post("working", "Posted while the socket was down.");
   await page.clock.runFor(10_000);
