@@ -102,12 +102,19 @@ Edict ships no agent runner in v1. The "Connect your agent" docs show how to con
 
 Agents post structured progress updates to an issue: a state (working, blocked, needs input, done), a markdown message and optional links such as pull requests. The issue shows a live "agent working" state while updates arrive.
 
-MCP tool descriptions steer agents toward progress updates and comments, and away from rewriting the description.
+Most progress costs the agent no tokens ([ADR 0029](./adr/0029-agent-activity-costs-no-tokens.md)). Each update has a source:
+
+- `agent`: the agent called `post_progress`, which it does only when it is blocked, needs a person, or sums up.
+- `activity`: the delegate moved the issue, linked a URL or commented, and Edict wrote the update in the same change.
+- `hook`: the agent's client posted it from a hook. Claude Code's HTTP hooks post to `/api/v1/organizations/{orgId}/agent-hooks/claude-code` with a hook key: the first Edict tool call on an issue says working, a commit says what it committed, `gh pr create` links the pull request, and the end of a turn says done.
+
+MCP tool descriptions steer agents toward comments and status moves, and away from rewriting the description.
 
 ### Authentication
 
 - OAuth 2.1 for MCP clients, as the MCP spec requires for remote servers. A human approves the connection, Edict creates or reuses that human's connected agent for the client, and the agent acts on the human's behalf.
 - API keys for admin-created agents (agent runners, CI, scripts). Each key belongs to one agent and is scoped to teams.
+- Hook keys: API keys that can only post client hooks. The person who connected an agent can create one for it, since its OAuth token stays in the client, out of a hook's reach.
 
 ### Guardrails
 
@@ -130,7 +137,7 @@ Tools are shaped around tasks, not endpoints. They accept human values ("In Prog
 | `create_issue` | Create in a team, optionally from a template |
 | `update_issue` | Change status (name or category), assignee, delegate, labels, priority, estimate, project |
 | `comment` | Add a markdown comment |
-| `post_progress` | Post a progress update |
+| `post_progress` | Post a progress update when blocked, needing a person, or summing up |
 | `my_work` | Issues assigned or delegated to the caller |
 | `list_teams` | Teams the caller can access |
 | `get_team_context` | A team's statuses, labels, members and templates |

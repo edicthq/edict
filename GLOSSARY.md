@@ -139,7 +139,7 @@ The agent doing the work on an issue while the assignee stays accountable.
 _Avoid_: Agent assignee, worker, executor
 
 **Progress update**:
-A structured report an agent posts on an issue: a state (working, blocked, needs input, done), a message and optional links.
+A structured report on an agent's work on an issue: a state (working, blocked, needs input, done), a message and optional links. The agent posts it, Edict writes it from what the delegate did on the issue (its source is then `activity`), or the agent's client posts it from a hook.
 _Avoid_: Status update, log, heartbeat
 
 **On behalf of**:
@@ -185,6 +185,14 @@ _Avoid_: Trash, hidden
 **API key**:
 A secret that lets one agent call the API as itself, scoped to teams.
 _Avoid_: Token (alone), personal access token, secret
+
+**Hook key**:
+An API key that can only post an agent's client hooks to Edict. It lives in the person's shell as `EDICT_HOOK_KEY`, and the person who connected an agent can create one for it.
+_Avoid_: Hook token, webhook secret
+
+**Client hook**:
+A command an agent's MCP client runs on its own at points in a session, such as after a tool call or when a turn ends. Claude Code's post to Edict and cost the agent no tokens.
+_Avoid_: Webhook, callback
 
 **Webhook**:
 A subscription that sends signed event payloads to an outside URL.
