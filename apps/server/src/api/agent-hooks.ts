@@ -3,8 +3,8 @@
 // JSON as Claude Code sends it, and the answer is an empty 204, which Claude
 // Code reads as "carry on".
 import { createRoute } from "@hono/zod-openapi";
-import { and, eq, lt } from "drizzle-orm";
-import { agentSessions, emit, issueLinks, type Transaction } from "@edicthq/db";
+import { and, eq, isNull, lt } from "drizzle-orm";
+import { agentSessions, emit, issueLinks, issues, type Transaction } from "@edicthq/db";
 import { ClaudeCodeHook } from "@edicthq/schema";
 import type { Caller } from "./callers.js";
 import { body, errors, inOrg, noContent, OrgParams, router, type ApiDeps } from "./context.js";
@@ -95,11 +95,21 @@ async function takeHook(tx: Transaction, caller: Caller, input: ClaudeCodeHook):
 
 type SessionKey = { orgId: string; agentId: string; sessionId: string };
 
+// The session's issue while it is open. A closed or trashed issue takes no
+// more reports: the session has moved on, whether or not it said so.
 async function tiedIssue(tx: Transaction, session: SessionKey): Promise<string | null> {
   const [row] = await tx
     .select({ issueId: agentSessions.issueId })
     .from(agentSessions)
-    .where(and(eq(agentSessions.agentId, session.agentId), eq(agentSessions.sessionId, session.sessionId)));
+    .innerJoin(issues, eq(issues.id, agentSessions.issueId))
+    .where(
+      and(
+        eq(agentSessions.agentId, session.agentId),
+        eq(agentSessions.sessionId, session.sessionId),
+        isNull(issues.closedAt),
+        isNull(issues.deletedAt),
+      ),
+    );
   return row?.issueId ?? null;
 }
 
@@ -110,7 +120,7 @@ async function tie(tx: Transaction, caller: Caller, session: SessionKey, ref: st
   let issueId: string;
   try {
     const { issue } = await visibleIssue(tx, caller, ref);
-    if (issue.delegateId !== caller.id) return;
+    if (issue.delegateId !== caller.id || issue.closedAt) return;
     issueId = issue.id;
   } catch (error) {
     // An issue the agent cannot see, or one in the trash, ties nothing.

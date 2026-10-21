@@ -243,6 +243,19 @@ describe("Claude Code hooks", () => {
     expect((await progress()).map((u) => u.state)).toEqual(["needs_input", "working"]);
   });
 
+  it("lets a closed issue go: no picking it up, and no more reports on it", async () => {
+    const { org, ferro, tool, send, issue, status, progress } = await hooked();
+    await tool("mcp__edict__get_issue", { issue: issue.identifier });
+    await ferro.client.patch(`${org}/issues/${issue.identifier}`, { version: issue.version, statusId: status("done").id });
+    await tool("mcp__edict__update_issue", { issue: issue.identifier, version: issue.version, status: "Done" });
+    await tool("Bash", { command: 'git commit -m "Next thing"' }, { stdout: "[main 1234567] Next thing", stderr: "" });
+    await send({ hook_event_name: "Stop", last_assistant_message: "On to the next." });
+    expect((await progress()).map((u) => [u.source, u.message])).toEqual([
+      ["activity", "Moved to Done"],
+      ["hook", "Picked up"],
+    ]);
+  });
+
   it("posts working when a session with an issue resumes or compacts", async () => {
     const { tool, send, issue, progress } = await hooked();
     await send({ hook_event_name: "SessionStart", source: "startup" });
