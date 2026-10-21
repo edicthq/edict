@@ -53,6 +53,7 @@ export function IssuePeek({
   onClose,
   onOpen,
   onAddSubIssue,
+  leaving = false,
 }: {
   orgId: string;
   slug: string;
@@ -76,6 +77,8 @@ export function IssuePeek({
   // Opens another issue, maybe in another team.
   onOpen: (identifier: string) => void;
   onAddSubIssue: () => void;
+  // Closed, and sliding out: it takes no input.
+  leaving?: boolean;
 }) {
   const update = useUpdateIssue(orgId);
   const remove = useDeleteIssue(orgId);
@@ -143,7 +146,7 @@ export function IssuePeek({
   // than pointerdown, so a field being edited has blurred and saved first.
   const panel = useRef<HTMLElement>(null);
   const close = useRef(onClose);
-  close.current = onClose;
+  close.current = leaving ? () => {} : onClose;
   useEffect(() => {
     const onClick = (event: MouseEvent) => {
       const target = event.target as Element | null;
@@ -160,7 +163,10 @@ export function IssuePeek({
     <aside
       ref={panel}
       aria-label={`${issue.identifier} ${issue.title}`}
-      className="absolute inset-2 z-20 flex flex-col overflow-hidden rounded-md bg-surface shadow-overlay outline outline-line md:start-auto md:w-[min(760px,calc(100%-96px))] lg:w-[min(1100px,calc(100%-96px))] motion-safe:animate-[peek-slide_220ms_cubic-bezier(0.2,0,0,1)]"
+      data-leaving={leaving || undefined}
+      inert={leaving || undefined}
+      aria-hidden={leaving || undefined}
+      className="motion-slide absolute inset-2 z-20 flex flex-col overflow-hidden rounded-md bg-raised shadow-overlay md:start-auto md:w-[min(760px,calc(100%-96px))] lg:w-[min(1100px,calc(100%-96px))]"
     >
       <header className="flex h-[46px] shrink-0 items-center gap-2 border-b border-line ps-6 pe-3">
         {parent.data ? (

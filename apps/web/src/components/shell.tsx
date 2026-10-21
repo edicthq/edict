@@ -1,29 +1,33 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
-import { cn } from "@edicthq/ui";
+import { LogoMark, cn } from "@edicthq/ui";
 import { Minus, Square, X } from "lucide-react";
 import { desktopShell, windowCommand } from "../lib/desktop.js";
-import { Logo } from "./logo.js";
 
-// Sign-in, sign-up, onboarding and invite pages: one narrow column on the
-// page background, no card.
+// Sign-in, sign-up, onboarding and invite pages: one narrow column, centered,
+// under a soft light from the top of the page. No card: the mark, the
+// heading and the form rise in one after another the first time it shows.
 export function AuthShell({ title, lead, children }: { title: string; lead?: ReactNode; children?: ReactNode }) {
   return (
-    <div className="flex min-h-dvh flex-col px-6">
+    <div className="flex min-h-dvh flex-col bg-[radial-gradient(70%_45%_at_50%_0%,var(--glow),transparent_75%)] px-6">
       {desktopShell() ? (
         <div data-tauri-drag-region className="fixed inset-x-0 top-0 z-10 flex h-12 justify-end pe-2">
           <WindowControls />
         </div>
       ) : null}
-      <header className="mx-auto flex w-full max-w-[360px] pt-10 pb-12 sm:pt-16">
-        <Link to="/" className="rounded-sm">
-          <Logo />
+      <main id="main" className="stagger mx-auto flex w-full max-w-[360px] flex-1 flex-col justify-center py-14 sm:py-20">
+        <Link
+          to="/"
+          aria-label="Edict"
+          className="mx-auto grid size-11 place-items-center rounded-[12px] bg-ink text-on-human shadow-[0_1px_2px_oklch(0_0_0/0.12)]"
+        >
+          <LogoMark size={24} className="text-on-human" />
         </Link>
-      </header>
-      <main id="main" className="mx-auto w-full max-w-[360px] pb-16">
-        <h1 className="text-2xl font-semibold text-balance">{title}</h1>
-        {lead ? <p className="mt-2 text-body text-ink-2 text-pretty">{lead}</p> : null}
-        {children ? <div className="mt-8">{children}</div> : null}
+        <div className="mt-6 text-center">
+          <h1 className="text-2xl font-semibold text-balance">{title}</h1>
+          {lead ? <p className="mt-2 text-body text-ink-2 text-pretty">{lead}</p> : null}
+        </div>
+        {children ? <div className="mt-8 [&>p]:text-center">{children}</div> : null}
       </main>
     </div>
   );

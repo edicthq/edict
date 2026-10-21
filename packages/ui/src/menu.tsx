@@ -9,6 +9,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "./cn.js";
+import { usePresence } from "./presence.js";
 
 export interface MenuItem<T extends string> {
   value: T;
@@ -29,6 +30,8 @@ interface Placement {
   left: number;
   top: number;
   maxHeight: number;
+  // Where it grows from: the corner nearest the trigger.
+  origin: string;
 }
 
 // A picker that opens under its trigger with a filter field, like the
@@ -116,10 +119,11 @@ export function Menu<T extends string>({
     const top = flip
       ? Math.max(MARGIN, rect.top - GAP - Math.min(height, maxHeight))
       : rect.bottom + GAP;
+    const origin = `${flip ? "bottom" : "top"} ${align === "end" ? "right" : "left"}`;
     setPlacement((current) =>
-      current && current.left === left && current.top === top && current.maxHeight === maxHeight
+      current && current.left === left && current.top === top && current.maxHeight === maxHeight && current.origin === origin
         ? current
-        : { left, top, maxHeight },
+        : { left, top, maxHeight, origin },
     );
   }, [align, side]);
 
@@ -142,10 +146,8 @@ export function Menu<T extends string>({
   // height, so it measures again then.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the row count changes the panel height
   useLayoutEffect(() => {
-    if (!open) {
-      setPlacement(null);
-      return;
-    }
+    // Closing keeps the placement, so the panel fades out where it was.
+    if (!open) return;
     place();
     const onScroll = () => place();
     window.addEventListener("resize", onScroll);
@@ -155,6 +157,14 @@ export function Menu<T extends string>({
       window.removeEventListener("scroll", onScroll, true);
     };
   }, [open, place, shown.length]);
+
+  // Focus moves into the filter once the panel is placed and visible:
+  // autoFocus would fire while it is still hidden for measuring, and fail.
+  const inputRef = useRef<HTMLInputElement>(null);
+  const placed = placement !== null;
+  useEffect(() => {
+    if (open && placed) inputRef.current?.focus();
+  }, [open, placed]);
 
   const close = () => {
     setOpen(false);
@@ -183,21 +193,26 @@ export function Menu<T extends string>({
     typeof document === "undefined"
       ? null
       : (triggerRef.current?.closest("dialog[open]") ?? document.body);
-  const panel = open ? (
+  const presence = usePresence(open, 100);
+  const panel = presence.shown ? (
     <div
       ref={panelRef}
       role="presentation"
+      data-leaving={presence.leaving || undefined}
+      inert={presence.leaving || undefined}
+      aria-hidden={presence.leaving || undefined}
       style={{
         width: WIDTH,
         maxHeight: placement?.maxHeight ?? MAX_HEIGHT,
         left: placement?.left ?? 0,
         top: placement?.top ?? 0,
+        transformOrigin: placement?.origin,
         visibility: placement ? undefined : "hidden",
       }}
-      className="fixed z-50 flex flex-col rounded-md bg-surface p-1 shadow-overlay"
+      className="motion-pop fixed z-50 flex flex-col rounded-md bg-raised p-1 shadow-overlay"
     >
       <input
-        autoFocus
+        ref={inputRef}
         role="combobox"
         aria-label={label}
         aria-expanded="true"
@@ -245,7 +260,7 @@ export function Menu<T extends string>({
             onPointerMove={() => setActive(index)}
             onClick={() => pick(item)}
             className={cn(
-              "flex h-8 shrink-0 cursor-default items-center gap-2 rounded-sm px-2 text-ui",
+              "hover-fade flex h-8 shrink-0 cursor-default items-center gap-2 rounded-sm px-2 text-ui",
               index === active && "bg-hover",
               !multiple && isSelected(item) && "font-semibold",
             )}

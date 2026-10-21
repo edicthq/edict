@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import type { Agent, Issue, Label, Member, Status } from "@edicthq/client";
-import { Avatar, LabelPill, PriorityIcon, ProgressBadge, StatusIcon, cn } from "@edicthq/ui";
+import { Avatar, LabelPill, PriorityIcon, ProgressBadge, StatusIcon, cn, useChangeCount } from "@edicthq/ui";
 import { agentState, plainLine, waitingLine } from "../lib/agents.js";
 import { useNow } from "../lib/live.js";
 import { ago, statusFill } from "../lib/issues.js";
@@ -17,7 +17,7 @@ import { NoAssignee } from "./issue-fields.js";
 // wraps, then priority, identifier, two labels and the people under it, with
 // the agent line below that. The age goes.
 export const issueRowClass =
-  "relative grid min-h-10 w-full grid-cols-[16px_58px_16px_minmax(0,1fr)_auto_auto_30px] items-center gap-x-3 gap-y-1 rounded-sm py-2 ps-4 pe-3 text-start transition-[background-color] duration-[140ms] ease-standard hover:bg-hover max-sm:grid-cols-[14px_16px_auto_minmax(0,1fr)_auto] max-sm:gap-x-2 max-sm:gap-y-1.5 max-sm:rounded-none max-sm:border-b max-sm:border-line max-sm:py-3 max-sm:pe-4";
+  "relative grid min-h-10 w-full grid-cols-[16px_58px_16px_minmax(0,1fr)_auto_auto_30px] items-center gap-x-3 gap-y-1 rounded-sm py-2 ps-4 pe-3 text-start hover-fade hover:bg-hover max-sm:grid-cols-[14px_16px_auto_minmax(0,1fr)_auto] max-sm:gap-x-2 max-sm:gap-y-1.5 max-sm:rounded-none max-sm:border-b max-sm:border-line max-sm:py-3 max-sm:pe-4";
 
 export function liveClass(issue: Issue, agents: Agent[], now: number): string | false {
   return (
@@ -43,6 +43,8 @@ export interface IssueRowProps {
 
 export function IssueRowCells({ issue, statuses, labels, orgMembers, agents, lead, titleAside, emphasis }: IssueRowProps) {
   const status = statuses.find((s) => s.id === issue.statusId);
+  // The status icon pops when the status changes, not when the row appears.
+  const statusChanges = useChangeCount(issue.statusId);
   return (
     <>
       <span className="flex size-4 items-center justify-center max-sm:col-start-2 max-sm:row-start-2">
@@ -51,7 +53,11 @@ export function IssueRowCells({ issue, statuses, labels, orgMembers, agents, lea
       <span className="text-sm font-medium whitespace-nowrap text-ink-2 tabular-nums max-sm:col-start-3 max-sm:row-start-2">
         {issue.identifier}
       </span>
-      <span title={status?.name} className="max-sm:col-start-1 max-sm:row-start-1 max-sm:mt-[3px] max-sm:self-start">
+      <span
+        key={statusChanges}
+        title={status?.name}
+        className={cn("max-sm:col-start-1 max-sm:row-start-1 max-sm:mt-[3px] max-sm:self-start", statusChanges > 0 && "status-pop")}
+      >
         {status ? <StatusIcon category={status.category} fill={statusFill(statuses, status)} /> : <span className="block size-3.5" />}
       </span>
       <span className="flex min-w-0 items-baseline gap-2 max-sm:col-span-4 max-sm:col-start-2 max-sm:row-start-1">

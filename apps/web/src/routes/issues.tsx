@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router";
 import type { Agent, Issue, Label, Member, Priority, SavedViewQuery, Status, Team } from "@edicthq/client";
-import { Avatar, Button, Dialog, Kbd, LabelPill, Menu, PriorityIcon, ProgressBadge, StatusIcon, TeamKey, cn } from "@edicthq/ui";
+import { Avatar, Button, Dialog, Kbd, LabelPill, Menu, PriorityIcon, ProgressBadge, StatusIcon, TeamKey, cn, usePresence } from "@edicthq/ui";
 import type { MenuItem } from "@edicthq/ui";
 import { ArrowDown, ArrowUp, Bookmark, Columns3, ListFilter, Rows3, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { CreateIssueDialog } from "../components/create-issue-dialog.js";
@@ -215,6 +215,8 @@ function TeamIssues({ team }: { team: Team }) {
   // An archived issue of this team opens in the peek too, from the lookup.
   const peeked =
     listed ?? (lookup.data?.archivedAt && lookup.data.teamId === team.id && peekRef === lookup.data.identifier ? lookup.data : undefined);
+  // The peek slides out after it closes; meanwhile it ignores input.
+  const peek = usePresence(peeked, 140);
   // ⌘K offers the issues opened last.
   useEffect(() => {
     if (peeked) rememberIssue(orgId, peeked);
@@ -897,12 +899,13 @@ function TeamIssues({ team }: { team: Team }) {
         </div>
       ) : null}
 
-      {peeked && statuses.data ? (
+      {peek.shown && statuses.data ? (
         <IssuePeek
+          leaving={peek.leaving}
           orgId={orgId}
           slug={slug}
           myId={membership.member.id}
-          issue={peeked}
+          issue={peek.shown}
           statuses={statuses.data}
           members={members}
           orgMembers={orgMembers.data ?? []}
@@ -913,7 +916,7 @@ function TeamIssues({ team }: { team: Team }) {
           onMenu={setMenu}
           onClose={closePeek}
           onOpen={openLinked}
-          onAddSubIssue={() => setCreating({ parent: peeked })}
+          onAddSubIssue={() => peeked && setCreating({ parent: peeked })}
         />
       ) : null}
 
@@ -1050,6 +1053,21 @@ function IssueList({
 }) {
   const now = useNow();
   const parentOf = (issue: Issue) => issues.find((i) => i.id === issue.parentId)?.identifier;
+  // Which group each row was in at the last render. A row that was in none
+  // just arrived, and one in another group just moved: both ease in. The
+  // first render animates nothing, and neither does a change of view, like a
+  // new filter or grouping, which moves many rows at once.
+  const placed = useRef<Map<string, string> | null>(null);
+  const arrived = new Set<string>();
+  for (const group of groups) {
+    for (const issue of group.issues) {
+      if (placed.current && placed.current.get(issue.id) !== groupKey(group)) arrived.add(issue.id);
+    }
+  }
+  if (arrived.size > 3) arrived.clear();
+  useEffect(() => {
+    placed.current = new Map(groups.flatMap((group) => group.issues.map((issue) => [issue.id, groupKey(group)] as const)));
+  });
   return (
     <div className="px-3">
       {groups.map((group) => (
@@ -1080,8 +1098,9 @@ function IssueList({
                     className={cn(
                       issueRowClass,
                       liveClass(issue, agents, now),
+                      arrived.has(issue.id) && "row-in",
                       isSelected && "bg-hover shadow-[inset_2px_0_0_0_var(--ink)]",
-                      "data-focused:bg-hover focus-visible:shadow-[inset_0_0_0_1.5px_var(--ink)] focus-visible:outline-none",
+                      "data-focused:bg-hover focus-visible:shadow-[inset_0_0_0_1.5px_var(--focus)] focus-visible:outline-none",
                     )}
                   >
                     <IssueRowCells
