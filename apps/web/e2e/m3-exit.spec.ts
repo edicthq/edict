@@ -162,7 +162,8 @@ test("an MCP client connects by URL and works a delegated issue", async ({ page,
   await expect(lane.getByRole("link", { name: "#42 Keep next through sign-in" })).toBeVisible();
   if (process.env.E2E_SCREENSHOTS) await page.screenshot({ path: `${process.env.E2E_SCREENSHOTS}/m3-peek-${test.info().project.name}.png` });
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: /ENG-1 Fix the login redirect.*Merged\./ })).toBeVisible();
+  // The row keeps to the issue: the agent's words stay in the lane.
+  await expect(page.getByRole("button", { name: /ENG-1 Fix the login redirect/ })).not.toContainText("Merged.");
   if (process.env.E2E_SCREENSHOTS) await page.screenshot({ path: `${process.env.E2E_SCREENSHOTS}/m3-list-${test.info().project.name}.png` });
 
   // Maya makes a hook key for her agent, and Claude Code's hooks report the

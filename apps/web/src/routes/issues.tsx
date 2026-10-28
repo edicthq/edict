@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router";
 import type { Agent, Issue, Label, Member, Priority, SavedViewQuery, Status, Team } from "@edicthq/client";
-import { Avatar, Button, Checkbox, Dialog, Kbd, LabelPill, Menu, PriorityIcon, ProgressBadge, StatusIcon, TeamKey, cn, usePresence } from "@edicthq/ui";
+import { Avatar, Button, Checkbox, Dialog, Kbd, LabelPill, Menu, PriorityIcon, StatusIcon, TeamKey, cn, usePresence } from "@edicthq/ui";
 import type { MenuItem } from "@edicthq/ui";
 import { ArrowDown, ArrowUp, Bookmark, Columns3, ListFilter, Rows3, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { CreateIssueDialog } from "../components/create-issue-dialog.js";
@@ -11,10 +11,10 @@ import { desktopShell, openSwitcher } from "../lib/desktop.js";
 import { useNarrow } from "../lib/narrow.js";
 import { rememberIssue } from "../lib/recent.js";
 import { EmptyState, Loading, PageBody, PageHeader } from "../components/shell.js";
-import { IssuePeople, IssueRowCells, issueRowClass, liveClass } from "../components/issue-row.js";
+import { AgentMark, IssuePeople, IssueRowCells, issueRowClass, liveClass } from "../components/issue-row.js";
 import { useToast } from "../components/toast.js";
 import { useOfferUndo } from "../components/undo.js";
-import { agentState, plainLine, waitingLine } from "../lib/agents.js";
+import { agentState } from "../lib/agents.js";
 import { useNow } from "../lib/live.js";
 import { ago, assignable, boardColumns, categoryLabel, priorityLabel, statusFill, type StatusGroup } from "../lib/issues.js";
 import {
@@ -1004,26 +1004,6 @@ function FilterPill({ name, onRemove }: { name: string; onRemove: () => void }) 
   );
 }
 
-// On a board card: the delegate's name and state, then the first two lines of
-// what it last said.
-function BoardAgentLine({ issue, agents }: { issue: Issue; agents: Agent[] }) {
-  const now = useNow();
-  const agent = agents.find((a) => a.id === issue.delegateId);
-  if (!agent) return null;
-  const state = agentState(issue, agent, now);
-  const latest = issue.latestProgress?.agentId === agent.id ? issue.latestProgress : null;
-  const line = latest ? plainLine(latest.message) : state === "waiting" ? waitingLine(agent) : null;
-  return (
-    <span className="flex flex-col gap-1 border-t border-line pt-2 text-sm">
-      <span className="flex min-w-0 items-center gap-1.5">
-        <span className="truncate font-medium text-agent-ink">{agent.name}</span>
-        <ProgressBadge state={state} />
-      </span>
-      {line ? <span className="line-clamp-2 text-ink-2">{line}</span> : null}
-    </span>
-  );
-}
-
 function IssueList({
   groups,
   statuses,
@@ -1069,11 +1049,14 @@ function IssueList({
     placed.current = new Map(groups.flatMap((group) => group.issues.map((issue) => [issue.id, groupKey(group)] as const)));
   });
   return (
-    <div className="px-3">
+    <div className="px-3 pt-2">
       {groups.map((group) => (
-        <section key={groupKey(group)} aria-label={groupName(group)} className="mb-3">
-          <div className="sticky top-0 z-[1]">
-            <GroupHeading group={group} statuses={statuses} />
+        <section key={groupKey(group)} aria-label={groupName(group)} className="mb-4">
+          {/* A faint band, opaque so rows scroll under it while it sticks. */}
+          <div className="sticky top-0 z-[1] bg-bg">
+            <div className="rounded-sm bg-hover/60 [&>h2]:bg-transparent">
+              <GroupHeading group={group} statuses={statuses} />
+            </div>
           </div>
           <ul className="flex flex-col gap-px">
             {group.issues.map((issue) => {
@@ -1224,10 +1207,10 @@ function IssueBoard({
                   data-focused={focusId === issue.id || undefined}
                   data-selected={isSelected || undefined}
                   className={cn(
-                    "flex w-full flex-col gap-2 rounded-md bg-surface px-3 pt-2.5 pb-3 text-start shadow-[inset_0_0_0_1px_var(--line)] transition-[box-shadow,background-color] duration-(--duration-fast) ease-standard hover:shadow-[inset_0_0_0_1px_var(--line-strong)]",
+                    "flex w-full flex-col gap-2 rounded-md bg-surface px-3 pt-2.5 pb-3 text-start shadow-card transition-[box-shadow,background-color] duration-(--duration-fast) ease-standard hover:shadow-card-hover",
                     agentState(issue, agents.find((a) => a.id === issue.delegateId), now) === "working" &&
                       "shadow-[inset_0_0_0_1px_var(--agent-edge)]",
-                    "focus-visible:shadow-[inset_0_0_0_1.5px_var(--focus)] focus-visible:outline-none data-focused:shadow-[inset_0_0_0_1px_var(--line-strong)]",
+                    "focus-visible:shadow-[inset_0_0_0_1.5px_var(--focus)] focus-visible:outline-none data-focused:shadow-card-hover",
                     isSelected && "bg-hover shadow-[inset_0_0_0_2px_var(--ink)]",
                     dragging?.id === issue.id && "opacity-50",
                   )}
@@ -1252,8 +1235,9 @@ function IssueBoard({
                     <IssuePeople issue={issue} orgMembers={orgMembers} agents={agents} size={18} />
                   </span>
                   <span className="text-body leading-[1.4] tracking-[-0.005em] text-pretty">{issue.title}</span>
-                  {issue.labelIds.length > 0 ? (
-                    <span className="flex flex-wrap gap-1">
+                  {issue.labelIds.length > 0 || issue.delegateId ? (
+                    <span className="flex flex-wrap items-center gap-1 empty:hidden">
+                      <AgentMark issue={issue} agents={agents} />
                       {labels
                         .filter((label) => issue.labelIds.includes(label.id))
                         .map((label) => (
@@ -1261,7 +1245,6 @@ function IssueBoard({
                         ))}
                     </span>
                   ) : null}
-                  <BoardAgentLine issue={issue} agents={agents} />
                 </button>
               </li>
               );

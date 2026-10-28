@@ -87,3 +87,35 @@ test("Connect an agent shows the steps for the client you pick", async ({ page, 
   await expect(hooks).toBeHidden();
   await expect(page.getByText("Once you approve a client, its agent shows up here and in the sidebar.")).toBeVisible();
 });
+
+// The rail folds away with [ or its button, the page panel takes the room, and
+// it stays folded until brought back, across a reload.
+test("the rail folds away and comes back, and stays as it was left", async ({ page, baseURL }) => {
+  const headers = { origin: baseURL! };
+  const signUp = await page.request.post("/api/auth/sign-up/email", {
+    headers,
+    data: { name: "Rhea Rail", email: "rhea-rail@example.com", password: "correct-horse-battery" },
+  });
+  expect(signUp.ok(), await signUp.text()).toBe(true);
+  const org = await (await page.request.post("/api/v1/organizations", { headers, data: { name: "Rail", slug: "rail-co" } })).json();
+  await page.request.post(`/api/v1/organizations/${org.organization.id}/teams`, { headers, data: { name: "Engineering", key: "ENG" } });
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/rail-co/inbox");
+  const rail = page.getByRole("navigation", { name: "Organization" });
+  await expect(rail.getByRole("link", { name: "My issues" })).toBeVisible();
+
+  await page.keyboard.press("[");
+  await expect(rail.getByRole("link", { name: "My issues" })).toBeHidden();
+  const show = page.getByRole("button", { name: "Show sidebar" });
+  await expect(show).toBeVisible();
+
+  await page.reload();
+  await expect(show).toBeVisible();
+  await expect(rail.getByRole("link", { name: "My issues" })).toBeHidden();
+
+  await show.click();
+  await expect(rail.getByRole("link", { name: "My issues" })).toBeVisible();
+  await rail.getByRole("button", { name: "Hide sidebar" }).click();
+  await expect(show).toBeVisible();
+});

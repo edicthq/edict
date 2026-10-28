@@ -211,7 +211,7 @@ function RosterRow({ agent, members, selected, onSelect }: { agent: Agent; membe
       <span className="flex min-w-0 items-center gap-2.5">
         <Avatar name={agent.name} kind="agent" />
         <span className="min-w-0">
-          <span className="block truncate text-ui font-medium text-agent-ink">{agent.name}</span>
+          <span className="block truncate text-ui font-medium">{agent.name}</span>
           <span className="block truncate text-sm text-ink-2">{connectionLine(agent, members)}</span>
         </span>
       </span>
@@ -283,7 +283,7 @@ function AgentPanel({
           <Avatar name={agent.name} kind="agent" size={32} />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-body font-semibold text-agent-ink">{agent.name}</h2>
+          <h2 className="truncate text-body font-semibold">{agent.name}</h2>
           <p className="text-sm text-ink-2">{connectionLine(agent, members)}</p>
           <div className="mt-1.5 flex flex-wrap gap-1">
             {agent.pausedAt ? <ProgressBadge state="paused" /> : null}

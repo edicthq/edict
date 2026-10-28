@@ -7,7 +7,9 @@ type Priority = "none" | "urgent" | "high" | "medium" | "low";
 // The status glyph from the C2 prototype: a dashed ring for backlog, a ring for
 // todo, a ring filling up through the in-progress stages, a filled check for
 // done and a filled cross for canceled. `fill` is how far along the
-// in-progress stages this status is, between 0 and 1.
+// in-progress stages this status is, between 0 and 1. Each stage has its
+// color: the first in-progress stage yellow, later ones like In Review green,
+// done indigo, the rest gray.
 export function StatusIcon({
   category,
   fill = 0.5,
@@ -71,7 +73,13 @@ export function StatusIcon({
       aria-hidden="true"
       className={cn(
         "shrink-0",
-        category === "in_progress" || category === "done" ? "text-ink" : "text-ink-3",
+        category === "in_progress"
+          ? fill > 0.5
+            ? "text-status-review"
+            : "text-status-started"
+          : category === "done"
+            ? "text-status-done"
+            : "text-ink-3",
         className,
       )}
     >

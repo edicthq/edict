@@ -1,6 +1,6 @@
 # Changelog
 
-Each release's notes, newest first, written by hand. The release workflow publishes the section headed with the tag's version as the GitHub Release notes; see [`docs/releasing.md`](docs/releasing.md).
+Each release's notes, newest first. Cutting a release writes its section from the commit subjects since the last release unless one is already written by hand, and the release workflow publishes the section headed with the tag's version as the GitHub Release notes; see [`docs/releasing.md`](docs/releasing.md).
 
 ## 0.0.1
 

@@ -8,6 +8,12 @@
 //   node scripts/release.mjs notes 1.4.2     print the release notes for 1.4.2
 //   node scripts/release.mjs plan v1.4.2     what the release workflow publishes,
 //                                            given every v* tag on stdin
+//   node scripts/release.mjs next patch      the version after the newest v* tag:
+//                                            patch, minor, major, or one given
+//   node scripts/release.mjs changelog 1.4.2 add a "## 1.4.2" section to
+//                                            CHANGELOG.md from the commit subjects
+//                                            since the last tag
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -79,10 +85,12 @@ function check() {
   return version;
 }
 
+const headsSection = (version) => (line) => line === `## ${version}` || line.startsWith(`## ${version} `);
+
 // The section of the changelog headed with this version, up to the next one.
 export function notes(version, changelog = readFileSync(join(root, "CHANGELOG.md"), "utf8")) {
   const lines = changelog.split("\n");
-  const start = lines.findIndex((line) => line === `## ${version}` || line.startsWith(`## ${version} `));
+  const start = lines.findIndex(headsSection(version));
   if (start === -1) throw new ReleaseError(`CHANGELOG.md has no "## ${version}" section`);
   const end = lines.findIndex((line, i) => i > start && line.startsWith("## "));
   const body = lines
@@ -145,12 +153,78 @@ function planRelease(tag, stdin) {
   ].join("\n");
 }
 
+// The version after the newest stable tag, or the one given, if no tag has it.
+export function next(bump, tags) {
+  if (SEMVER.test(bump)) {
+    if (tags.includes(bump)) throw new ReleaseError(`v${bump} is already tagged`);
+    return bump;
+  }
+  const stable = tags.filter((v) => SEMVER.test(v) && !parts(v).pre).sort(newest);
+  const { major, minor, patch } = parts(stable.at(-1) ?? "0.0.0");
+  if (bump === "major") return `${major + 1}.0.0`;
+  if (bump === "minor") return `${major}.${minor + 1}.0`;
+  if (bump === "patch") return `${major}.${minor}.${patch + 1}`;
+  throw new ReleaseError(`${bump} is not patch, minor, major or a version like 1.4.2`);
+}
+
+// The changelog with a section for this version on top, one bullet per commit
+// subject. Earlier release commits say nothing new. A section written by hand
+// before the release stays as it is.
+export function changelog(version, subjects, text, date = new Date()) {
+  if (!SEMVER.test(version)) throw new ReleaseError(`${version} is not a version like 1.4.2 or 1.5.0-rc.1`);
+  const lines = text.split("\n");
+  if (lines.some(headsSection(version))) return text;
+  const bullets = subjects.filter((subject) => subject.trim() !== "" && !/^Release \d+\.\d+\.\d+\S*$/.test(subject));
+  if (bullets.length === 0) throw new ReleaseError("Nothing to release: no commits since the last tag");
+  const section = [`## ${version} (${date.toISOString().slice(0, 10)})`, "", ...bullets.map((s) => `- ${s.trim()}`), ""];
+  const first = lines.findIndex((line) => line.startsWith("## "));
+  if (first === -1) return [text.trimEnd(), "", ...section].join("\n");
+  return [...lines.slice(0, first), ...section, ...lines.slice(first)].join("\n");
+}
+
+function git(...args) {
+  return execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+}
+
+function tagged() {
+  return git("tag", "--list", "v*")
+    .split("\n")
+    .filter(Boolean)
+    .map((tag) => tag.slice(1));
+}
+
+// The subjects of the commits since the closest v* tag behind HEAD, oldest
+// first, merges left out.
+function subjectsSinceTag() {
+  let since;
+  try {
+    since = git("describe", "--tags", "--abbrev=0", "--match", "v*", "HEAD");
+  } catch {
+    since = null;
+  }
+  const log = git("log", "--no-merges", "--reverse", "--format=%s", since ? `${since}..HEAD` : "HEAD");
+  return log.split("\n").filter(Boolean);
+}
+
+function writeChangelog(version) {
+  const file = join(root, "CHANGELOG.md");
+  const text = readFileSync(file, "utf8");
+  const updated = changelog(version, subjectsSinceTag(), text);
+  if (updated === text) return `CHANGELOG.md already has ${version}`;
+  writeFileSync(file, updated);
+  return `Added ${version} to CHANGELOG.md`;
+}
+
 function main([command, arg]) {
   if (command === "version" && arg) return setVersion(arg);
   if (command === "check") return check();
   if (command === "notes" && arg) return notes(arg);
   if (command === "plan" && arg) return planRelease(arg, readFileSync(0, "utf8"));
-  throw new ReleaseError("Usage: pnpm release version <x.y.z> | check | notes <x.y.z> | plan <vX.Y.Z> < tags");
+  if (command === "next" && arg) return next(arg, tagged());
+  if (command === "changelog" && arg) return writeChangelog(arg);
+  throw new ReleaseError(
+    "Usage: pnpm release version <x.y.z> | check | notes <x.y.z> | plan <vX.Y.Z> < tags | next <patch|minor|major|x.y.z> | changelog <x.y.z>",
+  );
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {

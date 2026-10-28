@@ -28,7 +28,7 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_store::StoreExt;
-use tauri_plugin_updater::UpdaterExt;
+use tauri_plugin_updater::{Update, UpdaterExt};
 use tauri_plugin_window_state::StateFlags;
 
 pub use instances::{default_name, window_title, Instance, Saved};
@@ -398,36 +398,131 @@ fn open_link(app: &AppHandle, link: &Url) {
     let _ = app.emit_to(MAIN, "open-link", link.as_str());
 }
 
+// While the app runs, it checks for updates this often, quietly.
+const UPDATE_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
+// How often it looks at the clock for that. The wall clock, so the hours a
+// laptop spends asleep count.
+const UPDATE_TICK: Duration = Duration::from_secs(15 * 60);
+
+// The updater does one thing at a time: a check, or an update that waits for
+// a restart. Either way a new check stays out of its way, so dialogs never
+// stack.
+struct Updates(Mutex<UpdateState>);
+
+enum UpdateState {
+    Idle,
+    Checking,
+    Ready(Box<Pending>),
+}
+
+struct Pending {
+    version: String,
+    // Installing on Windows quits the app to run the installer, so there the
+    // download waits for Restart. Elsewhere it is installed already.
+    install: Option<(Update, Vec<u8>)>,
+    // The Restart dialog is open.
+    asking: bool,
+}
+
+fn updates(app: &AppHandle) -> std::sync::MutexGuard<'_, UpdateState> {
+    app.state::<Updates>().inner().0.lock().expect("updates lock")
+}
+
 async fn check_for_update(app: AppHandle, asked: bool) {
     let say = |message: String| {
         if asked {
             app.dialog().message(message).title("Edict").show(|_| {});
         }
     };
-    let updater = match app.updater() {
-        Ok(updater) => updater,
-        Err(error) => return say(format!("Could not check for updates: {error}")),
-    };
-    match updater.check().await {
-        Ok(Some(update)) => {
-            let version = update.version.clone();
-            if let Err(error) = update.download_and_install(|_, _| {}, || {}).await {
-                return say(format!("Could not install Edict {version}: {error}"));
+    {
+        let mut state = updates(&app);
+        match *state {
+            UpdateState::Checking => return say("Edict is already checking for updates.".into()),
+            // Asking again offers the restart again.
+            UpdateState::Ready(_) => {
+                drop(state);
+                if asked {
+                    offer_restart(&app);
+                }
+                return;
             }
-            let handle = app.clone();
-            app.dialog()
-                .message(format!("Edict {version} is installed. Restart to use it?"))
-                .title("Update ready")
-                .buttons(MessageDialogButtons::OkCancelCustom("Restart".into(), "Later".into()))
-                .show(move |restart| {
-                    if restart {
-                        handle.restart();
-                    }
-                });
+            UpdateState::Idle => *state = UpdateState::Checking,
         }
-        Ok(None) => say("This is the latest Edict.".into()),
-        Err(error) => say(format!("Could not check for updates: {error}")),
     }
+    match fetch_update(&app).await {
+        Ok(Some(pending)) => {
+            *updates(&app) = UpdateState::Ready(pending);
+            offer_restart(&app);
+        }
+        Ok(None) => {
+            *updates(&app) = UpdateState::Idle;
+            say("This is the latest Edict.".into());
+        }
+        Err(message) => {
+            *updates(&app) = UpdateState::Idle;
+            say(message);
+        }
+    }
+}
+
+async fn fetch_update(app: &AppHandle) -> Result<Option<Box<Pending>>, String> {
+    let checking = |error: tauri_plugin_updater::Error| format!("Could not check for updates: {error}");
+    let Some(update) = app.updater().map_err(checking)?.check().await.map_err(checking)? else {
+        return Ok(None);
+    };
+    let version = update.version.clone();
+    let bytes = update
+        .download(|_, _| {}, || {})
+        .await
+        .map_err(|error| format!("Could not download Edict {version}: {error}"))?;
+    if cfg!(windows) {
+        return Ok(Some(Box::new(Pending { version, install: Some((update, bytes)), asking: false })));
+    }
+    update.install(&bytes).map_err(|error| format!("Could not install Edict {version}: {error}"))?;
+    Ok(Some(Box::new(Pending { version, install: None, asking: false })))
+}
+
+// One Restart dialog at a time. Later keeps the update waiting: elsewhere than
+// Windows the next launch runs it anyway.
+fn offer_restart(app: &AppHandle) {
+    let version = {
+        let mut state = updates(app);
+        let UpdateState::Ready(pending) = &mut *state else { return };
+        if pending.asking {
+            return;
+        }
+        pending.asking = true;
+        pending.version.clone()
+    };
+    let handle = app.clone();
+    app.dialog()
+        .message(format!("Edict {version} is ready. Restart to use it?"))
+        .title("Update ready")
+        .buttons(MessageDialogButtons::OkCancelCustom("Restart".into(), "Later".into()))
+        .show(move |restart| {
+            let install = {
+                let mut state = updates(&handle);
+                let UpdateState::Ready(pending) = &mut *state else { return };
+                pending.asking = false;
+                if !restart {
+                    return;
+                }
+                pending.install.take()
+            };
+            // On Windows this quits the app and the installer starts it again.
+            if let Some((update, bytes)) = install {
+                if let Err(error) = update.install(&bytes) {
+                    *updates(&handle) = UpdateState::Idle;
+                    handle
+                        .dialog()
+                        .message(format!("Could not install Edict {version}: {error}"))
+                        .title("Edict")
+                        .show(|_| {});
+                    return;
+                }
+            }
+            handle.restart();
+        });
 }
 
 // One check item per saved instance, most recently used first, with
@@ -686,6 +781,7 @@ pub fn run() {
                 None => WebviewUrl::App("index.html".into()),
             };
             app.manage(Shell(Mutex::new(saved.clone())));
+            app.manage(Updates(Mutex::new(UpdateState::Idle)));
 
             let opener = handle.clone();
             let main = chrome::styled(WebviewWindowBuilder::new(app, MAIN, url), &version(&handle))
@@ -730,8 +826,22 @@ pub fn run() {
                 }
             });
 
+            // Release builds check at launch, then every few hours while open.
             if !cfg!(debug_assertions) {
-                tauri::async_runtime::spawn(check_for_update(handle.clone(), false));
+                let checker = handle.clone();
+                std::thread::spawn(move || {
+                    let mut last = SystemTime::now();
+                    tauri::async_runtime::spawn(check_for_update(checker.clone(), false));
+                    loop {
+                        std::thread::sleep(UPDATE_TICK);
+                        let now = SystemTime::now();
+                        // A clock set back counts as time up.
+                        if now.duration_since(last).map_or(true, |elapsed| elapsed >= UPDATE_EVERY) {
+                            last = now;
+                            tauri::async_runtime::spawn(check_for_update(checker.clone(), false));
+                        }
+                    }
+                });
             }
             Ok(())
         })

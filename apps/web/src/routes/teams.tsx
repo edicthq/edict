@@ -222,7 +222,7 @@ export function TeamMembersPage() {
             {teamMembers.data?.map((member) => (
               <li key={member.id} className="flex min-h-14 items-center gap-3 px-4 py-2.5">
                 <Avatar name={member.name} kind={member.kind} size={32} />
-                <span className={cn("min-w-0 flex-1 truncate text-ui font-medium", member.kind === "agent" && "text-agent-ink")}>
+                <span className="min-w-0 flex-1 truncate text-ui font-medium">
                   {member.name}
                   {member.id === me ? <span className="font-normal text-ink-2"> (you)</span> : null}
                 </span>

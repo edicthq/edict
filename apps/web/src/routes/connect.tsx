@@ -239,7 +239,7 @@ export function ConnectPage() {
                   >
                     <Avatar name={agent.name} kind="agent" size={32} />
                     <span className="min-w-0">
-                      <span className="block truncate text-ui font-medium text-agent-ink">{agent.name}</span>
+                      <span className="block truncate text-ui font-medium">{agent.name}</span>
                       <span className="block truncate text-sm text-ink-2">{connectionLine(agent, members.data ?? [])}</span>
                     </span>
                     <ChevronRight aria-hidden="true" className="ms-auto size-4 text-ink-3" strokeWidth={1.75} />

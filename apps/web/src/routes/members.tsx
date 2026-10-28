@@ -1,5 +1,5 @@
 import type { Member, Role } from "@edicthq/client";
-import { Avatar, Badge, Button, SelectMenu, cn } from "@edicthq/ui";
+import { Avatar, Badge, Button, SelectMenu } from "@edicthq/ui";
 import { SettingsCard, SettingsFrame } from "../components/settings-frame.js";
 import { Loading } from "../components/shell.js";
 import { allRoles, roleLabel } from "../lib/labels.js";
@@ -69,7 +69,7 @@ function MemberRow({ member, me, canManage }: { member: Member; me: Member; canM
       <div className="flex min-h-14 items-center gap-3 px-4 py-2.5">
         <Avatar name={member.name} kind={member.kind} size={32} />
         <div className="flex min-w-0 flex-1 flex-col">
-          <span className={cn("truncate text-ui font-medium", member.kind === "agent" && "text-agent-ink")}>
+          <span className="truncate text-ui font-medium">
             {member.name}
             {isMe ? <span className="font-normal text-ink-2"> (you)</span> : null}
           </span>
