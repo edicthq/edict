@@ -1,0 +1,91 @@
+name: Cut a release
+
+# One click on main: works out the next version from the newest v* tag, adds
+# its CHANGELOG.md section from the commit subjects since the last tag (unless
+# one is already written), sets the version, commits "Release x.y.z" to main,
+# tags it and starts the Release workflow on the tag. docs/releasing.md has
+# the steps.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Which part of the version goes up
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      version:
+        description: Or this exact version instead, like 1.5.0-rc.1
+        type: string
+        required: false
+
+# One release cut at a time.
+concurrency:
+  group: cut-release
+  cancel-in-progress: false
+
+# Each job asks for what it needs and no more.
+permissions: {}
+
+# Actions are pinned to commits; the comment names the release each one is.
+jobs:
+  cut:
+    if: github.repository == 'edicthq/edict'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      # Pushes the release commit and its tag.
+      contents: write
+      # Starts the Release workflow. A tag pushed with this job's token
+      # triggers no workflow, but a dispatch does.
+      actions: write
+    steps:
+      - name: Only from main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Releases are cut from main, not ${GITHUB_REF_NAME}."
+          exit 1
+      # Every commit and tag, to find the last release and what came since.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - name: Work out the version
+        id: version
+        run: |
+          version=$(node scripts/release.mjs next "${VERSION:-$BUMP}")
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "Cutting Edict ${version}" >> "$GITHUB_STEP_SUMMARY"
+        env:
+          BUMP: ${{ inputs.bump }}
+          VERSION: ${{ inputs.version }}
+      - name: Write the changelog and set the version
+        run: |
+          node scripts/release.mjs changelog "$VERSION"
+          node scripts/release.mjs version "$VERSION"
+          node scripts/release.mjs notes "$VERSION" >> "$GITHUB_STEP_SUMMARY"
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+      # Both or neither: a push that loses the race to another commit on main
+      # leaves no tag behind, and the run can go again.
+      - name: Commit, tag and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Nothing to commit when "Release x.y.z" already landed by hand.
+          if ! git diff --quiet; then git commit --all --message "Release ${VERSION}"; fi
+          git tag --annotate "v${VERSION}" --message "Edict ${VERSION}"
+          git push --atomic "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/main "refs/tags/v${VERSION}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+      - name: Start the Release workflow
+        run: |
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "v${VERSION}"
+          echo "Started the [Release workflow](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/release.yml) on v${VERSION}." >> "$GITHUB_STEP_SUMMARY"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}

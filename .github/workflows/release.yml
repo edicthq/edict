@@ -4,9 +4,14 @@ name: Release
 # then the image goes to GHCR, @edicthq/client to npm, the desktop app is
 # built for macOS, Windows and Linux, and the notes from CHANGELOG.md go to a
 # GitHub Release with the installers. docs/releasing.md has the steps.
+#
+# "Cut a release" (cut-release.yml) pushes its tag with the workflow token,
+# which starts no workflow, so it dispatches this one on the tag instead. Run
+# on anything but a v* tag, the plan fails: the tag must match the version.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 # One release per tag at a time, and never cancelled halfway through publishing.
 concurrency:
