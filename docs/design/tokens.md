@@ -74,6 +74,18 @@ Lime does not follow the formula. It keeps a bright fill with dark text on it: l
 
 Users can choose an accent. Whether the choice is stored per user, as an organization default, or both is still open, and the setting is not in the plan's v1 scope yet. New presets need a hue at least 15° from amber (65–80) and red (25–27), since those mean "waiting on you".
 
+### Status icons
+
+Each stage of the workflow has its hue, as Linear has them, so a list reads at a glance. Backlog, Todo and Canceled stay `ink-3`.
+
+| Role | Use | Light | Dark |
+|---|---|---|---|
+| `status-started` | The first in-progress stage, like In Progress | `oklch(0.76 0.15 92)` | `oklch(0.84 0.15 95)` |
+| `status-review` | Later in-progress stages, like In Review | `oklch(0.62 0.14 155)` | `oklch(0.74 0.14 155)` |
+| `status-done` | Done | `oklch(0.56 0.15 270)` | `oklch(0.7 0.13 270)` |
+
+They color the status icon only, never text or a fill behind it. The yellow sits at hue 92, clear of the amber that means an agent is waiting on a person.
+
 ### Label dots
 
 Labels keep a hue from their definition. The dot is `oklch(0.66 0.1 h)` in light and `oklch(0.72 0.09 h)` in dark. Label text stays `ink-2`. These colors are decorative and never become buttons or states.
