@@ -102,3 +102,29 @@ html {
     animation: none;
   }
 }
+
+/* Scrolling into view: content rises 14px and fades in, once. Without
+   JavaScript, or with reduced motion, it is simply there. */
+@media (prefers-reduced-motion: no-preference) and (scripting: enabled) {
+  .landing [data-reveal] {
+    opacity: 0;
+    transform: translateY(14px);
+    transition:
+      opacity 700ms cubic-bezier(0.16, 1, 0.3, 1),
+      transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .landing [data-reveal][data-shown] {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Typing in the "Connect" step. */
+@keyframes l-caret {
+  50% {
+    opacity: 0;
+  }
+}
+.l-caret {
+  animation: l-caret 1s steps(1) infinite;
+}

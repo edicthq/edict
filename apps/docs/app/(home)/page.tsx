@@ -1,9 +1,28 @@
 import type { Metadata } from 'next';
-import { Database, Gauge, History, LogIn, Pause, RefreshCw, ShieldCheck, type LucideIcon } from 'lucide-react';
+import {
+  ArrowDown,
+  Bell,
+  Check,
+  Database,
+  Gauge,
+  History,
+  Keyboard,
+  Link2,
+  LogIn,
+  PanelsTopLeft,
+  Pause,
+  RefreshCw,
+  Server,
+  ShieldCheck,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { HeroScene } from '@/components/landing/hero-scene';
 import { ClientTabs, CopyBlock, DownloadButton } from '@/components/landing/interactive';
+import { Reveal } from '@/components/landing/motion';
+import { Timeline } from '@/components/landing/timeline';
 import { composeCommands, downloads, releasesUrl, repo, version } from '@/lib/release';
 
 export const metadata: Metadata = {
@@ -12,20 +31,23 @@ export const metadata: Metadata = {
     'Edict is an open-source, self-hosted issue tracker where AI agents are members of your team. Connect Claude Code, Codex, Cursor or any MCP client by pasting one URL.',
 };
 
-const tools = [
+const reads = [
   ['search_issues', 'Full-text and filtered search'],
   ['get_issue', 'An issue with its comments, relations and progress'],
+  ['my_work', "What's assigned or delegated to it"],
+  ['get_inbox', 'What its inbox asks of it'],
+  ['get_project', 'A project with its progress'],
+  ['list_teams', 'The teams it can reach'],
+  ['get_team_context', "A team's statuses, labels and people"],
+] as const;
+
+const writes = [
   ['create_issue', 'In a team, from a template if you like'],
   ['update_issue', 'Status, assignee, delegate, labels, priority'],
   ['comment', 'Markdown, like everyone else'],
-  ['post_progress', 'Only when blocked, needing you, or done'],
-  ['my_work', "What's assigned or delegated to it"],
   ['link', 'A pull request or any URL'],
   ['relate_issues', 'Blocks, related, duplicate of'],
-  ['get_inbox', 'What its inbox asks of it'],
-  ['list_teams', 'The teams it can reach'],
-  ['get_team_context', "A team's statuses, labels and people"],
-  ['get_project', 'A project with its progress'],
+  ['post_progress', 'Only when blocked, needing you, or done'],
 ] as const;
 
 export default function HomePage() {
@@ -139,13 +161,13 @@ function Hero() {
 
 function SectionHead({ eyebrow, title, lead }: { eyebrow: string; title: string; lead: ReactNode }) {
   return (
-    <div className="max-w-[640px]">
+    <Reveal className="max-w-[640px]">
       <p className="text-[13px] font-medium text-l-ink-3">{eyebrow}</p>
       <h2 className="mt-2.5 text-[30px] leading-[1.1] font-semibold tracking-[-0.025em] text-balance sm:mt-3 sm:text-[44px]">
         {title}
       </h2>
       <p className="mt-3.5 text-[16px] leading-[1.6] text-l-ink-2 text-pretty sm:mt-4 sm:text-[17px]">{lead}</p>
-    </div>
+    </Reveal>
   );
 }
 
@@ -168,20 +190,6 @@ function Point({ icon: Icon, title, children }: { icon: LucideIcon; title: strin
 }
 
 function HowItWorks() {
-  const steps = [
-    {
-      title: 'Connect',
-      body: 'Paste one URL into Claude Code, Codex, Cursor or any MCP client and approve it. It joins your team as an agent, named after the client and you.',
-    },
-    {
-      title: 'Delegate',
-      body: 'Hand an issue to an agent. You stay its assignee and answer for it; the agent is its delegate and does the work.',
-    },
-    {
-      title: 'Watch it land',
-      body: 'The agent moves the issue, comments and links its pull request. You see it in the list and in your inbox.',
-    },
-  ];
   return (
     <section className={`border-t border-l-line ${sectionY}`}>
       <Shell>
@@ -190,26 +198,7 @@ function HowItWorks() {
           title="Agents are members, not integrations."
           lead="An agent in Edict has a name, a queue and a history, like anyone on the team. It works through the tools you give it, and runs only where you put it."
         />
-        {/* A timeline: down the side on a phone, across on a wide screen. */}
-        <ol className="mt-10 grid gap-7 md:mt-14 md:grid-cols-3 md:gap-8">
-          {steps.map((step, index) => (
-            <li key={step.title} className="relative flex gap-4 md:flex-col md:gap-5">
-              {index < steps.length - 1 ? (
-                <span
-                  aria-hidden="true"
-                  className="absolute start-4 top-10 -bottom-5 w-px bg-l-line-2 md:start-12 md:-end-6 md:top-4 md:bottom-auto md:h-px md:w-auto"
-                />
-              ) : null}
-              <span className="relative grid size-8 shrink-0 place-items-center rounded-full bg-l-bg text-[13px] font-semibold tabular-nums shadow-[inset_0_0_0_1px_var(--l-line-2)]">
-                {index + 1}
-              </span>
-              <div className="min-w-0 pt-1 md:pt-0">
-                <h3 className="text-[17px] font-semibold tracking-[-0.01em] sm:text-[19px]">{step.title}</h3>
-                <p className="mt-1.5 text-[15px] leading-[1.55] text-l-ink-2 text-pretty">{step.body}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
+        <Timeline />
       </Shell>
     </section>
   );
@@ -218,48 +207,135 @@ function HowItWorks() {
 function Mcp() {
   return (
     <section id="mcp" className={`scroll-mt-14 bg-l-band ${sectionY}`}>
-      {/* On a phone: what it is, then how to connect, then the tools. On a
-          wide screen the setup sits beside the other two. */}
-      <Shell className="grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-x-20 lg:gap-y-10">
-        <div className="min-w-0 lg:col-start-1 lg:row-start-1">
-          <SectionHead
-            eyebrow="MCP"
-            title="One URL. Any MCP client."
-            lead={
-              <>
-                Every Edict serves MCP at <code className="font-l-mono text-[0.92em] text-l-ink">/mcp</code>. Its tools are
-                shaped like tasks, not endpoints, and take the words you would use: “In Progress”, “@maya”, “bug”.
-              </>
-            }
-          />
+      <Shell>
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-x-20">
+          <div className="min-w-0">
+            <SectionHead
+              eyebrow="MCP"
+              title="One URL. Any MCP client."
+              lead={
+                <>
+                  Every Edict serves MCP at <code className="font-l-mono text-[0.92em] text-l-ink">/mcp</code>. Its tools
+                  are shaped like tasks, and take the words you would use: “In Progress”, “@maya”, “bug”.
+                </>
+              }
+            />
+            <Reveal delay={100}>
+              <ol className="mt-9 flex flex-col gap-5">
+                {[
+                  ['Add the server', "One line in your client's settings."],
+                  ['Sign in', 'Your browser opens Edict, where you are already signed in.'],
+                  ['Approve it', 'It joins your team as Claude Code (Maya), with your access and less.'],
+                ].map(([title, body], index) => (
+                  <li key={title} className="flex gap-4">
+                    <span className="grid size-7 shrink-0 place-items-center rounded-full text-[12.5px] font-semibold tabular-nums shadow-[inset_0_0_0_1px_var(--l-line-2)]">
+                      {index + 1}
+                    </span>
+                    <div className="pt-0.5">
+                      <h3 className="text-[15.5px] font-semibold tracking-[-0.005em]">{title}</h3>
+                      <p className="mt-0.5 text-[15px] text-l-ink-2 text-pretty">{body}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+              <p className="mt-8 max-w-[52ch] text-[15px] leading-[1.6] text-l-ink-2 text-pretty">
+                Then tell it <q className="text-l-ink">work on ENG-142</q> or <q className="text-l-ink">do my Edict work</q>.
+                Moving the issue, commenting and linking are its progress report, at no extra tokens.{' '}
+                <Link href="/docs/agents" className="font-medium text-l-ink underline decoration-l-line-2 underline-offset-4 hover:decoration-l-ink">
+                  Connect your agent
+                </Link>
+              </p>
+            </Reveal>
+          </div>
+          <Reveal delay={80} className="flex min-w-0 flex-col gap-5 lg:pt-9">
+            <ClientTabs />
+            <Consent />
+          </Reveal>
         </div>
-        <div className="flex min-w-0 flex-col gap-4 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:pt-10">
-          <ClientTabs />
-          <p className="text-[14px] leading-[1.6] text-l-ink-2 text-pretty">
-            Then tell it <q className="text-l-ink">work on ENG-142</q> or <q className="text-l-ink">do my Edict work</q>.
-            Moving the issue, commenting and linking are its progress report, at no extra tokens.{' '}
-            <Link href="/docs/agents" className="font-medium text-l-ink underline decoration-l-line-2 underline-offset-4 hover:decoration-l-ink">
-              Connect your agent
-            </Link>
-          </p>
-        </div>
-        <div className="min-w-0 lg:col-start-1 lg:row-start-2">
-          <p className="text-[13px] font-medium text-l-ink-3">{tools.length} tools</p>
-          {/* Names only on a phone, as chips; with what each does from sm up. */}
-          <ul className="mt-3 flex flex-wrap gap-1.5 sm:grid sm:grid-cols-2 sm:gap-x-6 sm:gap-y-2.5">
-            {tools.map(([name, does]) => (
-              <li
-                key={name}
-                className="rounded-md bg-l-surface px-2 py-1 shadow-[0_0_0_1px_var(--l-line)] sm:flex sm:flex-col sm:rounded-none sm:bg-transparent sm:p-0 sm:shadow-none"
-              >
-                <code className="font-l-mono text-[12px] text-l-ink sm:text-[13px]">{name}</code>
-                <span className="hidden text-[13px] text-l-ink-3 sm:block">{does}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+
+        <Reveal className="mt-14 sm:mt-20">
+          <div className="flex items-baseline gap-3">
+            <h3 className="text-[19px] font-semibold tracking-[-0.01em]">Thirteen tools, shaped like tasks</h3>
+            <span className="hidden text-[14px] text-l-ink-3 sm:inline">Plus prompts like “do my Edict work” and “triage my inbox”.</span>
+          </div>
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <ToolPanel title="Reads" note="What it looks at" tools={reads} />
+            <ToolPanel title="Writes" note="What it changes, as itself" tools={writes} />
+          </div>
+        </Reveal>
       </Shell>
     </section>
+  );
+}
+
+// A group of tools: names as chips on a phone, a row each with what it does
+// from sm up.
+function ToolPanel({ title, note, tools }: { title: string; note: string; tools: readonly (readonly [string, string])[] }) {
+  return (
+    <div className="overflow-hidden rounded-xl bg-l-surface shadow-[0_0_0_1px_var(--l-line)]">
+      <div className="flex items-baseline justify-between gap-3 border-b border-l-line px-5 py-3">
+        <span className="text-[14px] font-semibold">{title}</span>
+        <span className="text-[13px] text-l-ink-3">{note}</span>
+      </div>
+      <ul className="flex flex-wrap gap-1.5 p-4 sm:block sm:divide-y sm:divide-l-line sm:p-0">
+        {tools.map(([name, does]) => (
+          <li
+            key={name}
+            className="rounded-md px-2 py-1 shadow-[0_0_0_1px_var(--l-line)] sm:flex sm:items-baseline sm:gap-4 sm:rounded-none sm:px-5 sm:py-2.5 sm:shadow-none"
+          >
+            <code className="font-l-mono text-[12px] text-l-ink sm:w-[152px] sm:shrink-0 sm:text-[13px]">{name}</code>
+            <span className="hidden text-[13.5px] text-l-ink-2 sm:block">{does}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// The page a person sees when their client connects, as the app draws it.
+function Consent() {
+  return (
+    <figure className="overflow-hidden rounded-xl bg-l-bg shadow-l-window">
+      <div className="flex flex-col items-center gap-4 px-6 pt-7 pb-5 text-center">
+        <div aria-hidden="true" className="flex items-center gap-3">
+          <span className="grid size-9 place-items-center rounded-[9px] bg-l-agent text-[11px] font-bold text-white">CC</span>
+          <span className="w-10 border-t border-dashed border-l-line-2" />
+          <span className="grid size-9 place-items-center rounded-[10px] bg-l-ink text-l-on-ink">
+            <Mark size={18} />
+          </span>
+        </div>
+        <div>
+          <p className="text-[17px] font-semibold tracking-[-0.01em]">Connect Claude Code to Edict</p>
+          <p className="mt-1 text-[13.5px] text-l-ink-2">
+            It joins as the agent <span className="font-medium text-l-agent-ink">Claude Code (Maya)</span> and acts on your
+            behalf.
+          </p>
+        </div>
+      </div>
+      <ul className="mx-5 flex flex-col gap-2 rounded-lg bg-l-surface px-4 py-3.5 text-[13px] shadow-[0_0_0_1px_var(--l-line)]">
+        <Can>Reads and updates issues, comments and posts progress, in the teams you can see</Can>
+        <Can>Shows as Claude Code (Maya), so everyone can tell its work from yours</Can>
+        <Can no>Deletes nothing and changes no settings or members, unless an admin allows it</Can>
+      </ul>
+      <div className="grid grid-cols-2 gap-2 p-5">
+        <span className="grid h-9 place-items-center rounded-lg text-[13.5px] font-semibold shadow-[inset_0_0_0_1px_var(--l-line-2)]">Deny</span>
+        <span className="grid h-9 place-items-center rounded-lg bg-l-ink text-[13.5px] font-semibold text-l-on-ink">Allow</span>
+      </div>
+      <figcaption className="sr-only">The approval page your browser opens when a client connects</figcaption>
+    </figure>
+  );
+}
+
+function Can({ children, no = false }: { children: ReactNode; no?: boolean }) {
+  return (
+    <li className="flex gap-2.5 text-pretty">
+      {no ? (
+        <X aria-label="Can't" className="mt-0.5 size-3.5 shrink-0 text-l-ink-3" strokeWidth={2.25} />
+      ) : (
+        <Check aria-label="Can" className="mt-0.5 size-3.5 shrink-0 text-l-ink-2" strokeWidth={2.25} />
+      )}
+      <span className={no ? 'text-l-ink-2' : ''}>{children}</span>
+    </li>
   );
 }
 
@@ -272,6 +348,7 @@ function Guardrails() {
           title="An agent never does more than its human."
           lead="Agents get the access of the person who connected them, narrowed further, and everything they touch is on the record."
         />
+        <Reveal delay={100}>
         <ul className="mt-10 grid gap-x-12 gap-y-7 sm:mt-14 sm:grid-cols-2 sm:gap-y-9">
           <Point icon={ShieldCheck} title="Its human's access, and less">
             It works in its human's teams, and can't delete, change settings or manage people unless an admin allows it.
@@ -286,6 +363,7 @@ function Guardrails() {
             600 requests a minute and 60 new issues an hour per agent, and a conflict when it writes over a newer change.
           </Point>
         </ul>
+        </Reveal>
       </Shell>
     </section>
   );
@@ -301,22 +379,40 @@ function SelfHost() {
             title="Yours to run, in one command."
             lead="One image for amd64 and arm64, and Postgres. The first person to sign up runs the instance."
           />
-          <ul className="mt-9 flex flex-col gap-6">
-            <Point icon={Database} title="Postgres and nothing else">
-              Redis and S3 are optional. Attachments go to disk until you point them at a bucket.
-            </Point>
-            <Point icon={RefreshCw} title="Migrations on boot">
-              Upgrading is pulling the new image and starting it again.
-            </Point>
-            <Point icon={LogIn} title="Your sign-in">
-              Email and password, magic links, Google, GitHub or any OpenID Connect provider.
-            </Point>
-          </ul>
+          <Reveal delay={100}>
+            <ul className="mt-9 flex flex-col gap-6">
+              <Point icon={Database} title="Postgres and nothing else">
+                Redis and S3 are optional. Attachments go to disk until you point them at a bucket.
+              </Point>
+              <Point icon={RefreshCw} title="Migrations on boot">
+                Upgrading is pulling the new image and starting it again.
+              </Point>
+              <Point icon={LogIn} title="Your sign-in">
+                Email and password, magic links, Google, GitHub or any OpenID Connect provider.
+              </Point>
+            </ul>
+          </Reveal>
         </div>
-        <div className="flex min-w-0 flex-col gap-3 lg:pt-10">
+        <Reveal delay={80} className="flex min-w-0 flex-col gap-3 lg:pt-9">
           <CopyBlock code={composeCommands} file="Terminal" label="the install commands" />
-          <p className="text-[14px] text-l-ink-2">
-            Then open <code className="font-l-mono text-[0.92em] text-l-ink">localhost:3000</code>.{' '}
+          {/* What the terminal says back, and what is running. */}
+          <div className="overflow-hidden rounded-xl bg-[oklch(0.17_0.008_260)] text-[oklch(0.92_0.005_255)] shadow-[0_0_0_1px_oklch(1_0_0/0.07)]">
+            <div className="flex h-10 items-center border-b border-[oklch(1_0_0/0.07)] px-4 font-l-mono text-[11.5px] text-[oklch(0.62_0.01_255)]">
+              docker compose ps
+            </div>
+            <pre className="overflow-x-auto px-4 py-3.5 font-l-mono text-[11.5px] leading-[1.75] sm:text-[12.5px]">
+              <code>
+                <span className="text-[oklch(0.62_0.01_255)]">{'SERVICE   IMAGE                        STATUS\n'}</span>
+                {'app       ghcr.io/edicthq/edict:latest '}
+                <span className="text-[oklch(0.78_0.14_155)]">Up</span>
+                {'\ndb        postgres:18-alpine           '}
+                <span className="text-[oklch(0.78_0.14_155)]">Up (healthy)</span>
+              </code>
+            </pre>
+          </div>
+          <Stack />
+          <p className="pt-1 text-[14px] text-l-ink-2">
+            Then open <code className="font-l-mono text-[0.92em] text-l-ink">localhost:3000</code> and sign up.{' '}
             <Link
               href="/docs/self-hosting"
               className="font-medium text-l-ink underline decoration-l-line-2 underline-offset-4 hover:decoration-l-ink"
@@ -324,63 +420,129 @@ function SelfHost() {
               Self-hosting guide
             </Link>
           </p>
-        </div>
+        </Reveal>
       </Shell>
     </section>
   );
 }
 
+// What an instance is made of: the app and Postgres, and what plugs in.
+function Stack() {
+  const optional = ['S3 storage', 'SMTP', 'Google, GitHub, OIDC'];
+  return (
+    <figure className="rounded-xl bg-l-surface p-4 shadow-[0_0_0_1px_var(--l-line)]">
+      <div className="flex items-stretch gap-2.5">
+        <div className="flex flex-1 flex-col gap-0.5 rounded-lg bg-l-bg px-3.5 py-2.5 shadow-[inset_0_0_0_1px_var(--l-line-2)]">
+          <span className="flex items-center gap-1.5 text-[13.5px] font-semibold">
+            <Mark size={13} />
+            Edict
+          </span>
+          <span className="text-[12px] text-l-ink-3">Web app, API, MCP and realtime</span>
+        </div>
+        <span aria-hidden="true" className="self-center text-l-ink-3">
+          →
+        </span>
+        <div className="flex flex-1 flex-col gap-0.5 rounded-lg bg-l-bg px-3.5 py-2.5 shadow-[inset_0_0_0_1px_var(--l-line-2)]">
+          <span className="flex items-center gap-1.5 text-[13.5px] font-semibold">
+            <Database aria-hidden="true" className="size-3.5" strokeWidth={2} />
+            Postgres
+          </span>
+          <span className="text-[12px] text-l-ink-3">The only thing it needs</span>
+        </div>
+      </div>
+      <figcaption className="mt-3 flex flex-wrap items-center gap-1.5 text-[12px] text-l-ink-3">
+        <span className="me-1">If you want them</span>
+        {optional.map((item) => (
+          <span key={item} className="rounded-full px-2 py-0.5 text-l-ink-2 shadow-[inset_0_0_0_1px_var(--l-line-2)] [border-style:dashed]">
+            {item}
+          </span>
+        ))}
+      </figcaption>
+    </figure>
+  );
+}
+
 function Download() {
+  const features = [
+    { icon: PanelsTopLeft, label: 'Tabs' },
+    { icon: Keyboard, label: 'A new issue from anywhere' },
+    { icon: Bell, label: 'Notifications' },
+    { icon: Link2, label: 'edict:// links' },
+    { icon: Server, label: 'Several servers, one window' },
+    { icon: RefreshCw, label: 'Updates itself' },
+  ];
+  const needs: Record<string, string> = {
+    macos: 'macOS 11 or later',
+    windows: 'Windows 10 or 11, 64-bit',
+    linux: 'Ubuntu 22.04, Debian 12 or newer',
+  };
   return (
     <section id="download" className={`scroll-mt-14 bg-l-band ${sectionY}`}>
       <Shell>
         <SectionHead
           eyebrow={`Desktop app · v${version}`}
           title="Edict, a hotkey away."
-          lead="Tabs, a global hotkey for a new issue, notifications and edict:// links, for every Edict you use. It loads the app from your server, so the two always match, and it updates itself."
+          lead="The desktop app loads Edict from your own server, so the two always match, and adds what a browser tab can't."
         />
+        <Reveal delay={80}>
+          <ul className="mt-8 flex flex-wrap gap-2 sm:mt-10">
+            {features.map(({ icon: Icon, label }) => (
+              <li
+                key={label}
+                className="inline-flex h-8 items-center gap-2 rounded-full bg-l-surface px-3 text-[13px] text-l-ink-2 shadow-[0_0_0_1px_var(--l-line)]"
+              >
+                <Icon aria-hidden="true" className="size-3.5 text-l-ink-3" strokeWidth={2} />
+                {label}
+              </li>
+            ))}
+          </ul>
+        </Reveal>
         {/* A row per system on a phone, a card each on a wide screen. */}
-        <ul className="mt-10 flex flex-col overflow-hidden rounded-xl bg-l-bg shadow-[0_0_0_1px_var(--l-line)] max-md:divide-y max-md:divide-l-line md:mt-14 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:rounded-none md:bg-transparent md:shadow-none">
-          {downloads.map((download) => (
-            <li
-              key={download.platform}
-              className="flex items-center gap-4 px-5 py-4 md:flex-col md:items-stretch md:gap-5 md:rounded-xl md:bg-l-bg md:p-6 md:shadow-[0_0_0_1px_var(--l-line)]"
-            >
-              <div className="min-w-0 flex-1">
-                <h3 className="text-[16px] font-semibold tracking-[-0.01em] md:text-[19px]">{download.name}</h3>
-                <p className="mt-0.5 text-[13px] text-l-ink-3 md:mt-1 md:text-[14px]">
-                  {download.primary.detail}
-                  {download.others.map((other) => (
-                    <span key={other.label} className="md:hidden">
-                      {' · '}
-                      <a href={other.href} className="underline decoration-l-line-2 underline-offset-2 hover:text-l-ink">
-                        {other.label}
-                      </a>
-                    </span>
-                  ))}
-                </p>
-              </div>
-              <div className="flex shrink-0 flex-wrap items-center gap-2 md:mt-auto">
-                <a
-                  href={download.primary.href}
-                  aria-label={download.primary.label}
-                  className="inline-flex h-9 items-center rounded-lg bg-l-ink px-3.5 text-[14px] font-semibold text-l-on-ink transition-opacity hover:opacity-90 md:h-10 md:px-4"
-                >
-                  Download
-                </a>
-                {download.others.map((other) => (
+        <Reveal delay={140}>
+          <ul className="mt-8 flex flex-col overflow-hidden rounded-xl bg-l-bg shadow-[0_0_0_1px_var(--l-line)] max-md:divide-y max-md:divide-l-line md:mt-10 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:rounded-none md:bg-transparent md:shadow-none">
+            {downloads.map((download) => (
+              <li
+                key={download.platform}
+                className="flex items-center gap-4 px-5 py-4 md:flex-col md:items-stretch md:gap-5 md:rounded-xl md:bg-l-bg md:p-6 md:shadow-[0_0_0_1px_var(--l-line)]"
+              >
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-[16px] font-semibold tracking-[-0.01em] md:text-[19px]">{download.name}</h3>
+                  <p className="mt-0.5 text-[13px] text-l-ink-3 md:mt-1 md:text-[14px]">
+                    {download.primary.detail}
+                    {download.others.map((other) => (
+                      <span key={other.label} className="md:hidden">
+                        {' · '}
+                        <a href={other.href} className="underline decoration-l-line-2 underline-offset-2 hover:text-l-ink">
+                          {other.label}
+                        </a>
+                      </span>
+                    ))}
+                  </p>
+                  <p className="mt-2 hidden text-[13px] text-l-ink-2 md:block">{needs[download.platform]}</p>
+                </div>
+                <div className="flex shrink-0 flex-wrap items-center gap-2 md:mt-auto md:border-t md:border-l-line md:pt-5">
                   <a
-                    key={other.label}
-                    href={other.href}
-                    className="hidden h-10 items-center rounded-lg px-3 font-l-mono text-[13px] text-l-ink-2 shadow-[inset_0_0_0_1px_var(--l-line-2)] transition-colors hover:bg-l-hover hover:text-l-ink md:inline-flex"
+                    href={download.primary.href}
+                    aria-label={download.primary.label}
+                    className="inline-flex h-9 items-center gap-2 rounded-lg bg-l-ink px-3.5 text-[14px] font-semibold text-l-on-ink transition-opacity hover:opacity-90 md:h-10 md:px-4"
                   >
-                    {other.label}
+                    <ArrowDown aria-hidden="true" className="size-4" strokeWidth={2.25} />
+                    Download
                   </a>
-                ))}
-              </div>
-            </li>
-          ))}
-        </ul>
+                  {download.others.map((other) => (
+                    <a
+                      key={other.label}
+                      href={other.href}
+                      className="hidden h-10 items-center rounded-lg px-3 font-l-mono text-[13px] text-l-ink-2 shadow-[inset_0_0_0_1px_var(--l-line-2)] transition-colors hover:bg-l-hover hover:text-l-ink md:inline-flex"
+                    >
+                      {other.label}
+                    </a>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Reveal>
         <p className="mt-5 max-w-[72ch] text-[13.5px] leading-[1.6] text-l-ink-2 text-pretty sm:mt-6 sm:text-[14px]">
           A beta, not yet signed by Apple or Microsoft. On macOS, right-click Edict and choose Open the first time; on Windows,
           choose More info, then Run anyway.{' '}

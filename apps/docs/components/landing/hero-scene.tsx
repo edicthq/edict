@@ -60,10 +60,10 @@ export function HeroScene() {
   const working = step >= 2 && step < 7;
   const linked = step >= 6;
   return (
-    // Side by side on a wide screen: the terminal a step lower, its edge over
-    // the window's, so the two read as one desk. Stacked on a narrow one.
-    <div className="flex flex-col-reverse gap-4 lg:grid lg:grid-cols-[360px_minmax(0,1fr)] lg:items-start lg:gap-0">
-      <div className="relative z-10 lg:mt-[268px] lg:-me-10">
+    // Side by side on a wide screen, the same height, so the terminal and the
+    // window it drives read as one desk. Stacked on a narrow one.
+    <div className="flex flex-col-reverse gap-4 lg:grid lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:items-stretch lg:gap-5">
+      <div className="flex">
         <Terminal step={step} />
       </div>
       <AppWindow status={status} working={working} linked={linked} step={step} />
@@ -76,7 +76,7 @@ function Terminal({ step }: { step: number }) {
     <div
       aria-label="Claude Code working an Edict issue"
       role="img"
-      className="overflow-hidden rounded-xl bg-[oklch(0.17_0.008_260)] text-[oklch(0.9_0.005_255)] shadow-[0_0_0_1px_oklch(1_0_0/0.08),0_32px_80px_-24px_oklch(0_0_0/0.6)]"
+      className="flex w-full flex-col overflow-hidden rounded-xl bg-[oklch(0.17_0.008_260)] text-[oklch(0.9_0.005_255)] shadow-[0_0_0_1px_oklch(1_0_0/0.08),0_32px_80px_-24px_oklch(0_0_0/0.6)]"
     >
       <div className="flex h-9 items-center gap-2 border-b border-[oklch(1_0_0/0.07)] px-3.5">
         <span className="flex gap-1.5" aria-hidden="true">
@@ -86,7 +86,7 @@ function Terminal({ step }: { step: number }) {
         </span>
         <span className="ms-2 font-l-mono text-[11px] text-[oklch(0.65_0.01_255)]">claude — ~/acme/web</span>
       </div>
-      <div className="flex h-[300px] flex-col justify-end gap-2 overflow-hidden px-4 py-3.5 font-l-mono text-[12px] leading-[1.55]">
+      <div className="flex min-h-[300px] flex-1 flex-col gap-2 overflow-hidden px-4 py-3.5 font-l-mono text-[12px] leading-[1.55]">
         {script.slice(0, step + 1).map((line) => (
           <TerminalLine key={line.key} line={line} />
         ))}
