@@ -1,7 +1,104 @@
 @import 'tailwindcss';
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
+@import '@fontsource-variable/instrument-sans';
 
 html {
   scrollbar-gutter: stable;
+}
+
+/* The landing page at /: Edict's own look, not the docs theme. Ink for people,
+   one violet for agents and nothing else, cool off-white or near-black
+   surfaces, Instrument Sans. Light and dark follow the docs' theme class. */
+
+.landing {
+  --l-bg: oklch(0.985 0.003 255);
+  --l-band: oklch(0.968 0.004 255);
+  --l-surface: oklch(1 0 0);
+  --l-ink: oklch(0.2 0.016 260);
+  --l-ink-2: oklch(0.45 0.014 260);
+  --l-ink-3: oklch(0.63 0.01 260);
+  --l-line: oklch(0.22 0.02 260 / 0.1);
+  --l-line-2: oklch(0.22 0.02 260 / 0.17);
+  --l-hover: oklch(0.22 0.02 260 / 0.05);
+  --l-on-ink: oklch(0.985 0.003 255);
+  --l-agent: oklch(0.56 0.22 293);
+  --l-agent-ink: oklch(0.5 0.21 293);
+  --l-agent-wash: oklch(0.56 0.22 293 / 0.1);
+  --l-started: oklch(0.76 0.15 92);
+  --l-review: oklch(0.62 0.14 155);
+  --l-done: oklch(0.56 0.15 270);
+  --l-window: 0 0 0 1px oklch(0.22 0.02 260 / 0.08), 0 2px 4px oklch(0.2 0.02 260 / 0.04),
+    0 24px 64px -24px oklch(0.2 0.02 260 / 0.28);
+  font-family: 'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  background: var(--l-bg);
+  color: var(--l-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+.dark .landing {
+  --l-bg: oklch(0.155 0.006 260);
+  --l-band: oklch(0.175 0.007 260);
+  --l-surface: oklch(0.2 0.007 260);
+  --l-ink: oklch(0.95 0.004 255);
+  --l-ink-2: oklch(0.74 0.009 255);
+  --l-ink-3: oklch(0.58 0.009 255);
+  --l-line: oklch(1 0 0 / 0.08);
+  --l-line-2: oklch(1 0 0 / 0.14);
+  --l-hover: oklch(1 0 0 / 0.05);
+  --l-on-ink: oklch(0.17 0.008 260);
+  --l-agent: oklch(0.64 0.19 293);
+  --l-agent-ink: oklch(0.8 0.13 293);
+  --l-agent-wash: oklch(0.64 0.19 293 / 0.16);
+  --l-started: oklch(0.84 0.15 95);
+  --l-review: oklch(0.74 0.14 155);
+  --l-done: oklch(0.7 0.13 270);
+  --l-window: inset 0 1px 0 oklch(1 0 0 / 0.05), 0 0 0 1px oklch(1 0 0 / 0.09),
+    0 32px 80px -24px oklch(0 0 0 / 0.7);
+}
+
+@theme inline {
+  --color-l-bg: var(--l-bg);
+  --color-l-band: var(--l-band);
+  --color-l-surface: var(--l-surface);
+  --color-l-ink: var(--l-ink);
+  --color-l-ink-2: var(--l-ink-2);
+  --color-l-ink-3: var(--l-ink-3);
+  --color-l-line: var(--l-line);
+  --color-l-line-2: var(--l-line-2);
+  --color-l-hover: var(--l-hover);
+  --color-l-on-ink: var(--l-on-ink);
+  --color-l-agent: var(--l-agent);
+  --color-l-agent-ink: var(--l-agent-ink);
+  --color-l-agent-wash: var(--l-agent-wash);
+  --color-l-started: var(--l-started);
+  --color-l-review: var(--l-review);
+  --color-l-done: var(--l-done);
+  --shadow-l-window: var(--l-window);
+  --font-l-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+}
+
+/* Things that arrive in the hero's scene ease in once. */
+@keyframes l-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.l-in {
+  animation: l-in 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes l-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+.l-pulse {
+  animation: l-pulse 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .l-in,
+  .l-pulse {
+    animation: none;
+  }
 }

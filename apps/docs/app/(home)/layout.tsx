@@ -1,6 +1,5 @@
-import { HomeLayout } from 'fumadocs-ui/layouts/home';
-import { baseOptions } from '@/lib/layout.shared';
-
+// The landing page carries its own look (global.css, .landing), not the docs
+// theme's layout.
 export default function Layout({ children }: LayoutProps<'/'>) {
-  return <HomeLayout {...baseOptions()}>{children}</HomeLayout>;
+  return <div className="landing flex min-h-screen flex-col">{children}</div>;
 }
