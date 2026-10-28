@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { z } from "zod";
-import { Button, Field, Input } from "@edicthq/ui";
+import { Button, Field, Input, PasswordInput } from "@edicthq/ui";
 import { AuthShell, FormError } from "../components/shell.js";
 import { authClient } from "../lib/auth.js";
 
@@ -97,7 +97,7 @@ export function ResetPassword() {
     <AuthShell title="Choose a new password">
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
         <Field label="New password" hint="At least 8 characters." error={form.formState.errors.password?.message}>
-          {(control) => <Input {...control} type="password" autoComplete="new-password" autoFocus {...form.register("password")} />}
+          {(control) => <PasswordInput {...control} autoComplete="new-password" autoFocus {...form.register("password")} />}
         </Field>
         <FormError message={failure} />
         <Button type="submit" variant="primary" size="lg" disabled={form.formState.isSubmitting} className="mt-2">

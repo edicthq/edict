@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { z } from "zod";
-import { Button, Field, Input } from "@edicthq/ui";
+import { Button, Field, Input, PasswordInput } from "@edicthq/ui";
 import { AuthShell, FormError } from "../components/shell.js";
 import { authClient } from "../lib/auth.js";
 import { keys, useInstance } from "../lib/queries.js";
@@ -71,9 +71,8 @@ export function SignIn() {
           }
         >
           {(control) => (
-            <Input
+            <PasswordInput
               {...control}
-              type="password"
               autoComplete="current-password"
               autoFocus={Boolean(email)}
               {...form.register("password")}
@@ -156,7 +155,7 @@ export function SignUp() {
           )}
         </Field>
         <Field label="Password" hint="At least 8 characters." error={form.formState.errors.password?.message}>
-          {(control) => <Input {...control} type="password" autoComplete="new-password" {...form.register("password")} />}
+          {(control) => <PasswordInput {...control} autoComplete="new-password" {...form.register("password")} />}
         </Field>
         <FormError message={failure} />
         <Button type="submit" variant="primary" size="lg" disabled={form.formState.isSubmitting} className="mt-2">

@@ -4,7 +4,7 @@ export { Button, Kbd, buttonClass, type ButtonProps } from "./button.js";
 export { cn } from "./cn.js";
 export { Checkbox, Radio, SelectMenu, Switch } from "./controls.js";
 export { Dialog } from "./dialog.js";
-export { Field, Input, type FieldProps } from "./field.js";
+export { Field, Input, PasswordInput, type FieldProps } from "./field.js";
 export { LogoMark } from "./logo.js";
 export { PriorityIcon, StatusIcon } from "./issue-icons.js";
 export { Menu, type MenuItem } from "./menu.js";
