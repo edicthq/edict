@@ -14,6 +14,10 @@ async function collector(now = () => new Date("2027-02-01T10:00:00Z")) {
   const url = new URL(adminUrl);
   url.pathname = `/${name}`;
   const pool = new pg.Pool({ connectionString: url.toString() });
+  // pool.end() resolves once it has asked its connections to close, not once
+  // they have; the forced drop below can end one still closing, and that
+  // connection's error must not go unheard.
+  pool.on("connect", (client) => client.on("error", () => {}));
   const running = await startCollector({ pool, port: 0, now });
   onTestFinished(async () => {
     await running.close();
