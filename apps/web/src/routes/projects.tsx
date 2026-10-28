@@ -86,7 +86,7 @@ export function ProjectsPage() {
                   <li key={proj.id}>
                     <Link
                       to={`/${slug}/projects/${proj.slug}`}
-                      className="group flex flex-col gap-3 rounded-md border border-line bg-surface p-4 transition-[border-color,background-color] hover:border-line-strong hover:bg-hover/50"
+                      className="group flex flex-col gap-3 rounded-md border border-line bg-surface px-3 py-4 transition-[border-color,background-color] hover:border-line-strong hover:bg-hover/50"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-2.5 min-w-0">
@@ -325,7 +325,7 @@ export function ProjectDetailPage() {
 
       <PageBody className="pt-5 flex flex-col gap-6">
         {/* Progress & Metrics Card */}
-        <section className="rounded-md border border-line bg-surface p-5 flex flex-col gap-4">
+        <section className="rounded-md border border-line bg-surface px-3 py-4 flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-ink">Progress</h2>
             <div className="flex items-center gap-3 text-sm">
@@ -368,7 +368,7 @@ export function ProjectDetailPage() {
 
         {/* Description */}
         <section className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between px-3">
             <h2 className="text-sm font-semibold text-ink">Description</h2>
             {!isEditingDesc ? (
               <button
@@ -408,7 +408,7 @@ export function ProjectDetailPage() {
               </div>
             </div>
           ) : project.description ? (
-            <div className="rounded-md border border-line/60 bg-surface/50 p-4">
+            <div className="rounded-md border border-line/60 bg-surface/50 px-3 py-3.5">
               <Markdown text={project.description} />
             </div>
           ) : null}
@@ -486,7 +486,7 @@ function ProjectIssues({
                 setUnfolded(next);
               }}
               disabled={!closed || !anyOpen}
-              className="hover-fade flex h-[34px] w-full items-center gap-2 rounded-sm px-3 text-sm font-semibold enabled:hover:bg-hover"
+              className="hover-fade flex h-[34px] w-full items-center gap-2 rounded-sm bg-hover/60 px-3 text-sm font-semibold enabled:hover:bg-hover"
             >
               <StatusIcon category={group.category} />
               {group.name}

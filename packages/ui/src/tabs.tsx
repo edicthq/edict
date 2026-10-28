@@ -63,7 +63,7 @@ export function Tabs<Value extends string>({
       className={cn(
         "flex items-center text-sm",
         variant === "segmented" && "inline-flex gap-0.5 rounded-sm border border-line bg-surface p-0.5",
-        variant === "underline" && "gap-1 border-b border-line px-3",
+        variant === "underline" && "gap-1 border-b border-line px-0.5",
         className,
       )}
     >

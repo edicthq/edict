@@ -1054,7 +1054,7 @@ function IssueList({
         <section key={groupKey(group)} aria-label={groupName(group)} className="mb-4">
           {/* A faint band, opaque so rows scroll under it while it sticks. */}
           <div className="sticky top-0 z-[1] bg-bg">
-            <div className="rounded-sm bg-hover/60 [&>h2]:bg-transparent [&>h2]:ps-4">
+            <div className="rounded-sm bg-hover/60 [&>h2]:bg-transparent">
               <GroupHeading group={group} statuses={statuses} />
             </div>
           </div>
@@ -1184,7 +1184,10 @@ function IssueBoard({
             setDragging(null);
           }}
         >
-          <GroupHeading group={column} statuses={statuses} />
+          {/* Cards sit 2px in for their focus ring; the heading follows them. */}
+          <div className="[&>h2]:ps-3.5">
+            <GroupHeading group={column} statuses={statuses} />
+          </div>
           <ul className="flex min-h-0 flex-col gap-2 overflow-y-auto px-0.5 pt-0.5 pb-28">
             {column.issues.map((issue) => {
               const isSelected = selectedIds.has(issue.id);

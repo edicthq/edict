@@ -18,7 +18,7 @@ import { NoAssignee } from "./issue-fields.js";
 // wraps, then priority, identifier, two labels and the people under it. The
 // age goes.
 export const issueRowClass =
-  "relative grid min-h-10 w-full grid-cols-[16px_58px_16px_minmax(0,1fr)_auto_auto_30px] items-center gap-x-3 gap-y-1 rounded-sm py-2 ps-4 pe-3 text-start hover-fade hover:bg-hover max-sm:grid-cols-[14px_16px_auto_minmax(0,1fr)_auto] max-sm:gap-x-2 max-sm:gap-y-1.5 max-sm:rounded-none max-sm:border-b max-sm:border-line max-sm:py-3 max-sm:pe-4";
+  "relative grid min-h-10 w-full grid-cols-[16px_58px_16px_minmax(0,1fr)_auto_auto_30px] items-center gap-x-3 gap-y-1 rounded-sm px-3 py-2 text-start hover-fade hover:bg-hover max-sm:grid-cols-[14px_16px_auto_minmax(0,1fr)_auto] max-sm:gap-x-2 max-sm:gap-y-1.5 max-sm:rounded-none max-sm:border-b max-sm:border-line max-sm:py-3 max-sm:pe-4";
 
 export function liveClass(issue: Issue, agents: Agent[], now: number): string | false {
   return (

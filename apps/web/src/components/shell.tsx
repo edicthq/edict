@@ -143,9 +143,11 @@ export function GroupHeader({ children, count, actions }: { children: ReactNode;
   );
 }
 
-// One list row: 40 high, 6 radius, hover fill.
+// One list row: 40 high, 6 radius, hover fill. Its content starts on the
+// page's edge, 24px in, with the title and the toolbar; the fill reaches 12px
+// past it.
 export const rowClass =
-  "flex min-h-10 items-center gap-3 rounded-sm py-2 ps-4 pe-3 hover-fade hover:bg-hover";
+  "flex min-h-10 items-center gap-3 rounded-sm px-3 py-2 hover-fade hover:bg-hover";
 
 export function SectionLabel({ children, id }: { children: ReactNode; id?: string }) {
   return (
