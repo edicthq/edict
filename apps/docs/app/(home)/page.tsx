@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Database, Gauge, History, LogIn, Pause, RefreshCw, ShieldCheck, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { HeroScene } from '@/components/landing/hero-scene';
@@ -96,7 +97,7 @@ function Nav() {
 
 function Hero() {
   return (
-    <section className="overflow-hidden pt-16 pb-24 sm:pt-24 lg:pb-32">
+    <section className="overflow-hidden pt-12 pb-16 sm:pt-24 sm:pb-24 lg:pb-32">
       <Shell>
         <p className="text-[13px] font-medium text-l-ink-2">
           Open source · Self-hosted ·{' '}
@@ -128,7 +129,7 @@ function Hero() {
           . Free under AGPL-3.0.
         </p>
 
-        <div className="mt-16 lg:mt-20">
+        <div className="mt-12 sm:mt-16 lg:mt-20">
           <HeroScene />
         </div>
       </Shell>
@@ -140,9 +141,29 @@ function SectionHead({ eyebrow, title, lead }: { eyebrow: string; title: string;
   return (
     <div className="max-w-[640px]">
       <p className="text-[13px] font-medium text-l-ink-3">{eyebrow}</p>
-      <h2 className="mt-3 text-[32px] leading-[1.1] font-semibold tracking-[-0.025em] text-balance sm:text-[44px]">{title}</h2>
-      <p className="mt-4 text-[16px] leading-[1.6] text-l-ink-2 text-pretty sm:text-[17px]">{lead}</p>
+      <h2 className="mt-2.5 text-[30px] leading-[1.1] font-semibold tracking-[-0.025em] text-balance sm:mt-3 sm:text-[44px]">
+        {title}
+      </h2>
+      <p className="mt-3.5 text-[16px] leading-[1.6] text-l-ink-2 text-pretty sm:mt-4 sm:text-[17px]">{lead}</p>
     </div>
+  );
+}
+
+// Sections breathe less on a phone, where every pixel of height is a scroll.
+const sectionY = 'py-16 sm:py-24 lg:py-32';
+
+// A small tile that anchors a point of text, so a list of them scans.
+function Point({ icon: Icon, title, children }: { icon: LucideIcon; title: string; children: ReactNode }) {
+  return (
+    <li className="flex gap-4">
+      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-l-surface text-l-ink-2 shadow-[0_0_0_1px_var(--l-line)]">
+        <Icon aria-hidden="true" className="size-[17px]" strokeWidth={1.75} />
+      </span>
+      <div className="min-w-0 pt-1.5">
+        <h3 className="text-[15.5px] leading-[1.35] font-semibold tracking-[-0.005em]">{title}</h3>
+        <p className="mt-1 text-[15px] leading-[1.55] text-l-ink-2 text-pretty">{children}</p>
+      </div>
+    </li>
   );
 }
 
@@ -150,7 +171,7 @@ function HowItWorks() {
   const steps = [
     {
       title: 'Connect',
-      body: 'Paste one URL into Claude Code, Codex, Cursor or any MCP client and approve it. Edict adds it to your team as an agent, named after the client and you.',
+      body: 'Paste one URL into Claude Code, Codex, Cursor or any MCP client and approve it. It joins your team as an agent, named after the client and you.',
     },
     {
       title: 'Delegate',
@@ -158,23 +179,34 @@ function HowItWorks() {
     },
     {
       title: 'Watch it land',
-      body: 'The agent moves the issue, comments and links its pull request through the same API your team uses. You see it in the list and in your inbox.',
+      body: 'The agent moves the issue, comments and links its pull request. You see it in the list and in your inbox.',
     },
   ];
   return (
-    <section className="border-t border-l-line py-24 sm:py-32">
+    <section className={`border-t border-l-line ${sectionY}`}>
       <Shell>
         <SectionHead
           eyebrow="How it works"
           title="Agents are members, not integrations."
-          lead="An agent in Edict has a name, a queue and a history, like anyone on the team. It works through the tools you give it, and never runs anywhere you didn't put it."
+          lead="An agent in Edict has a name, a queue and a history, like anyone on the team. It works through the tools you give it, and runs only where you put it."
         />
-        <ol className="mt-14 grid gap-px overflow-hidden rounded-xl bg-l-line shadow-[0_0_0_1px_var(--l-line)] md:grid-cols-3">
+        {/* A timeline: down the side on a phone, across on a wide screen. */}
+        <ol className="mt-10 grid gap-7 md:mt-14 md:grid-cols-3 md:gap-8">
           {steps.map((step, index) => (
-            <li key={step.title} className="flex flex-col gap-3 bg-l-bg p-7">
-              <span className="font-l-mono text-[13px] text-l-ink-3">0{index + 1}</span>
-              <h3 className="text-[19px] font-semibold tracking-[-0.01em]">{step.title}</h3>
-              <p className="text-[15px] leading-[1.6] text-l-ink-2 text-pretty">{step.body}</p>
+            <li key={step.title} className="relative flex gap-4 md:flex-col md:gap-5">
+              {index < steps.length - 1 ? (
+                <span
+                  aria-hidden="true"
+                  className="absolute start-4 top-10 -bottom-5 w-px bg-l-line-2 md:start-12 md:-end-6 md:top-4 md:bottom-auto md:h-px md:w-auto"
+                />
+              ) : null}
+              <span className="relative grid size-8 shrink-0 place-items-center rounded-full bg-l-bg text-[13px] font-semibold tabular-nums shadow-[inset_0_0_0_1px_var(--l-line-2)]">
+                {index + 1}
+              </span>
+              <div className="min-w-0 pt-1 md:pt-0">
+                <h3 className="text-[17px] font-semibold tracking-[-0.01em] sm:text-[19px]">{step.title}</h3>
+                <p className="mt-1.5 text-[15px] leading-[1.55] text-l-ink-2 text-pretty">{step.body}</p>
+              </div>
             </li>
           ))}
         </ol>
@@ -185,9 +217,11 @@ function HowItWorks() {
 
 function Mcp() {
   return (
-    <section id="mcp" className="scroll-mt-14 bg-l-band py-24 sm:py-32">
-      <Shell className="grid gap-14 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-20">
-        <div>
+    <section id="mcp" className={`scroll-mt-14 bg-l-band ${sectionY}`}>
+      {/* On a phone: what it is, then how to connect, then the tools. On a
+          wide screen the setup sits beside the other two. */}
+      <Shell className="grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-x-20 lg:gap-y-10">
+        <div className="min-w-0 lg:col-start-1 lg:row-start-1">
           <SectionHead
             eyebrow="MCP"
             title="One URL. Any MCP client."
@@ -198,24 +232,31 @@ function Mcp() {
               </>
             }
           />
-          <ul className="mt-10 grid grid-cols-1 gap-x-6 gap-y-2.5 sm:grid-cols-2">
-            {tools.map(([name, does]) => (
-              <li key={name} className="flex flex-col">
-                <code className="font-l-mono text-[13px] text-l-ink">{name}</code>
-                <span className="text-[13px] text-l-ink-3">{does}</span>
-              </li>
-            ))}
-          </ul>
         </div>
-        <div className="flex flex-col gap-5 lg:pt-10">
+        <div className="flex min-w-0 flex-col gap-4 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:pt-10">
           <ClientTabs />
           <p className="text-[14px] leading-[1.6] text-l-ink-2 text-pretty">
             Then tell it <q className="text-l-ink">work on ENG-142</q> or <q className="text-l-ink">do my Edict work</q>.
-            Status moves, comments and links cost it no tokens to report: Edict turns them into progress.{' '}
+            Moving the issue, commenting and linking are its progress report, at no extra tokens.{' '}
             <Link href="/docs/agents" className="font-medium text-l-ink underline decoration-l-line-2 underline-offset-4 hover:decoration-l-ink">
               Connect your agent
             </Link>
           </p>
+        </div>
+        <div className="min-w-0 lg:col-start-1 lg:row-start-2">
+          <p className="text-[13px] font-medium text-l-ink-3">{tools.length} tools</p>
+          {/* Names only on a phone, as chips; with what each does from sm up. */}
+          <ul className="mt-3 flex flex-wrap gap-1.5 sm:grid sm:grid-cols-2 sm:gap-x-6 sm:gap-y-2.5">
+            {tools.map(([name, does]) => (
+              <li
+                key={name}
+                className="rounded-md bg-l-surface px-2 py-1 shadow-[0_0_0_1px_var(--l-line)] sm:flex sm:flex-col sm:rounded-none sm:bg-transparent sm:p-0 sm:shadow-none"
+              >
+                <code className="font-l-mono text-[12px] text-l-ink sm:text-[13px]">{name}</code>
+                <span className="hidden text-[13px] text-l-ink-3 sm:block">{does}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       </Shell>
     </section>
@@ -223,39 +264,27 @@ function Mcp() {
 }
 
 function Guardrails() {
-  const items = [
-    {
-      title: 'The access of the person who connected it',
-      body: "A connected agent works in its human's teams and can't delete, change settings or manage people unless an admin allows it.",
-    },
-    {
-      title: 'Every action says who',
-      body: 'The history reads “Claude Code (Maya) on behalf of Maya”, so you always know which agent did what, and for whom.',
-    },
-    {
-      title: 'One switch to pause it',
-      body: 'Pausing an agent revokes every token it holds, OAuth grants included, and stops its webhooks.',
-    },
-    {
-      title: 'Limits by default',
-      body: '600 requests a minute and 60 new issues an hour per agent, and a 409 when it writes over someone else’s change.',
-    },
-  ];
   return (
-    <section className="py-24 sm:py-32">
+    <section className={sectionY}>
       <Shell>
         <SectionHead
           eyebrow="Guardrails"
           title="An agent never does more than its human."
-          lead="Agents get the same access as the person who connected them, narrowed further, and everything they touch is on the record."
+          lead="Agents get the access of the person who connected them, narrowed further, and everything they touch is on the record."
         />
-        <ul className="mt-14 grid gap-x-10 gap-y-10 sm:grid-cols-2">
-          {items.map((item) => (
-            <li key={item.title} className="flex flex-col gap-2 border-t border-l-line pt-6">
-              <h3 className="text-[17px] font-semibold tracking-[-0.01em]">{item.title}</h3>
-              <p className="max-w-[48ch] text-[15px] leading-[1.6] text-l-ink-2 text-pretty">{item.body}</p>
-            </li>
-          ))}
+        <ul className="mt-10 grid gap-x-12 gap-y-7 sm:mt-14 sm:grid-cols-2 sm:gap-y-9">
+          <Point icon={ShieldCheck} title="Its human's access, and less">
+            It works in its human's teams, and can't delete, change settings or manage people unless an admin allows it.
+          </Point>
+          <Point icon={History} title="Every action says who">
+            The history reads “Claude Code (Maya) on behalf of Maya”, so you know which agent did what, and for whom.
+          </Point>
+          <Point icon={Pause} title="One switch to pause it">
+            Pausing an agent revokes every token it holds, OAuth grants included, and stops its webhooks.
+          </Point>
+          <Point icon={Gauge} title="Limits by default">
+            600 requests a minute and 60 new issues an hour per agent, and a conflict when it writes over a newer change.
+          </Point>
         </ul>
       </Shell>
     </section>
@@ -263,33 +292,31 @@ function Guardrails() {
 }
 
 function SelfHost() {
-  const points = [
-    ['Postgres and nothing else', 'Redis and S3 are optional. Attachments go to disk until you point them at a bucket.'],
-    ['Migrations on boot', 'Upgrade with docker compose pull && docker compose up -d.'],
-    ['Your sign-in', 'Email and password, magic links, Google, GitHub or any OpenID Connect provider.'],
-  ];
   return (
-    <section id="self-host" className="scroll-mt-14 border-t border-l-line py-24 sm:py-32">
-      <Shell className="grid gap-14 lg:grid-cols-2 lg:gap-20">
+    <section id="self-host" className={`scroll-mt-14 border-t border-l-line ${sectionY}`}>
+      <Shell className="grid gap-10 lg:grid-cols-2 lg:gap-20">
         <div>
           <SectionHead
             eyebrow="Self-hosting"
             title="Yours to run, in one command."
             lead="One image for amd64 and arm64, and Postgres. The first person to sign up runs the instance."
           />
-          <dl className="mt-10 flex flex-col gap-5">
-            {points.map(([term, detail]) => (
-              <div key={term}>
-                <dt className="text-[15px] font-semibold">{term}</dt>
-                <dd className="mt-0.5 text-[15px] text-l-ink-2 text-pretty">{detail}</dd>
-              </div>
-            ))}
-          </dl>
+          <ul className="mt-9 flex flex-col gap-6">
+            <Point icon={Database} title="Postgres and nothing else">
+              Redis and S3 are optional. Attachments go to disk until you point them at a bucket.
+            </Point>
+            <Point icon={RefreshCw} title="Migrations on boot">
+              Upgrading is pulling the new image and starting it again.
+            </Point>
+            <Point icon={LogIn} title="Your sign-in">
+              Email and password, magic links, Google, GitHub or any OpenID Connect provider.
+            </Point>
+          </ul>
         </div>
-        <div className="flex flex-col gap-4 lg:pt-10">
-          <CopyBlock code={composeCommands} label="the install commands" />
+        <div className="flex min-w-0 flex-col gap-3 lg:pt-10">
+          <CopyBlock code={composeCommands} file="Terminal" label="the install commands" />
           <p className="text-[14px] text-l-ink-2">
-            Then open <code className="font-l-mono text-[0.92em] text-l-ink">http://localhost:3000</code>.{' '}
+            Then open <code className="font-l-mono text-[0.92em] text-l-ink">localhost:3000</code>.{' '}
             <Link
               href="/docs/self-hosting"
               className="font-medium text-l-ink underline decoration-l-line-2 underline-offset-4 hover:decoration-l-ink"
@@ -305,24 +332,39 @@ function SelfHost() {
 
 function Download() {
   return (
-    <section id="download" className="scroll-mt-14 bg-l-band py-24 sm:py-32">
+    <section id="download" className={`scroll-mt-14 bg-l-band ${sectionY}`}>
       <Shell>
         <SectionHead
           eyebrow={`Desktop app · v${version}`}
           title="Edict, a hotkey away."
-          lead="Tabs, a global hotkey for a new issue, notifications and edict:// links, for every Edict you use. It loads the app from your own server, so it always matches it, and updates itself."
+          lead="Tabs, a global hotkey for a new issue, notifications and edict:// links, for every Edict you use. It loads the app from your server, so the two always match, and it updates itself."
         />
-        <ul className="mt-14 grid gap-4 md:grid-cols-3">
+        {/* A row per system on a phone, a card each on a wide screen. */}
+        <ul className="mt-10 flex flex-col overflow-hidden rounded-xl bg-l-bg shadow-[0_0_0_1px_var(--l-line)] max-md:divide-y max-md:divide-l-line md:mt-14 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:rounded-none md:bg-transparent md:shadow-none">
           {downloads.map((download) => (
-            <li key={download.platform} className="flex flex-col gap-5 rounded-xl bg-l-bg p-6 shadow-[0_0_0_1px_var(--l-line)]">
-              <div>
-                <h3 className="text-[19px] font-semibold tracking-[-0.01em]">{download.name}</h3>
-                <p className="mt-1 text-[14px] text-l-ink-3">{download.primary.detail}</p>
+            <li
+              key={download.platform}
+              className="flex items-center gap-4 px-5 py-4 md:flex-col md:items-stretch md:gap-5 md:rounded-xl md:bg-l-bg md:p-6 md:shadow-[0_0_0_1px_var(--l-line)]"
+            >
+              <div className="min-w-0 flex-1">
+                <h3 className="text-[16px] font-semibold tracking-[-0.01em] md:text-[19px]">{download.name}</h3>
+                <p className="mt-0.5 text-[13px] text-l-ink-3 md:mt-1 md:text-[14px]">
+                  {download.primary.detail}
+                  {download.others.map((other) => (
+                    <span key={other.label} className="md:hidden">
+                      {' · '}
+                      <a href={other.href} className="underline decoration-l-line-2 underline-offset-2 hover:text-l-ink">
+                        {other.label}
+                      </a>
+                    </span>
+                  ))}
+                </p>
               </div>
-              <div className="mt-auto flex flex-wrap items-center gap-2">
+              <div className="flex shrink-0 flex-wrap items-center gap-2 md:mt-auto">
                 <a
                   href={download.primary.href}
-                  className="inline-flex h-10 items-center rounded-lg bg-l-ink px-4 text-[14px] font-semibold text-l-on-ink transition-opacity hover:opacity-90"
+                  aria-label={download.primary.label}
+                  className="inline-flex h-9 items-center rounded-lg bg-l-ink px-3.5 text-[14px] font-semibold text-l-on-ink transition-opacity hover:opacity-90 md:h-10 md:px-4"
                 >
                   Download
                 </a>
@@ -330,7 +372,7 @@ function Download() {
                   <a
                     key={other.label}
                     href={other.href}
-                    className="inline-flex h-10 items-center rounded-lg px-3 font-l-mono text-[13px] text-l-ink-2 shadow-[inset_0_0_0_1px_var(--l-line-2)] transition-colors hover:bg-l-hover hover:text-l-ink"
+                    className="hidden h-10 items-center rounded-lg px-3 font-l-mono text-[13px] text-l-ink-2 shadow-[inset_0_0_0_1px_var(--l-line-2)] transition-colors hover:bg-l-hover hover:text-l-ink md:inline-flex"
                   >
                     {other.label}
                   </a>
@@ -339,9 +381,9 @@ function Download() {
             </li>
           ))}
         </ul>
-        <p className="mt-6 max-w-[72ch] text-[14px] leading-[1.6] text-l-ink-2 text-pretty">
-          The apps are a beta and not yet signed by Apple or Microsoft. On macOS, right-click Edict and choose Open the first
-          time; on Windows, choose More info, then Run anyway.{' '}
+        <p className="mt-5 max-w-[72ch] text-[13.5px] leading-[1.6] text-l-ink-2 text-pretty sm:mt-6 sm:text-[14px]">
+          A beta, not yet signed by Apple or Microsoft. On macOS, right-click Edict and choose Open the first time; on Windows,
+          choose More info, then Run anyway.{' '}
           <a href={releasesUrl} className="font-medium text-l-ink underline decoration-l-line-2 underline-offset-4 hover:decoration-l-ink">
             All releases
           </a>

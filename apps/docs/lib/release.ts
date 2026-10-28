@@ -43,7 +43,8 @@ export const downloads: Download[] = [
 ];
 
 export const composeCommands = [
-  'curl -fsSLO https://github.com/edicthq/edict/releases/latest/download/compose.yml',
-  'curl -fsSLO https://github.com/edicthq/edict/releases/latest/download/postgres-init.sh',
+  'base=https://github.com/edicthq/edict/releases/latest/download',
+  'curl -fsSLO $base/compose.yml',
+  'curl -fsSLO $base/postgres-init.sh',
   'EDICT_VERSION=latest docker compose up -d',
 ].join('\n');
