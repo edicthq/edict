@@ -7,6 +7,8 @@ import { PriorityIcon } from "@edicthq/ui";
 import { accentNames, accents, cycleAccent, cycleTheme, setAppearance, themes } from "../lib/appearance.js";
 import { useProjects, useSearchIssues, useTeams } from "../lib/queries.js";
 import { recentIssues } from "../lib/recent.js";
+import { useRail } from "../lib/rail.js";
+import { formatShortcut, useShortcuts } from "../lib/shortcuts.js";
 import type { OrgContext } from "../routes/org.js";
 
 interface Command {
@@ -50,6 +52,8 @@ function PaletteBody({ context, others, onClose }: { context: OrgContext; others
   const { teamId: currentTeam } = useParams();
   // Read once per opening: the list changes only when an issue is opened.
   const [recent] = useState(() => recentIssues(context.orgId));
+  const shortcuts = useShortcuts();
+  const rail = useRail();
 
   const commands = useMemo<Command[]>(() => {
     const go = (path: string) => () => {
@@ -64,7 +68,7 @@ function PaletteBody({ context, others, onClose }: { context: OrgContext; others
         group: "Actions",
         label: "New issue",
         lead: <SquarePen aria-hidden="true" className="size-4 text-ink-2" strokeWidth={1.75} />,
-        hint: "C",
+        hint: formatShortcut(shortcuts.newIssue),
         run: go(`/${context.slug}/teams/${newIssueTeam}?create=1`),
       });
     }
@@ -124,9 +128,22 @@ function PaletteBody({ context, others, onClose }: { context: OrgContext; others
     list.push({ id: "new-org", group: "Organizations", label: "Create organization", run: go("/new") });
 
     list.push(
-      { id: "toggle-theme", group: "Appearance", label: "Toggle theme", hint: "T", run: cycleTheme },
-      { id: "cycle-accent", group: "Appearance", label: "Cycle agent color", hint: "G", run: cycleAccent },
+      { id: "toggle-theme", group: "Appearance", label: "Toggle theme", hint: formatShortcut(shortcuts.toggleTheme), run: cycleTheme },
+      { id: "cycle-accent", group: "Appearance", label: "Cycle agent color", hint: formatShortcut(shortcuts.cycleAccent), run: cycleAccent },
     );
+    if (rail) {
+      list.push({
+        id: "toggle-sidebar",
+        group: "Appearance",
+        label: rail.collapsed ? "Show sidebar" : "Hide sidebar",
+        hint: formatShortcut(shortcuts.toggleSidebar),
+        run: () => {
+          onClose();
+          rail.toggle();
+        },
+      });
+    }
+    list.push({ id: "shortcuts", group: "Go to", label: "Keyboard shortcuts", run: go(`/${context.slug}/settings#shortcuts`) });
     for (const theme of themes) {
       list.push({
         id: `theme-${theme}`,
@@ -146,7 +163,7 @@ function PaletteBody({ context, others, onClose }: { context: OrgContext; others
     }
     list.push({ id: "sign-out", group: "You", label: "Sign out", run: () => void context.signOut() });
     return list;
-  }, [teams.data, projects.data, recent, currentTeam, context, others, navigate, onClose]);
+  }, [teams.data, projects.data, recent, currentTeam, context, others, navigate, onClose, shortcuts, rail]);
 
   const issueCommands = useMemo<Command[]>(() => {
     return (searchResults.data ?? []).map((issue) => ({

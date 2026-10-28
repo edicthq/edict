@@ -27,6 +27,7 @@ import { CommandPalette } from "../components/palette.js";
 import { desktopShell, openSwitcher, useDesktopBridge } from "../lib/desktop.js";
 import { cycleAccent, cycleTheme, isTyping, setOrganizationAccent } from "../lib/appearance.js";
 import { RailContext, useRail, useRailState } from "../lib/rail.js";
+import { formatShortcut, matchesShortcut, useShortcuts, type ShortcutAction } from "../lib/shortcuts.js";
 import { RailToggle } from "../components/rail-toggle.js";
 import { UndoProvider } from "../components/undo.js";
 import { VerifyBanner } from "../components/verify-banner.js";
@@ -91,23 +92,19 @@ export function OrgLayout() {
   }, [orgAccent]);
 
   useEffect(() => {
+    // The app-wide shortcuts, as the person bound them in Preferences.
     const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+      const typing = isTyping(event);
+      const run = (action: ShortcutAction, effect: () => void) => {
+        if (!matchesShortcut(event, action, typing)) return false;
         event.preventDefault();
-        setDialog((open) => (open === "palette" ? null : "palette"));
-        return;
-      }
-      if (isTyping(event) || event.metaKey || event.ctrlKey || event.altKey) return;
-      if (event.key === "[") {
-        event.preventDefault();
-        rail.toggle();
-      } else if (event.key.toLowerCase() === "t") {
-        event.preventDefault();
-        cycleTheme();
-      } else if (event.key.toLowerCase() === "g") {
-        event.preventDefault();
-        cycleAccent();
-      }
+        effect();
+        return true;
+      };
+      if (run("openPalette", () => setDialog((open) => (open === "palette" ? null : "palette")))) return;
+      if (run("toggleSidebar", rail.toggle)) return;
+      if (run("toggleTheme", cycleTheme)) return;
+      run("cycleAccent", cycleAccent);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -257,6 +254,7 @@ function Rail({ context, others, drawer }: { context: OrgContext; others: Member
   const navigate = useNavigate();
   const { teamId: currentTeam } = useParams();
   const collapsed = useRail()?.collapsed ?? false;
+  const shortcuts = useShortcuts();
   const newIssue = () => {
     const teamId = currentTeam ?? teams.data?.[0]?.id;
     if (teamId) navigate(`/${slug}/teams/${teamId}?create=1`);
@@ -280,7 +278,7 @@ function Rail({ context, others, drawer }: { context: OrgContext; others: Member
             <button
               type="button"
               aria-label="New issue"
-              title="New issue (C)"
+              title={`New issue (${formatShortcut(shortcuts.newIssue)})`}
               onClick={newIssue}
               className="grid size-7 shrink-0 place-items-center rounded-sm text-ink-2 hover:bg-hover hover:text-ink"
             >
@@ -296,7 +294,7 @@ function Rail({ context, others, drawer }: { context: OrgContext; others: Member
         >
           <Search aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
           <span>Search or command</span>
-          <Kbd className="ms-auto">{`${mod}K`}</Kbd>
+          <Kbd className="ms-auto">{formatShortcut(shortcuts.openPalette)}</Kbd>
         </button>
       </div>
 

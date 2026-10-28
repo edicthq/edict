@@ -88,8 +88,8 @@ test("Connect an agent shows the steps for the client you pick", async ({ page, 
   await expect(page.getByText("Once you approve a client, its agent shows up here and in the sidebar.")).toBeVisible();
 });
 
-// The rail folds away with [ or its button, the page panel takes the room, and
-// it stays folded until brought back, across a reload.
+// The rail folds away with ⌘B (Ctrl+B) or its button, the page panel takes the
+// room, and it stays folded until brought back, across a reload.
 test("the rail folds away and comes back, and stays as it was left", async ({ page, baseURL }) => {
   const headers = { origin: baseURL! };
   const signUp = await page.request.post("/api/auth/sign-up/email", {
@@ -105,7 +105,7 @@ test("the rail folds away and comes back, and stays as it was left", async ({ pa
   const rail = page.getByRole("navigation", { name: "Organization" });
   await expect(rail.getByRole("link", { name: "My issues" })).toBeVisible();
 
-  await page.keyboard.press("[");
+  await page.keyboard.press("ControlOrMeta+b");
   await expect(rail.getByRole("link", { name: "My issues" })).toBeHidden();
   const show = page.getByRole("button", { name: "Show sidebar" });
   await expect(show).toBeVisible();
@@ -118,4 +118,38 @@ test("the rail folds away and comes back, and stays as it was left", async ({ pa
   await expect(rail.getByRole("link", { name: "My issues" })).toBeVisible();
   await rail.getByRole("button", { name: "Hide sidebar" }).click();
   await expect(show).toBeVisible();
+});
+
+test("Preferences rebind the sidebar shortcut, and refuse keys the list keeps", async ({ page, baseURL }) => {
+  const headers = { origin: baseURL! };
+  const signUp = await page.request.post("/api/auth/sign-up/email", {
+    headers,
+    data: { name: "Kai Keys", email: "kai-keys@example.com", password: "correct-horse-battery" },
+  });
+  expect(signUp.ok(), await signUp.text()).toBe(true);
+  await page.request.post("/api/v1/organizations", { headers, data: { name: "Keys", slug: "keys-co" } });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const rail = page.getByRole("navigation", { name: "Organization" });
+
+  await page.goto("/keys-co/settings");
+  const binding = page.getByRole("button", { name: "Show or hide the sidebar" });
+  await binding.click();
+  await expect(binding).toContainText("Press keys");
+  await page.keyboard.press("j");
+  await expect(page.getByText("J is kept for the next issue.")).toBeVisible();
+  // The button keeps focus, so Enter starts recording again without a mouse.
+  await expect(binding).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(binding).toContainText("Press keys");
+  await page.keyboard.press("n");
+  await expect(binding).toContainText("N");
+  await expect(page.getByRole("button", { name: /Reset to/ })).toBeVisible();
+
+  await page.goto("/keys-co/inbox");
+  await expect(rail.getByRole("link", { name: "My issues" })).toBeVisible();
+  // The old keys do nothing now; the new one folds the rail.
+  await page.keyboard.press("ControlOrMeta+b");
+  await expect(rail.getByRole("link", { name: "My issues" })).toBeVisible();
+  await page.keyboard.press("n");
+  await expect(rail.getByRole("link", { name: "My issues" })).toBeHidden();
 });

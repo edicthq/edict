@@ -210,7 +210,7 @@ The polish pass before v1.0 settled how screens are put together, on top of thes
 
 ### One page frame
 
-- The page is a panel inset from the window, with the rail as the frame around it. `[` or the button beside New issue folds the rail away: its column narrows while it slides 24px and fades, and the panel takes the room. Folded, the page bar leads with the button that brings it back. It stays as it was left, across reloads.
+- The page is a panel inset from the window, with the rail as the frame around it. ⌘B (Ctrl+B elsewhere, rebindable in Preferences) or the button beside New issue folds the rail away: its column narrows while it slides 24px and fades, and the panel takes the room. Folded, the page bar leads with the button that brings it back. It stays as it was left, across reloads.
 - Every page starts with a 48px page bar on a hairline: the title, led by a team key or a breadcrumb (Projects › name), then a status such as a live "Claude is working" pill, then the page's actions. At most one ink button.
 - The bar stays put while the page scrolls. In the desktop app it is also the handle to drag the window by.
 - A page with view options puts them in a toolbar under the bar, at least 44 high. No page has a big title above its content.

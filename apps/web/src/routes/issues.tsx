@@ -15,6 +15,7 @@ import { AgentMark, IssuePeople, IssueRowCells, issueRowClass, liveClass } from 
 import { useToast } from "../components/toast.js";
 import { useOfferUndo } from "../components/undo.js";
 import { agentState } from "../lib/agents.js";
+import { formatShortcut, matchesShortcut, useShortcuts } from "../lib/shortcuts.js";
 import { useNow } from "../lib/live.js";
 import { ago, assignable, boardColumns, categoryLabel, priorityLabel, statusFill, type StatusGroup } from "../lib/issues.js";
 import {
@@ -78,6 +79,7 @@ export function TeamIssuesPage() {
 }
 
 function TeamIssues({ team }: { team: Team }) {
+  const shortcuts = useShortcuts();
   const { orgId, slug, membership } = useOrg();
   const statuses = useStatuses(orgId, team.id);
   const issues = useTeamIssues(orgId, team.id);
@@ -337,6 +339,28 @@ function TeamIssues({ team }: { team: Team }) {
       return;
     }
 
+    // The rebindable ones, as bound in Preferences.
+    if (matchesShortcut(event, "newIssue", false)) {
+      event.preventDefault();
+      setCreating({});
+      return;
+    }
+    if (matchesShortcut(event, "focusSearch", false)) {
+      event.preventDefault();
+      searchRef.current?.focus();
+      return;
+    }
+    if (matchesShortcut(event, "toggleView", false)) {
+      event.preventDefault();
+      setParams((current) => {
+        const next = new URLSearchParams(current);
+        if (next.get("view") === "board") next.delete("view");
+        else next.set("view", "board");
+        return next;
+      });
+      return;
+    }
+
     if (event.metaKey || event.ctrlKey || event.altKey) return;
 
     const index = order.findIndex((i) => i.id === (peeked?.id ?? focusId));
@@ -400,21 +424,7 @@ function TeamIssues({ team }: { team: Team }) {
         event.preventDefault();
         clearSelection();
       }
-        } else if (key === "c") {
-      event.preventDefault();
-      setCreating({});
-    } else if (key === "/") {
-      event.preventDefault();
-      searchRef.current?.focus();
-    } else if (key === "v") {
-      event.preventDefault();
-      setParams((current) => {
-        const next = new URLSearchParams(current);
-        if (next.get("view") === "board") next.delete("view");
-        else next.set("view", "board");
-        return next;
-      });
-    } else if (key === "s" || key === "p" || key === "a" || key === "d") {
+        } else if (key === "s" || key === "p" || key === "a" || key === "d") {
       const menuType: PeekMenu = key === "s" ? "status" : key === "p" ? "priority" : key === "a" ? "assignee" : "delegate";
       event.preventDefault();
       if (peeked) {
@@ -695,7 +705,7 @@ function TeamIssues({ team }: { team: Team }) {
                 Members
               </Button>
               <Button variant="primary" onClick={() => setCreating({})}>
-                New issue <Kbd>C</Kbd>
+                New issue <Kbd>{formatShortcut(shortcuts.newIssue)}</Kbd>
               </Button>
             </>
           )
@@ -745,7 +755,7 @@ function TeamIssues({ team }: { team: Team }) {
               body={`Issues in ${team.name} are numbered ${team.key}-1, ${team.key}-2 and so on. Press C to create one.`}
               action={
                 <Button variant="primary" onClick={() => setCreating({})}>
-                  New issue <Kbd>C</Kbd>
+                  New issue <Kbd>{formatShortcut(shortcuts.newIssue)}</Kbd>
                 </Button>
               }
             />

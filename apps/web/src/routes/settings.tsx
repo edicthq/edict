@@ -2,6 +2,7 @@ import { Avatar, Button, Input, ProgressBadge, cn } from "@edicthq/ui";
 import { Download } from "lucide-react";
 import { useParams } from "react-router";
 import { SettingRow, SettingsCard, SettingsFrame } from "../components/settings-frame.js";
+import { ShortcutSettings } from "../components/shortcut-settings.js";
 import { firstName } from "../lib/agents.js";
 import { useToast } from "../components/toast.js";
 import { useState } from "react";
@@ -125,6 +126,7 @@ function Preferences() {
           <AccentSwatches labelledBy="accent-heading" value={accent} onPick={(value) => setAppearance({ accent: value })} />
         </SettingRow>
       </SettingsCard>
+      <ShortcutSettings />
     </>
   );
 }
