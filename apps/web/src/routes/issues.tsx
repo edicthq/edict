@@ -701,7 +701,7 @@ function TeamIssues({ team }: { team: Team }) {
             </button>
           ) : (
             <>
-              <Button variant="ghost" className="h-8 text-ui" onClick={() => navigate(`/${slug}/teams/${team.id}/members`)}>
+              <Button variant="ghost" size="md" onClick={() => navigate(`/${slug}/teams/${team.id}/members`)}>
                 Members
               </Button>
               <Button variant="primary" onClick={() => setCreating({})}>

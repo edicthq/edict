@@ -83,7 +83,7 @@ function InviteForm({ context, onDone }: { context: OrgContext; onDone: () => vo
       <FormError message={create.error?.message} />
       {created ? <InviteLink invite={created} /> : null}
       <div className="flex justify-end gap-2 pt-1">
-        <Button variant="ghost" className="h-8 text-ui" onClick={onDone}>
+        <Button variant="ghost" size="md" onClick={onDone}>
           {created ? "Done" : "Cancel"}
         </Button>
         <Button type="submit" variant="primary" disabled={form.formState.isSubmitting}>

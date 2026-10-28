@@ -100,7 +100,7 @@ function CreateTeamForm({ context, onDone }: { context: OrgContext; onDone: () =
       </label>
       <FormError message={failure} />
       <div className="flex justify-end gap-2 pt-1">
-        <Button variant="ghost" className="h-8 text-ui" onClick={onDone}>
+        <Button variant="ghost" size="md" onClick={onDone}>
           Cancel
         </Button>
         <Button type="submit" variant="primary" disabled={form.formState.isSubmitting}>

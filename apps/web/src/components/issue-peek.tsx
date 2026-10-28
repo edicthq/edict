@@ -665,7 +665,7 @@ function Relations({
           <Button type="submit" disabled={create.isPending}>
             Add
           </Button>
-          <Button variant="ghost" onClick={() => setAdding(false)}>
+          <Button variant="ghost" size="md" onClick={() => setAdding(false)}>
             Cancel
           </Button>
         </form>
@@ -994,6 +994,7 @@ function CommentRow({
           <div className="flex justify-end gap-2 pt-1.5">
             <Button
               variant="ghost"
+              size="md"
               type="button"
               onClick={() => {
                 setDraft(comment.body);

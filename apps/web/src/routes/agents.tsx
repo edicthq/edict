@@ -815,7 +815,7 @@ function NewAgentDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
         </fieldset>
         <FormError message={failure} />
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="ghost" size="md" onClick={onClose}>
             Cancel
           </Button>
           <Button type="submit" variant="primary" disabled={create.isPending || !name.trim()}>

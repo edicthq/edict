@@ -210,7 +210,7 @@ function CreateIssueForm({
       <div className="flex flex-col gap-3 border-t border-line px-5 py-3">
         <FormError message={failure} />
         <div className="flex items-center justify-end gap-2">
-          <Button variant="ghost" className="h-8 text-ui" onClick={onDone}>
+          <Button variant="ghost" size="md" onClick={onDone}>
             Cancel
           </Button>
           <Button type="submit" variant="primary" disabled={create.isPending}>

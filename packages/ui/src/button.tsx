@@ -2,42 +2,48 @@ import { forwardRef, type ButtonHTMLAttributes } from "react";
 import { cn } from "./cn.js";
 
 type Variant = "primary" | "secondary" | "ghost";
+type Size = "sm" | "md" | "lg";
 
-// Sizes and fills from the C2 prototype: the one filled action is ink, 32 high;
-// secondary is outlined; ghost is quiet and small. A disabled primary turns
-// into a quiet surface rather than a faded ink slab, which reads as a bright
-// block in dark.
+// Fills from the C2 prototype: the one filled action is ink; secondary is
+// outlined; ghost is quiet. A disabled primary turns into a quiet surface
+// rather than a faded ink slab, which reads as a bright block in dark.
 const variants: Record<Variant, string> = {
   primary:
     "gap-2 px-3.5 font-semibold bg-ink text-on-human hover:bg-ink/88 has-[kbd]:pe-2 disabled:bg-hover disabled:text-ink-2",
   secondary:
     "gap-1.5 px-3 font-medium text-ink shadow-[inset_0_0_0_1px_var(--line-strong)] hover:bg-hover has-[kbd]:pe-2 disabled:opacity-50",
-  ghost: "gap-1.5 px-2 text-sm text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-50",
+  ghost: "gap-1.5 px-2 text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-50",
 };
 
-const heights: Record<Variant, string> = { primary: "h-8", secondary: "h-[30px]", ghost: "h-[26px]" };
+// Height and type size come from the size alone, never the variant, so
+// buttons side by side, like Cancel beside Create team, always match. A ghost
+// button is small unless asked; the others are 32 high.
+const sizes: Record<Size, string> = {
+  sm: "h-[26px] text-sm",
+  md: "h-8 text-ui",
+  lg: "h-10 px-4 text-body",
+};
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
-  // "lg" for the single action of a sign-in style page.
-  size?: "md" | "lg";
+  // "md" beside a primary button; "lg" for the single action of a sign-in
+  // style page. Ghost buttons default to "sm", the rest to "md".
+  size?: Size;
 }
 
 // A button's classes, for a link that looks like one.
-export function buttonClass({ variant = "secondary", size = "md" }: { variant?: Variant; size?: "md" | "lg" } = {}): string {
+export function buttonClass({ variant = "secondary", size }: { variant?: Variant; size?: Size } = {}): string {
   return cn(
     "inline-flex shrink-0 select-none items-center justify-center whitespace-nowrap rounded-sm",
     "transition-[background-color,color,transform] duration-(--duration-fast) ease-standard active:scale-[0.96]",
     "disabled:pointer-events-none",
     variants[variant],
-    // Heights live apart from the variants: cn does not merge classes, so a
-    // size must not compete with a variant's own height.
-    size === "lg" ? "h-10 px-4 text-body" : heights[variant],
+    sizes[size ?? (variant === "ghost" ? "sm" : "md")],
   );
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { variant = "secondary", size = "md", className, type = "button", ...props },
+  { variant = "secondary", size, className, type = "button", ...props },
   ref,
 ) {
   return (

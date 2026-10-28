@@ -399,7 +399,7 @@ export function ProjectDetailPage() {
                 />
               </div>
               <div className="flex justify-end gap-2">
-                <Button variant="ghost" onClick={() => setIsEditingDesc(false)}>
+                <Button variant="ghost" size="md" onClick={() => setIsEditingDesc(false)}>
                   Cancel
                 </Button>
                 <Button variant="primary" onClick={() => void handleSaveDescription()}>

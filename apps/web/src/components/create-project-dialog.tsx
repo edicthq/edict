@@ -193,7 +193,7 @@ function CreateProjectForm({
       <FormError message={failure} />
 
       <div className="flex justify-end gap-2 pt-2">
-        <Button type="button" variant="ghost" onClick={onDone}>
+        <Button type="button" variant="ghost" size="md" onClick={onDone}>
           Cancel
         </Button>
         <Button type="submit" disabled={create.isPending || !name.trim()}>
