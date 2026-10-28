@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 
-// The hero: Claude Code works ENG-142 through Edict's MCP tools in a terminal,
-// and the Edict window answers each call as it lands. The issue moves from
-// Todo to In Progress with its agent working, gets its pull request linked,
-// and goes to In Review. It loops; with reduced motion it shows the end.
+// The hero: Claude Code works ENG-142 through Edict's MCP tools, and Edict
+// answers each call. On a wide screen the scene is driven by scroll: it
+// tilts up into view, then holds still while each step of scrolling plays one
+// step of the work, and every MCP call travels as a pulse from the terminal
+// line that made it to the issue it changes. On a phone it plays by itself;
+// with reduced motion it shows where the work ends.
 
 type Line =
   | { kind: 'prompt'; text: string }
@@ -22,21 +24,250 @@ const lines: Line[] = [
   { kind: 'tool', tool: 'link', args: 'ENG-142, #418' },
   { kind: 'tool', tool: 'update_issue', args: 'ENG-142, status: "In Review"' },
 ];
-// Each line keeps one key for its life on screen.
 const script = lines.map((line, index) => ({ ...line, key: `line-${index}` }));
+const LAST = script.length - 1;
 
-const STEP_MS = 1500;
-const HOLD_MS = 4200;
+const captions = [
+  'You ask Claude Code to work on ENG-142.',
+  'It reads the issue through Edict’s MCP server.',
+  'It picks the issue up. Edict shows it working, live.',
+  'It writes the fix in your repository.',
+  'It says what it found, as a comment on the issue.',
+  'It opens a pull request.',
+  'It links the pull request to the issue.',
+  'It hands the issue to review. Maya hears about it in her inbox.',
+];
 
-function useScript(): number {
-  const [step, setStep] = useState(script.length - 1);
+const isCall = (step: number) => script[step]?.kind === 'tool';
+// How long a pulse takes to cross from the terminal to Edict.
+const TRAVEL_MS = 620;
+
+type Mode = 'scroll' | 'auto' | 'still';
+
+function useMode(): Mode {
+  const [mode, setMode] = useState<Mode>('still');
   useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const wide = window.matchMedia('(min-width: 1024px)');
+    const pick = () => setMode(reduce.matches ? 'still' : wide.matches ? 'scroll' : 'auto');
+    pick();
+    wide.addEventListener('change', pick);
+    reduce.addEventListener('change', pick);
+    return () => {
+      wide.removeEventListener('change', pick);
+      reduce.removeEventListener('change', pick);
+    };
+  }, []);
+  return mode;
+}
+
+// What Edict shows trails the terminal by a pulse's travel: a call lands
+// before it changes anything. Going back (scrolling up) shows at once.
+function useLanded(step: number) {
+  const [landed, setLanded] = useState(step);
+  useEffect(() => {
+    if (step < landed || !isCall(step)) {
+      setLanded(step);
+      return;
+    }
+    const timer = setTimeout(() => setLanded(step), TRAVEL_MS);
+    return () => clearTimeout(timer);
+  }, [step, landed]);
+  return landed;
+}
+
+export function HeroScene() {
+  const mode = useMode();
+  if (mode === 'scroll') return <ScrollScene />;
+  return <PlayingScene still={mode === 'still'} />;
+}
+
+// --- Scroll-driven, on a wide screen -------------------------------------
+
+// The nav is 56 high; the pinned scene centres in what is left below it.
+const NAV = 56;
+const SCROLL_LENGTH = 1500;
+// Scroll spent rising flat before the first step plays.
+const RISE = 180;
+
+function ScrollScene() {
+  const track = useRef<HTMLDivElement>(null);
+  const pinned = useRef<HTMLDivElement>(null);
+  const stage = useRef<HTMLDivElement>(null);
+  const [{ step, rise }, setProgress] = useState({ step: 0, rise: 0 });
+  const [pinTop, setPinTop] = useState(88);
+
+  useEffect(() => {
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      if (!track.current || !pinned.current) return;
+      const height = pinned.current.offsetHeight;
+      const pin = Math.max(NAV + 24, Math.round(NAV + (window.innerHeight - NAV - height) / 2));
+      setPinTop(pin);
+      const top = track.current.getBoundingClientRect().top;
+      const scrolled = window.scrollY;
+      // The scroll at which it pins, plus a little for it to finish rising.
+      const begin = Math.max(0, top + scrolled - pin) + RISE;
+      // Tilted back at first; flat by the time the story starts.
+      const rise = Math.min(1, Math.max(0, scrolled / begin));
+      const distance = track.current.offsetHeight - height - RISE;
+      const played = Math.min(1, Math.max(0, (scrolled - begin) / distance));
+      const step = Math.min(LAST, Math.floor(played * (LAST + 1)));
+      setProgress((last) => (last.step === step && Math.abs(last.rise - rise) < 0.002 ? last : { step, rise }));
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(measure);
+    };
+    measure();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, []);
+
+  const landed = useLanded(step);
+  const tilt = 1 - rise;
+  return (
+    // The track is as tall as the pinned scene plus the scroll it plays over.
+    <div ref={track} className="relative" style={{ height: 500 + RISE + SCROLL_LENGTH }}>
+      <div ref={pinned} className="sticky" style={{ top: pinTop }}>
+        <div style={{ perspective: 1800 }}>
+          <div
+            ref={stage}
+            className="relative grid grid-cols-[minmax(0,340px)_minmax(0,1fr)] gap-24 will-change-transform"
+            style={{
+              transform: `translateY(${tilt * 20}px) rotateX(${tilt * 14}deg) scale(${0.95 + rise * 0.05})`,
+              transformOrigin: '50% 0%',
+              opacity: 0.8 + rise * 0.2,
+            }}
+          >
+            <Terminal step={step} active={rise > 0.98 && isCall(step) ? step : null} />
+            <AppWindow step={landed} hit={rise > 0.98 && isCall(step) ? step : null} />
+            {rise > 0.98 ? <Connector stage={stage} step={step} /> : null}
+          </div>
+        </div>
+        <Caption step={step} hint={step === 0} />
+      </div>
+    </div>
+  );
+}
+
+// The path from the terminal to Edict. A call draws it bright and sends a
+// pulse with the tool's name along it; the rest of the time it rests faint.
+function Connector({ stage, step }: { stage: RefObject<HTMLDivElement | null>; step: number }) {
+  const [geometry, setGeometry] = useState<{ path: string; mid: { x: number; y: number }; width: number; height: number } | null>(null);
+  useLayoutEffect(() => {
+    const box = stage.current;
+    if (!box) return;
+    const measure = () => {
+      const area = box.getBoundingClientRect();
+      const terminal = box.querySelector<HTMLElement>('[data-card="terminal"]')?.getBoundingClientRect();
+      const app = box.querySelector<HTMLElement>('[data-card="app"]')?.getBoundingClientRect();
+      const line = box.querySelector<HTMLElement>(`[data-line="${step}"]`)?.getBoundingClientRect();
+      const row = box.querySelector<HTMLElement>('[data-row="ENG-142"]')?.getBoundingClientRect();
+      if (!terminal || !app || !line || !row) return;
+      const start = { x: terminal.right - area.left, y: line.top + line.height / 2 - area.top };
+      const end = { x: app.left - area.left, y: row.top + row.height / 2 - area.top };
+      const bend = (end.x - start.x) * 0.55;
+      setGeometry({
+        path: `M ${start.x} ${start.y} C ${start.x + bend} ${start.y}, ${end.x - bend} ${end.y}, ${end.x} ${end.y}`,
+        mid: { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 },
+        width: area.width,
+        height: area.height,
+      });
+    };
+    measure();
+    // The row may still be moving to its new group; measure again once it has.
+    const later = setTimeout(measure, TRAVEL_MS + 60);
+    return () => clearTimeout(later);
+  }, [stage, step]);
+  if (!geometry) return null;
+  const call = script[step];
+  const calling = call?.kind === 'tool';
+  return (
+    <>
+      <svg
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 overflow-visible"
+        width={geometry.width}
+        height={geometry.height}
+      >
+        <defs>
+          <filter id="l-glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3" />
+          </filter>
+        </defs>
+        <path d={geometry.path} fill="none" stroke="var(--l-line-2)" strokeWidth="1.5" strokeDasharray="3 5" />
+        {calling ? (
+          // Drawn, travelled, then gone: once the call has landed only the
+          // faint path rests between them.
+          <g key={step}>
+            <animate attributeName="opacity" values="1;1;0" keyTimes="0;0.7;1" dur={`${TRAVEL_MS + 500}ms`} fill="freeze" />
+            <path d={geometry.path} fill="none" stroke="var(--l-agent)" strokeWidth="2" pathLength={1} className="l-draw" />
+            <circle r="7" fill="var(--l-agent)" opacity="0.45" filter="url(#l-glow)">
+              <animateMotion dur={`${TRAVEL_MS}ms`} fill="freeze" path={geometry.path} keyPoints="0;1" keyTimes="0;1" calcMode="spline" keySplines="0.4 0 0.2 1" />
+            </circle>
+            <circle r="3.5" fill="var(--l-agent)">
+              <animateMotion dur={`${TRAVEL_MS}ms`} fill="freeze" path={geometry.path} keyPoints="0;1" keyTimes="0;1" calcMode="spline" keySplines="0.4 0 0.2 1" />
+            </circle>
+          </g>
+        ) : null}
+      </svg>
+      {calling ? (
+        <span
+          key={`label-${step}`}
+          className="l-tag pointer-events-none absolute -translate-x-1/2 -translate-y-[150%] rounded-full bg-l-surface px-2 py-0.5 font-l-mono text-[11px] text-l-agent-ink shadow-[0_0_0_1px_var(--l-line-2),0_6px_16px_-8px_oklch(0_0_0/0.35)]"
+          style={{ left: geometry.mid.x, top: geometry.mid.y }}
+        >
+          {call.tool}
+        </span>
+      ) : null}
+    </>
+  );
+}
+
+function Caption({ step, hint }: { step: number; hint: boolean }) {
+  return (
+    <div className="mt-8 flex items-center gap-5">
+      <ol aria-hidden="true" className="flex shrink-0 gap-1.5">
+        {script.map((line, index) => (
+          <li
+            key={line.key}
+            className={`h-1 rounded-full transition-[width,background-color] duration-300 ${
+              index === step ? 'w-6 bg-l-ink' : index < step ? 'w-2.5 bg-l-ink-3' : 'w-2.5 bg-l-line-2'
+            }`}
+          />
+        ))}
+      </ol>
+      <p key={step} className="l-in min-w-0 text-[15px] text-l-ink-2" aria-live="polite">
+        {captions[step]}
+      </p>
+      {hint ? <span className="ms-auto shrink-0 text-[13px] text-l-ink-3">Scroll to watch it work ↓</span> : null}
+    </div>
+  );
+}
+
+// --- Playing by itself, on a phone or tablet ------------------------------
+
+const STEP_MS = 1600;
+const HOLD_MS = 4000;
+
+function PlayingScene({ still }: { still: boolean }) {
+  const [step, setStep] = useState(still ? LAST : 0);
+  useEffect(() => {
+    if (still) {
+      setStep(LAST);
+      return;
+    }
     let current = 0;
     setStep(0);
     let timer: ReturnType<typeof setTimeout>;
     const tick = () => {
-      if (current < script.length - 1) {
+      if (current < LAST) {
         current += 1;
         setStep(current);
         timer = setTimeout(tick, STEP_MS);
@@ -50,43 +281,44 @@ function useScript(): number {
     };
     timer = setTimeout(tick, STEP_MS);
     return () => clearTimeout(timer);
-  }, []);
-  return step;
-}
-
-export function HeroScene() {
-  const step = useScript();
-  const status: 'todo' | 'progress' | 'review' = step < 2 ? 'todo' : step < 7 ? 'progress' : 'review';
-  const working = step >= 2 && step < 7;
-  const linked = step >= 6;
+  }, [still]);
+  const landed = useLanded(step);
   return (
-    // One window, two panes: the terminal and the Edict it drives, side by
-    // side on a wide screen and stacked on a narrow one, on one surface.
-    <div className="overflow-hidden rounded-xl bg-l-band shadow-l-window">
-      <div className="flex flex-col-reverse lg:grid lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
-        <Terminal step={step} />
-        <AppWindow status={status} working={working} linked={linked} step={step} />
+    <div>
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)] lg:gap-6">
+        <div className="order-2 lg:order-1">
+          <Terminal step={step} active={null} />
+        </div>
+        <div className="order-1 min-w-0 lg:order-2">
+          <AppWindow step={landed} hit={isCall(step) ? step : null} />
+        </div>
       </div>
+      <p key={step} className="l-in mt-4 text-[14px] text-l-ink-2" aria-live="polite">
+        {captions[step]}
+      </p>
     </div>
   );
 }
 
-function Terminal({ step }: { step: number }) {
+// --- The two windows -------------------------------------------------------
+
+function Terminal({ step, active }: { step: number; active: number | null }) {
   return (
     <div
-      aria-label="Claude Code working an Edict issue"
+      data-card="terminal"
       role="img"
-      className="flex w-full flex-col border-l-line text-l-ink max-lg:border-t lg:border-e"
+      aria-label="Claude Code working an Edict issue"
+      className="flex h-full flex-col overflow-hidden rounded-xl bg-l-band text-l-ink shadow-l-window"
     >
-      <div className="flex h-10 items-center gap-2 px-3.5">
-        <TrafficLights className="max-lg:hidden" />
-        <span className="font-l-mono text-[11px] text-l-ink-3 lg:ms-2">claude — ~/acme/web</span>
+      <div className="flex h-10 shrink-0 items-center gap-2 border-b border-l-line px-3.5">
+        <TrafficLights />
+        <span className="ms-2 font-l-mono text-[11px] text-l-ink-3">claude — ~/acme/web</span>
       </div>
-      <div className="flex min-h-[300px] flex-1 flex-col gap-2 overflow-hidden px-4 py-3.5 font-l-mono text-[12px] leading-[1.55]">
-        {script.slice(0, step + 1).map((line) => (
-          <TerminalLine key={line.key} line={line} />
+      <div className="flex min-h-[320px] flex-1 flex-col gap-1 overflow-hidden px-2.5 py-3 font-l-mono text-[12px] leading-[1.55]">
+        {script.slice(0, step + 1).map((line, index) => (
+          <TerminalLine key={line.key} line={line} index={index} active={index === active} />
         ))}
-        <div className="flex items-center gap-2 text-l-ink-3">
+        <div className="flex items-center gap-2 px-1.5 text-l-ink-3">
           <span aria-hidden="true">›</span>
           <span className="l-pulse inline-block h-3.5 w-1.5 bg-l-ink-2" />
         </div>
@@ -95,32 +327,22 @@ function Terminal({ step }: { step: number }) {
   );
 }
 
-function TerminalLine({ line }: { line: Line }) {
+function TerminalLine({ line, index, active }: { line: Line; index: number; active: boolean }) {
+  const frame = `l-in rounded-md px-1.5 py-0.5 transition-colors duration-500 ${active ? 'bg-l-agent-wash' : ''}`;
   if (line.kind === 'prompt') {
     return (
-      <p className="l-in text-l-ink">
+      <p data-line={index} className={frame}>
         <span className="text-l-ink-3">› </span>
         {line.text}
       </p>
     );
   }
-  const head =
-    line.kind === 'tool' ? (
-      <>
-        <span className="font-semibold">edict · {line.tool}</span>
-        <span className="text-l-ink-3"> ({line.args})</span>
-      </>
-    ) : (
-      <>
-        <span className="font-semibold">{line.label}</span>
-        <span className="text-l-ink-3"> ({line.text})</span>
-      </>
-    );
   return (
-    <div className="l-in">
+    <div data-line={index} className={frame}>
       <p className="truncate">
         <span className={line.kind === 'tool' ? 'text-l-agent' : 'text-l-review'}>⏺ </span>
-        {head}
+        <span className="font-semibold">{line.kind === 'tool' ? `edict · ${line.tool}` : line.label}</span>
+        <span className="text-l-ink-3"> ({line.kind === 'tool' ? line.args : line.text})</span>
       </p>
       {line.result ? (
         <p className="truncate ps-4 text-l-ink-3">
@@ -141,42 +363,38 @@ const rows = {
   ],
 };
 
-function AppWindow({
-  status,
-  working,
-  linked,
-  step,
-}: {
-  status: 'todo' | 'progress' | 'review';
-  working: boolean;
-  linked: boolean;
-  step: number;
-}) {
+const groups: { key: 'review' | 'progress' | 'todo'; name: string }[] = [
+  { key: 'review', name: 'In Review' },
+  { key: 'progress', name: 'In Progress' },
+  { key: 'todo', name: 'Todo' },
+];
+
+// Edict as it stands after `step`, with the row flashing when a call lands
+// on it (`hit`).
+function AppWindow({ step, hit }: { step: number; hit: number | null }) {
+  const status: 'todo' | 'progress' | 'review' = step < 2 ? 'todo' : step < 7 ? 'progress' : 'review';
+  const working = step >= 2 && step < 7;
+  const linked = step >= 6;
+  const commented = step >= 4;
   const ours = { id: 'ENG-142', title: 'Keep ?next through SSO sign-in', person: 'MC', agent: 'CC', prio: 3 };
-  const groups: { key: 'review' | 'progress' | 'todo'; name: string }[] = [
-    { key: 'review', name: 'In Review' },
-    { key: 'progress', name: 'In Progress' },
-    { key: 'todo', name: 'Todo' },
-  ];
   return (
     <div
+      data-card="app"
       role="img"
       aria-label="Edict's issue list, where ENG-142 moves to In Progress and then In Review as the agent works"
-      className="min-w-0"
+      className="overflow-hidden rounded-xl bg-l-band shadow-l-window"
     >
-      {/* The desktop app's top bar: its tabs, over the page. On a phone this
-          pane comes first, so it carries the window's traffic lights. */}
-      <div className="flex h-10 items-center gap-2 px-3.5">
-        <TrafficLights className="lg:hidden" />
-        <span className="ms-[118px] hidden h-6 items-center rounded-md bg-l-bg px-3 text-[11px] text-l-ink shadow-[0_0_0_1px_var(--l-line)] sm:inline-flex lg:ms-[168px]">
+      <div className="flex h-10 items-center gap-2 border-b border-l-line px-3.5">
+        <TrafficLights />
+        <span className="ms-[118px] hidden h-6 items-center rounded-md bg-l-bg px-3 text-[11px] text-l-ink shadow-[0_0_0_1px_var(--l-line)] sm:inline-flex">
           Engineering
         </span>
         <span className="hidden px-2 text-[11px] text-l-ink-3 sm:inline">My issues</span>
       </div>
-      <div className="flex">
+      <div className="flex pt-2">
         <aside className="hidden w-[168px] shrink-0 flex-col gap-3 px-2 pb-3 text-[11.5px] sm:flex">
           <div className="flex flex-col gap-px">
-            <RailItem label="Inbox" aside={<span className="font-semibold tabular-nums">{linked ? 4 : 3}</span>} />
+            <RailItem label="Inbox" aside={<span className="font-semibold tabular-nums">{step >= 7 ? 4 : 3}</span>} />
             <RailItem label="My issues" />
             <RailItem label="Projects" />
           </div>
@@ -231,8 +449,17 @@ function AppWindow({
                       return (
                         <li
                           key={`${row.id}-${group.key}`}
+                          data-row={row.id}
                           className={`relative flex h-8 items-center gap-2.5 rounded-md px-2.5 ${live ? 'l-in' : ''}`}
                         >
+                          {/* A call landing: the row lights up in the agent's color. */}
+                          {live && hit !== null ? (
+                            <i
+                              key={`hit-${hit}`}
+                              className="l-hit pointer-events-none absolute inset-0 rounded-md"
+                              style={{ animationDelay: `${TRAVEL_MS - 80}ms` }}
+                            />
+                          ) : null}
                           {live && working ? <i className="absolute inset-y-1.5 start-0 w-[2.5px] rounded-full bg-l-agent" /> : null}
                           <Priority level={row.prio} />
                           <span className="w-12 shrink-0 text-[10.5px] font-medium text-l-ink-3 tabular-nums">{row.id}</span>
@@ -245,6 +472,9 @@ function AppWindow({
                             </span>
                           ) : null}
                           <span className="ms-auto flex shrink-0 items-center gap-1.5">
+                            {live && commented ? (
+                              <span className="l-in hidden text-[10px] text-l-ink-3 tabular-nums md:inline">1 comment</span>
+                            ) : null}
                             {live && linked ? (
                               <span className="l-in hidden rounded-full px-1.5 text-[10px] text-l-ink-2 shadow-[0_0_0_1px_var(--l-line-2)] md:inline">
                                 #418
@@ -266,7 +496,7 @@ function AppWindow({
               <Square>CC</Square>
               <span>
                 <span className="font-medium">Claude Code (Maya)</span>
-                <span className="text-l-ink-2"> linked #418 on ENG-142</span>
+                <span className="text-l-ink-2"> {step >= 7 ? 'moved ENG-142 to In Review' : 'linked #418 on ENG-142'}</span>
               </span>
             </div>
           ) : null}
@@ -276,9 +506,9 @@ function AppWindow({
   );
 }
 
-function TrafficLights({ className = '' }: { className?: string }) {
+function TrafficLights() {
   return (
-    <span className={`flex gap-1.5 ${className}`} aria-hidden="true">
+    <span className="flex gap-1.5" aria-hidden="true">
       <i className="size-2.5 rounded-full bg-[#ff5f57]" />
       <i className="size-2.5 rounded-full bg-[#febc2e]" />
       <i className="size-2.5 rounded-full bg-[#28c840]" />

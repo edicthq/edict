@@ -121,7 +121,7 @@ function Nav() {
 // stage, all of it in the first screen of a laptop.
 function Hero() {
   return (
-    <section className="overflow-hidden pt-10 pb-16 sm:pt-14 sm:pb-24 lg:pb-28">
+    <section className="overflow-x-clip pt-10 pb-16 sm:pt-14 sm:pb-24 lg:pb-28">
       <Shell>
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
           <div>
