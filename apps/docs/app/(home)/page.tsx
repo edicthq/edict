@@ -156,9 +156,7 @@ function Hero() {
           </div>
         </div>
 
-        {/* The stage: a frame of its own, so the product reads as the thing
-            the page is about. */}
-        <div className="mt-10 rounded-2xl bg-l-band p-2 shadow-[0_0_0_1px_var(--l-line)] sm:mt-12 sm:p-3">
+        <div className="mt-10 sm:mt-12">
           <HeroScene />
         </div>
       </Shell>

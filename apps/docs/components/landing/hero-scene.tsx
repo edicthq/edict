@@ -60,13 +60,13 @@ export function HeroScene() {
   const working = step >= 2 && step < 7;
   const linked = step >= 6;
   return (
-    // Side by side on a wide screen, the same height, so the terminal and the
-    // window it drives read as one desk. Stacked on a narrow one.
-    <div className="flex flex-col-reverse gap-4 lg:grid lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:items-stretch lg:gap-5">
-      <div className="flex">
+    // One window, two panes: the terminal and the Edict it drives, side by
+    // side on a wide screen and stacked on a narrow one, on one surface.
+    <div className="overflow-hidden rounded-xl bg-l-band shadow-l-window">
+      <div className="flex flex-col-reverse lg:grid lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
         <Terminal step={step} />
+        <AppWindow status={status} working={working} linked={linked} step={step} />
       </div>
-      <AppWindow status={status} working={working} linked={linked} step={step} />
     </div>
   );
 }
@@ -76,23 +76,19 @@ function Terminal({ step }: { step: number }) {
     <div
       aria-label="Claude Code working an Edict issue"
       role="img"
-      className="flex w-full flex-col overflow-hidden rounded-xl bg-[oklch(0.17_0.008_260)] text-[oklch(0.9_0.005_255)] shadow-[0_0_0_1px_oklch(1_0_0/0.08),0_32px_80px_-24px_oklch(0_0_0/0.6)]"
+      className="flex w-full flex-col border-l-line text-l-ink max-lg:border-t lg:border-e"
     >
-      <div className="flex h-9 items-center gap-2 border-b border-[oklch(1_0_0/0.07)] px-3.5">
-        <span className="flex gap-1.5" aria-hidden="true">
-          <i className="size-2.5 rounded-full bg-[oklch(1_0_0/0.16)]" />
-          <i className="size-2.5 rounded-full bg-[oklch(1_0_0/0.16)]" />
-          <i className="size-2.5 rounded-full bg-[oklch(1_0_0/0.16)]" />
-        </span>
-        <span className="ms-2 font-l-mono text-[11px] text-[oklch(0.65_0.01_255)]">claude — ~/acme/web</span>
+      <div className="flex h-10 items-center gap-2 px-3.5">
+        <TrafficLights className="max-lg:hidden" />
+        <span className="font-l-mono text-[11px] text-l-ink-3 lg:ms-2">claude — ~/acme/web</span>
       </div>
       <div className="flex min-h-[300px] flex-1 flex-col gap-2 overflow-hidden px-4 py-3.5 font-l-mono text-[12px] leading-[1.55]">
         {script.slice(0, step + 1).map((line) => (
           <TerminalLine key={line.key} line={line} />
         ))}
-        <div className="flex items-center gap-2 text-[oklch(0.6_0.01_255)]">
+        <div className="flex items-center gap-2 text-l-ink-3">
           <span aria-hidden="true">›</span>
-          <span className="l-pulse inline-block h-3.5 w-1.5 bg-[oklch(0.75_0.01_255)]" />
+          <span className="l-pulse inline-block h-3.5 w-1.5 bg-l-ink-2" />
         </div>
       </div>
     </div>
@@ -102,8 +98,8 @@ function Terminal({ step }: { step: number }) {
 function TerminalLine({ line }: { line: Line }) {
   if (line.kind === 'prompt') {
     return (
-      <p className="l-in text-[oklch(0.97_0.004_255)]">
-        <span className="text-[oklch(0.6_0.01_255)]">› </span>
+      <p className="l-in text-l-ink">
+        <span className="text-l-ink-3">› </span>
         {line.text}
       </p>
     );
@@ -112,22 +108,22 @@ function TerminalLine({ line }: { line: Line }) {
     line.kind === 'tool' ? (
       <>
         <span className="font-semibold">edict · {line.tool}</span>
-        <span className="text-[oklch(0.65_0.01_255)]"> ({line.args})</span>
+        <span className="text-l-ink-3"> ({line.args})</span>
       </>
     ) : (
       <>
         <span className="font-semibold">{line.label}</span>
-        <span className="text-[oklch(0.65_0.01_255)]"> ({line.text})</span>
+        <span className="text-l-ink-3"> ({line.text})</span>
       </>
     );
   return (
     <div className="l-in">
       <p className="truncate">
-        <span className={line.kind === 'tool' ? 'text-[oklch(0.72_0.16_293)]' : 'text-[oklch(0.78_0.14_155)]'}>⏺ </span>
+        <span className={line.kind === 'tool' ? 'text-l-agent' : 'text-l-review'}>⏺ </span>
         {head}
       </p>
       {line.result ? (
-        <p className="truncate ps-4 text-[oklch(0.65_0.01_255)]">
+        <p className="truncate ps-4 text-l-ink-3">
           <span aria-hidden="true">⎿ </span>
           {line.result}
         </p>
@@ -166,16 +162,13 @@ function AppWindow({
     <div
       role="img"
       aria-label="Edict's issue list, where ENG-142 moves to In Progress and then In Review as the agent works"
-      className="overflow-hidden rounded-xl bg-l-band shadow-l-window"
+      className="min-w-0"
     >
-      {/* The desktop app's top bar: traffic lights, then tabs. */}
+      {/* The desktop app's top bar: its tabs, over the page. On a phone this
+          pane comes first, so it carries the window's traffic lights. */}
       <div className="flex h-10 items-center gap-2 px-3.5">
-        <span className="flex gap-1.5" aria-hidden="true">
-          <i className="size-2.5 rounded-full bg-[#ff5f57]" />
-          <i className="size-2.5 rounded-full bg-[#febc2e]" />
-          <i className="size-2.5 rounded-full bg-[#28c840]" />
-        </span>
-        <span className="ms-[118px] hidden h-6 items-center rounded-md bg-l-bg px-3 text-[11px] text-l-ink shadow-[0_0_0_1px_var(--l-line)] sm:inline-flex">
+        <TrafficLights className="lg:hidden" />
+        <span className="ms-[118px] hidden h-6 items-center rounded-md bg-l-bg px-3 text-[11px] text-l-ink shadow-[0_0_0_1px_var(--l-line)] sm:inline-flex lg:ms-[168px]">
           Engineering
         </span>
         <span className="hidden px-2 text-[11px] text-l-ink-3 sm:inline">My issues</span>
@@ -280,6 +273,16 @@ function AppWindow({
         </div>
       </div>
     </div>
+  );
+}
+
+function TrafficLights({ className = '' }: { className?: string }) {
+  return (
+    <span className={`flex gap-1.5 ${className}`} aria-hidden="true">
+      <i className="size-2.5 rounded-full bg-[#ff5f57]" />
+      <i className="size-2.5 rounded-full bg-[#febc2e]" />
+      <i className="size-2.5 rounded-full bg-[#28c840]" />
+    </span>
   );
 }
 
