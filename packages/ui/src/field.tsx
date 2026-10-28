@@ -1,6 +1,7 @@
 import {
   forwardRef,
   useId,
+  useState,
   type InputHTMLAttributes,
   type ReactNode,
 } from "react";
@@ -23,6 +24,69 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
 ) {
   return <input ref={ref} className={cn(control, className)} {...props} />;
 });
+
+// A password field with a button that shows what was typed. The button keeps
+// focus in the field, so the caret stays where it was.
+export const PasswordInput = forwardRef<HTMLInputElement, Omit<InputHTMLAttributes<HTMLInputElement>, "type">>(
+  function PasswordInput({ className, ...props }, ref) {
+    const [shown, setShown] = useState(false);
+    return (
+      <div className="relative">
+        <input
+          ref={ref}
+          type={shown ? "text" : "password"}
+          // Edge draws its own reveal button; this one replaces it.
+          className={cn(control, "pe-10 [&::-ms-reveal]:hidden", className)}
+          {...props}
+        />
+        <button
+          type="button"
+          aria-label={shown ? "Hide password" : "Show password"}
+          title={shown ? "Hide password" : "Show password"}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => setShown((value) => !value)}
+          className={cn(
+            "absolute inset-y-0 end-0 flex w-10 items-center justify-center rounded-e-sm text-ink-2",
+            "transition-colors duration-(--duration-fast) ease-standard hover:text-ink",
+            "focus-visible:outline-none focus-visible:text-ink focus-visible:shadow-[0_0_0_2px_var(--focus-soft)]",
+          )}
+        >
+          <EyeIcon crossed={shown} />
+        </button>
+      </div>
+    );
+  },
+);
+
+function EyeIcon({ crossed }: { crossed: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {crossed ? (
+        <>
+          <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c4.5 0 8.3 3 9.94 6.66a1 1 0 0 1 0 .68 13.5 13.5 0 0 1-1.67 2.68" />
+          <path d="M14.08 14.16a3 3 0 0 1-4.24-4.24" />
+          <path d="M17.48 17.5A10.75 10.75 0 0 1 2.06 12.35a1 1 0 0 1 0-.7 13.6 13.6 0 0 1 4.45-5.15" />
+          <path d="m2 2 20 20" />
+        </>
+      ) : (
+        <>
+          <path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0" />
+          <circle cx="12" cy="12" r="3" />
+        </>
+      )}
+    </svg>
+  );
+}
 
 export interface FieldProps {
   label: string;

@@ -7,7 +7,7 @@ test("a fresh instance: set up, create an organization and a team, invite someon
   await expect(page.getByRole("heading", { name: "Set up Edict" })).toBeVisible();
   await page.getByLabel("Name").fill("Amirali Beigi");
   await page.getByLabel("Email").fill("amirali@example.com");
-  await page.getByLabel("Password").fill("correct-horse-battery");
+  await page.getByLabel("Password", { exact: true }).fill("correct-horse-battery");
   await page.getByRole("button", { name: "Sign up", exact: true }).click();
 
   await expect(page.getByRole("heading", { name: "Create an organization" })).toBeVisible();
@@ -39,7 +39,7 @@ test("a fresh instance: set up, create an organization and a team, invite someon
   await mia.getByRole("button", { name: "Sign up to join" }).click();
   await expect(mia.getByLabel("Email")).toHaveValue("mia@example.com");
   await mia.getByLabel("Name").fill("Mia Chen");
-  await mia.getByLabel("Password").fill("correct-horse-battery");
+  await mia.getByLabel("Password", { exact: true }).fill("correct-horse-battery");
   await mia.getByRole("button", { name: "Sign up", exact: true }).click();
   await mia.getByRole("button", { name: "Join Edict Labs" }).click();
 
@@ -54,7 +54,7 @@ test("a fresh instance: set up, create an organization and a team, invite someon
 test("signing in with a wrong password says so beside the form", async ({ page }) => {
   await page.goto("/sign-in");
   await page.getByLabel("Email").fill("nobody@example.com");
-  await page.getByLabel("Password").fill("not-the-password");
+  await page.getByLabel("Password", { exact: true }).fill("not-the-password");
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("alert")).toHaveText(/don't match/);
 });
