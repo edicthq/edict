@@ -1054,7 +1054,7 @@ function IssueList({
         <section key={groupKey(group)} aria-label={groupName(group)} className="mb-4">
           {/* A faint band, opaque so rows scroll under it while it sticks. */}
           <div className="sticky top-0 z-[1] bg-bg">
-            <div className="rounded-sm bg-hover/60 [&>h2]:bg-transparent">
+            <div className="rounded-sm bg-hover/60 [&>h2]:bg-transparent [&>h2]:ps-4">
               <GroupHeading group={group} statuses={statuses} />
             </div>
           </div>
@@ -1104,16 +1104,21 @@ function IssueList({
                           <span className={cn("transition-opacity", isSelected || selectedIds.size > 0 ? "opacity-0 pointer-events-none" : "group-hover/row:opacity-0")}>
                             <PriorityIcon priority={issue.priority} />
                           </span>
-                          <Checkbox
-                            checked={isSelected}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => onToggleSelect(issue.id, (e.nativeEvent as MouseEvent).shiftKey)}
+                          {/* Its own layer over the priority icon, so the
+                              checkbox lands exactly where the icon was. */}
+                          <span
                             className={cn(
-                              "absolute inset-0 transition-opacity",
+                              "absolute inset-0 grid place-items-center transition-opacity",
                               isSelected || selectedIds.size > 0 ? "opacity-100" : "opacity-0 group-hover/row:opacity-100",
                             )}
-                            aria-label={`Select ${issue.identifier}`}
-                          />
+                          >
+                            <Checkbox
+                              checked={isSelected}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => onToggleSelect(issue.id, (e.nativeEvent as MouseEvent).shiftKey)}
+                              aria-label={`Select ${issue.identifier}`}
+                            />
+                          </span>
                         </span>
                       }
                     />
@@ -1220,16 +1225,19 @@ function IssueBoard({
                       <span className={cn("transition-opacity", isSelected || selectedIds.size > 0 ? "opacity-0" : "group-hover/card:opacity-0")}>
                         <PriorityIcon priority={issue.priority} />
                       </span>
-                      <Checkbox
-                        checked={isSelected}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => onToggleSelect(issue.id, (e.nativeEvent as MouseEvent).shiftKey)}
+                      <span
                         className={cn(
-                          "absolute inset-0 transition-opacity",
+                          "absolute inset-0 grid place-items-center transition-opacity",
                           isSelected || selectedIds.size > 0 ? "opacity-100" : "opacity-0 group-hover/card:opacity-100",
                         )}
-                        aria-label={`Select ${issue.identifier}`}
-                      />
+                      >
+                        <Checkbox
+                          checked={isSelected}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => onToggleSelect(issue.id, (e.nativeEvent as MouseEvent).shiftKey)}
+                          aria-label={`Select ${issue.identifier}`}
+                        />
+                      </span>
                     </span>
                     <span className="flex-1 text-sm font-medium text-ink-2 tabular-nums">{issue.identifier}</span>
                     <IssuePeople issue={issue} orgMembers={orgMembers} agents={agents} size={18} />
