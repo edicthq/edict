@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "edict": {
+      "type": "remote",
+      "url": "http://localhost:5173/mcp",
+      "enabled": true,
+      "headers": {
+        "Authorization": "Bearer {env:EDICT_API_KEY}"
+      }
+    }
+  }
+}
