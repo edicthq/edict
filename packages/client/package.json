@@ -1,6 +1,6 @@
 {
   "name": "@edicthq/client",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Typed client for the Edict API, generated from its OpenAPI document",
   "license": "MIT",
   "homepage": "https://github.com/edicthq/edict/tree/main/packages/client#readme",

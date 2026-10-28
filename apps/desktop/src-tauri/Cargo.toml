@@ -1,6 +1,6 @@
 [package]
 name = "edict-desktop"
-version = "0.0.1"
+version = "0.1.0"
 description = "Edict's desktop app: a Tauri shell around the server's web UI"
 authors = ["Amirali Beigi"]
 license = "AGPL-3.0-only"

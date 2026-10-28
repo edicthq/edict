@@ -1,6 +1,6 @@
 {
   "name": "@edicthq/desktop",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "description": "Edict's desktop app: a Tauri shell around the server's web UI (ADR 0004)",
   "type": "module",

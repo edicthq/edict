@@ -1,6 +1,6 @@
 {
   "name": "@edicthq/docs",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "description": "Edict's documentation site at docs.edict.dev, built with Fumadocs",
   "type": "module",
