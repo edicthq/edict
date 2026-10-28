@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-switch-instance-at"
+description = "Enables the switch_instance_at command without any pre-configured scope."
+commands.allow = ["switch_instance_at"]
+
+[[permission]]
+identifier = "deny-switch-instance-at"
+description = "Denies the switch_instance_at command without any pre-configured scope."
+commands.deny = ["switch_instance_at"]

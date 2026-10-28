@@ -1,6 +1,6 @@
 // The window chrome of the app's own pages. The shell sets
 // window.__EDICT_DESKTOP__ before any script runs (src-tauri/src/chrome.rs):
-// on macOS the traffic lights sit over the 48px top strip, so the strip leaves
+// on macOS the traffic lights sit over the 44px top strip, so the strip leaves
 // room for them; on Windows and Linux there is no native frame, so the page
 // draws the window's buttons.
 (() => {

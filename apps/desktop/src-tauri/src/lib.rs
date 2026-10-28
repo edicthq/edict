@@ -133,6 +133,7 @@ fn allow_server(app: &AppHandle, server: &Url) {
         .permission("core:event:default")
         .permission("notification:default")
         .permission("allow-open-switcher")
+        .permission("allow-switch-instance-at")
         .permission("core:window:allow-start-dragging")
         .permission("core:window:allow-internal-toggle-maximize")
         .permission("core:window:allow-minimize")
@@ -384,6 +385,18 @@ async fn open_switcher(app: AppHandle) {
     show_switcher(&app, false);
 }
 
+// ⌃1…⌃9 from an instance's page on Windows and Linux, where the menu bar
+// that carries those keys is hidden. The page names a place in the list, never
+// an instance, so it still never learns which others are saved.
+#[tauri::command]
+fn switch_instance_at(app: AppHandle, index: usize) {
+    if let Some(instance) = saved(&app).ordered().get(index) {
+        if let Ok(url) = Url::parse(&instance.url) {
+            let _ = switch_to(&app, &url);
+        }
+    }
+}
+
 fn quick_create(app: &AppHandle) {
     show_main(app);
     let _ = app.emit_to(MAIN, "quick-create", ());
@@ -603,19 +616,27 @@ fn menu_bar(app: &AppHandle, saved: &Saved) -> tauri::Result<Menu<tauri::Wry>> {
             &PredefinedMenuItem::select_all(app, None)?,
         ],
     )?;
+    // Tabs live in the page; these keys reach it as events, since the menu
+    // bar takes ⌘T and ⌘W before the page sees them.
+    let file = Submenu::with_items(
+        app,
+        "File",
+        true,
+        &[
+            &MenuItem::with_id(app, "new-tab", "New Tab", true, Some("CmdOrCtrl+T"))?,
+            &separator()?,
+            &MenuItem::with_id(app, "close-tab", "Close Tab", true, Some("CmdOrCtrl+W"))?,
+            &MenuItem::with_id(app, "close-window", "Close Window", true, Some("Shift+CmdOrCtrl+W"))?,
+        ],
+    )?;
     let view = Submenu::with_items(app, "View", true, &[&PredefinedMenuItem::fullscreen(app, None)?])?;
     let window = Submenu::with_items(
         app,
         "Window",
         true,
-        &[
-            &PredefinedMenuItem::minimize(app, None)?,
-            &PredefinedMenuItem::maximize(app, None)?,
-            &separator()?,
-            &PredefinedMenuItem::close_window(app, None)?,
-        ],
+        &[&PredefinedMenuItem::minimize(app, None)?, &PredefinedMenuItem::maximize(app, None)?],
     )?;
-    Menu::with_items(app, &[&edict, &edit, &view, &instance_menu(app, saved)?, &window])
+    Menu::with_items(app, &[&edict, &file, &edit, &view, &instance_menu(app, saved)?, &window])
 }
 
 // The main window's menu on Windows and Linux, where the webview handles
@@ -659,6 +680,9 @@ fn set_menus(app: &AppHandle, saved: &Saved) -> tauri::Result<()> {
     #[cfg(not(target_os = "macos"))]
     if let Some(window) = app.get_webview_window(MAIN) {
         window.set_menu(bar)?;
+        // The window has no frame and the page draws its own top bar, so a
+        // native menu bar would sit above it as a stray strip.
+        let _ = window.hide_menu();
     }
     if let Some(tray) = app.tray_by_id(TRAY) {
         tray.set_menu(Some(tray_menu(app, saved)?))?;
@@ -688,6 +712,20 @@ fn on_menu(app: &AppHandle, id: &str) {
             tauri::async_runtime::spawn(check_for_update(app.clone(), true));
         }
         "quit" => app.exit(0),
+        "new-tab" => {
+            show_main(app);
+            let _ = app.emit_to(MAIN, "new-tab", ());
+        }
+        // An instance's page closes its tab, or the window with its last one.
+        // The app's own pages have no tabs.
+        "close-tab" if saved(app).active.is_some() => {
+            let _ = app.emit_to(MAIN, "close-tab", ());
+        }
+        "close-tab" | "close-window" => {
+            if let Some(window) = app.get_webview_window(MAIN) {
+                let _ = window.hide();
+            }
+        }
         other => {
             let Some(url) = other.strip_prefix(INSTANCE_ITEM).and_then(|url| Url::parse(url).ok()) else {
                 return;
@@ -743,7 +781,8 @@ pub fn run() {
             switch_instance,
             remove_instance,
             rename_instance,
-            open_switcher
+            open_switcher,
+            switch_instance_at
         ])
         // Every menu: the menu bar, the window menu and the tray's. Each item
         // is handled once here.
@@ -862,6 +901,16 @@ pub fn run() {
             RunEvent::WindowEvent { label, event: WindowEvent::ThemeChanged(_), .. } => {
                 if let Some(window) = app.get_webview_window(&label) {
                     chrome::paint(&window, label == SWITCHER);
+                }
+            }
+            #[cfg(target_os = "macos")]
+            RunEvent::WindowEvent {
+                label,
+                event: WindowEvent::Resized(_) | WindowEvent::Focused(true) | WindowEvent::ScaleFactorChanged { .. },
+                ..
+            } => {
+                if let Some(window) = app.get_webview_window(&label) {
+                    chrome::keep_traffic_lights(&window);
                 }
             }
             #[cfg(target_os = "macos")]

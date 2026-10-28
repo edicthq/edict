@@ -216,6 +216,12 @@ The polish pass before v1.0 settled how screens are put together, on top of thes
 - A page with view options puts them in a toolbar under the bar, at least 44 high. No page has a big title above its content.
 - Fields that belong to the page, like a project's status, lead and target date, sit in the bar as chips that open app menus.
 
+### The desktop app's top bar
+
+- In the desktop app a 44px bar runs across the top of the window, in the rail's color, and everything on it shares its middle line: on macOS the traffic lights, then back and forward over the rail, then the tabs over the page panel, and on Windows and Linux minimize, maximize and close, 46 wide and as tall as the bar, flush in the corner. The page panel starts under it.
+- Tabs are 28 high and up to 200 wide. The one in front takes the page's `bg` with a hairline; the others are `ink-2` until hovered. ⌘T opens one on My issues, ⌘W closes the one in front (the last one closes the window), ⌃Tab and ⌘⇧] / ⌘⇧[ step through them, ⌘-click or a middle click on a link opens it in a new tab, and dragging reorders them. ⌘1…⌘9 stay with instances (ADR 0028).
+- A tab's title is its page bar's title. Each instance keeps its own tabs.
+
 ### One issue row
 
 - An issue looks the same wherever it is listed: a team's list, My issues, a project, the inbox. In order: priority, identifier, status, title, labels, the people on it and how long ago it changed.

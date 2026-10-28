@@ -176,6 +176,13 @@ export function useDesktopBridge(slug: string, orgId: string): void {
       } else if (event.key.toLowerCase() === "n" && !event.shiftKey) {
         event.preventDefault();
         quickCreate();
+      } else if (desktopShell()?.titleBar === "custom" && /^Digit[1-9]$/.test(event.code) && !event.shiftKey) {
+        // ⌃1…⌃9 switch instances. macOS gets them from its menu bar; Windows
+        // and Linux hide theirs, so the page asks the shell by position.
+        event.preventDefault();
+        void tauri()
+          ?.core.invoke("switch_instance_at", { index: Number(event.code.slice(5)) - 1 })
+          .catch(() => undefined);
       }
     };
     window.addEventListener("keydown", onKey);

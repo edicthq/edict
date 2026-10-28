@@ -59,13 +59,14 @@ input, .error { user-select: text; -webkit-user-select: text; }
 
 button { cursor: default; }
 
-/* The 48px strip at the top of every window. It drags the window (only where
+/* The 44px strip at the top of every window, as tall as the web app's top bar
+   so the traffic lights sit in its middle. It drags the window (only where
    nothing else sits on it), leaves room for the macOS traffic lights and holds
    the page's own window buttons on Windows and Linux. */
 .titlebar {
   display: flex;
   align-items: center;
-  height: 48px;
+  height: 44px;
   flex: none;
 }
 

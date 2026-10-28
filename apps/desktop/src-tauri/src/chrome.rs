@@ -1,6 +1,6 @@
-// The window chrome. On macOS the traffic lights sit over the page in a 48px
-// top strip; on Windows and Linux there is no native frame and the page draws
-// its own controls. Every page, an instance's included, learns which from
+// The window chrome. On macOS the traffic lights sit over the page in a 44px
+// top bar, on one line with back, forward and the tabs; on Windows and Linux
+// there is no native frame and the page draws its own controls. Every page, an instance's included, learns which from
 // `window.__EDICT_DESKTOP__`, set before any of its scripts run.
 
 use serde_json::json;
@@ -18,10 +18,24 @@ pub const PLATFORM: &str = "linux";
 /// minimize, maximize and close.
 pub const TITLE_BAR: &str = if cfg!(target_os = "macos") { "overlay" } else { "custom" };
 
-/// Where the traffic lights go, from the window's top left corner, so they
-/// sit in the middle of the pages' 48px top strip.
+/// Where the traffic lights go, from the window's top left corner, so their
+/// middle sits on the middle of the pages' 44px top bar (22px down). AppKit
+/// measures y to the bottom of a title bar the buttons are centred in, so 24.5
+/// lands them there; checked against a screen capture of the window.
 #[cfg(target_os = "macos")]
-pub const TRAFFIC_LIGHTS: (f64, f64) = (16.0, 26.0);
+pub const TRAFFIC_LIGHTS: (f64, f64) = (16.0, 24.5);
+
+/// AppKit puts the traffic lights back in their default spot after some
+/// layout passes, like a resize, entering or leaving a display, or the window
+/// becoming key, without redrawing the view that would move them again.
+/// Setting the title makes tao re-apply the position, so the window sets its
+/// own title again.
+#[cfg(target_os = "macos")]
+pub fn keep_traffic_lights(window: &WebviewWindow) {
+    if let Ok(title) = window.title() {
+        let _ = window.set_title(&title);
+    }
+}
 
 /// The script that tells a page it runs in the desktop app.
 pub fn desktop_script(platform: &str, title_bar: &str, version: &str) -> String {

@@ -1,8 +1,6 @@
 import {
   ArrowLeftRight,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   CircleUserRound,
   FolderKanban,
   Inbox,
@@ -30,6 +28,7 @@ import { RailContext, useRail, useRailState } from "../lib/rail.js";
 import { formatShortcut, matchesShortcut, useShortcuts, type ShortcutAction } from "../lib/shortcuts.js";
 import { RailToggle } from "../components/rail-toggle.js";
 import { UndoProvider } from "../components/undo.js";
+import { DesktopBar } from "../components/desktop-bar.js";
 import { VerifyBanner } from "../components/verify-banner.js";
 import { AuthShell, Loading } from "../components/shell.js";
 import { authClient, useSession } from "../lib/auth.js";
@@ -83,6 +82,7 @@ export function OrgLayout() {
     return () => window.removeEventListener("keydown", onKey);
   }, [drawer]);
   const rail = useRailState();
+  const desktop = Boolean(desktopShell());
   const current = memberships.data?.find((m) => m.organization.slug === slug);
   useRealtime(current?.organization.id);
   // Members who have not picked an agent color see the organization's.
@@ -147,7 +147,11 @@ export function OrgLayout() {
     <UndoProvider orgId={context.orgId}>
     <RailContext.Provider value={rail}>
     <DesktopBridge slug={context.slug} orgId={context.orgId} />
-    <div className="flex min-h-dvh bg-rail">
+    {/* In the desktop app a 44px bar with the tabs runs across the top, and
+        the rail and the page sit under it. */}
+    <div className="flex min-h-dvh flex-col bg-rail">
+    {desktop ? <DesktopBar slug={context.slug} /> : null}
+    <div className="flex min-h-0 flex-1">
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:start-2 focus:top-2 focus:z-10 focus:rounded-sm focus:bg-surface focus:px-3 focus:py-2"
@@ -173,7 +177,8 @@ export function OrgLayout() {
           so the rail reads as the frame around it. Full bleed on a phone. */}
       <div
         className={cn(
-          "flex h-dvh min-w-0 flex-1 flex-col bg-bg md:my-2 md:me-2 md:h-[calc(100dvh-16px)] md:overflow-hidden md:rounded-md md:shadow-panel",
+          "flex h-dvh min-w-0 flex-1 flex-col bg-bg md:me-2 md:mb-2 md:overflow-hidden md:rounded-md md:shadow-panel",
+          desktop ? "md:h-[calc(100dvh-52px)]" : "md:mt-2 md:h-[calc(100dvh-16px)]",
           "transition-[margin] duration-(--duration-slow) ease-standard motion-reduce:transition-none",
           rail.collapsed && "md:ms-2",
         )}
@@ -197,6 +202,7 @@ export function OrgLayout() {
         open={dialog === "palette"}
         onClose={() => setDialog(null)}
       />
+    </div>
     </div>
     </RailContext.Provider>
     </UndoProvider>
@@ -228,24 +234,6 @@ function InboxBadge({ orgId }: { orgId: string }) {
   return <span className="ms-auto text-sm font-semibold text-ink tabular-nums">{count}</span>;
 }
 
-// The desktop app's title strip: room for the macOS traffic lights, back and
-// forward, and a handle to drag the window by. Browsers show none of it.
-function TitleStrip() {
-  const navigate = useNavigate();
-  if (!desktopShell()) return null;
-  const arrow = "grid size-7 place-items-center rounded-sm text-ink-2 hover:bg-hover hover:text-ink";
-  return (
-    <div data-tauri-drag-region className="-mx-2 -mt-2.5 mb-1 flex h-12 shrink-0 items-center gap-0.5 px-2 [[data-title-bar=overlay]_&]:ps-[84px]">
-      <button type="button" aria-label="Back" title={`Back (${mod}[)`} className={arrow} onClick={() => navigate(-1)}>
-        <ChevronLeft aria-hidden="true" className="size-4" strokeWidth={1.75} />
-      </button>
-      <button type="button" aria-label="Forward" title={`Forward (${mod}])`} className={arrow} onClick={() => navigate(1)}>
-        <ChevronRight aria-hidden="true" className="size-4" strokeWidth={1.75} />
-      </button>
-    </div>
-  );
-}
-
 function Rail({ context, others, drawer }: { context: OrgContext; others: Membership[]; drawer: boolean }) {
   const { orgId, slug, canManage, membership, instanceAdmin } = context;
   const teams = useTeams(orgId);
@@ -264,14 +252,15 @@ function Rail({ context, others, drawer }: { context: OrgContext; others: Member
     <nav
       aria-label="Organization"
       className={cn(
-        "sticky top-0 flex h-dvh w-[240px] shrink-0 flex-col gap-4 overflow-y-auto bg-rail px-2 pt-2.5 pb-2",
+        "sticky top-0 flex w-[240px] shrink-0 flex-col gap-4 overflow-y-auto bg-rail px-2 pt-2.5 pb-2",
+        // Under the desktop app's bar, the rail is the rest of the window.
+        desktopShell() ? "h-[calc(100dvh-44px)] md:pt-1" : "h-dvh",
         "transition-[opacity,translate] duration-(--duration-slow) ease-standard motion-reduce:transition-none",
         collapsed && "md:-translate-x-6 md:opacity-0",
         drawer ? "motion-drawer max-md:fixed max-md:inset-y-0 max-md:start-0 max-md:z-40 max-md:w-[min(280px,85vw)] max-md:shadow-overlay" : "max-md:hidden",
       )}
     >
       <div className="flex flex-col gap-2">
-        <TitleStrip />
         <div className="flex items-center gap-1">
           <Workspace context={context} others={others} />
           {teams.data?.length ? (

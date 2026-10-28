@@ -56,8 +56,8 @@ export function MarkTile() {
 // The page bar: 48 high on a hairline, with the title (optionally led by a team
 // key chip or a breadcrumb), a status such as a live agent, and the page's
 // actions. It stays put while the page scrolls. In the desktop app it is also
-// a handle to drag the window by, and on Windows and Linux it ends in the
-// window controls.
+// a handle to drag the window by; the window controls live in the app's top
+// bar (DesktopBar).
 export function PageHeader({
   title,
   lead,
@@ -77,7 +77,7 @@ export function PageHeader({
       data-tauri-drag-region
       className={cn(
         "app-bar sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2.5 border-b border-line bg-bg ps-6 pe-4",
-        collapsed && "md:ps-3 md:[[data-title-bar=overlay]_&]:ps-[76px]",
+        collapsed && "md:ps-3",
       )}
     >
       {collapsed ? <RailToggle className="motion-fade -me-1 max-md:hidden" /> : null}
@@ -90,18 +90,21 @@ export function PageHeader({
       {status ? <div className="flex min-w-0 items-center">{status}</div> : null}
       <div data-tauri-drag-region className="flex-1 self-stretch" />
       {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
-      <WindowControls />
     </header>
   );
 }
 
 // Minimize, maximize and close for the frameless desktop window on Windows and
 // Linux. macOS keeps its own traffic lights, and browsers have their frame.
-export function WindowControls() {
+// In the app's top bar (`bar`) they are 46 wide and as tall as the bar, flush
+// in the corner, as Windows draws its own.
+export function WindowControls({ bar = false }: { bar?: boolean }) {
   if (desktopShell()?.titleBar !== "custom") return null;
-  const control = "grid h-8 w-10 place-items-center rounded-sm text-ink-2 hover:bg-hover hover:text-ink";
+  const control = bar
+    ? "grid h-full w-[46px] place-items-center text-ink-2 transition-colors duration-(--duration-fast) hover:bg-hover hover:text-ink"
+    : "grid h-8 w-10 place-items-center rounded-sm text-ink-2 hover:bg-hover hover:text-ink";
   return (
-    <div className="-me-2 ms-1 flex items-center">
+    <div className={cn("flex", bar ? "h-full self-stretch" : "-me-2 ms-1 items-center")}>
       <button type="button" aria-label="Minimize" className={control} onClick={() => windowCommand("minimize")}>
         <Minus aria-hidden="true" className="size-4" strokeWidth={1.5} />
       </button>
