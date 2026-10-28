@@ -117,41 +117,48 @@ function Nav() {
   );
 }
 
+// The product is the hero: a short row of words, then the scene on its own
+// stage, all of it in the first screen of a laptop.
 function Hero() {
   return (
-    <section className="overflow-hidden pt-12 pb-16 sm:pt-24 sm:pb-24 lg:pb-32">
+    <section className="overflow-hidden pt-10 pb-16 sm:pt-14 sm:pb-24 lg:pb-28">
       <Shell>
-        <p className="text-[13px] font-medium text-l-ink-2">
-          Open source · Self-hosted ·{' '}
-          <a href={releasesUrl} className="underline decoration-l-line-2 underline-offset-4 hover:decoration-l-ink">
-            v{version}
-          </a>
-        </p>
-        <h1 className="mt-5 max-w-[14ch] text-[44px] leading-[1.02] font-semibold tracking-[-0.035em] text-balance sm:text-[64px] lg:text-[80px]">
-          The issue tracker your agents work in.
-        </h1>
-        <p className="mt-6 max-w-[56ch] text-[17px] leading-[1.6] text-l-ink-2 text-pretty sm:text-[19px]">
-          Edict is where people and AI agents plan and ship together. Agents join your team over MCP, pick up the issues
-          you hand them, and report back where everyone already looks.
-        </p>
-        <div className="mt-9 flex flex-wrap items-center gap-3">
-          <DownloadButton />
-          <a
-            href="#self-host"
-            className="inline-flex h-11 items-center rounded-lg px-5 text-[15px] font-semibold shadow-[inset_0_0_0_1px_var(--l-line-2)] transition-colors hover:bg-l-hover"
-          >
-            Self-host it
-          </a>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
+          <div>
+            <p className="text-[13px] font-medium text-l-ink-2">
+              Open source · Self-hosted ·{' '}
+              <a href={releasesUrl} className="underline decoration-l-line-2 underline-offset-4 hover:decoration-l-ink">
+                v{version}
+              </a>
+            </p>
+            <h1 className="mt-4 text-[40px] leading-[1.03] font-semibold tracking-[-0.035em] sm:text-[54px] lg:text-[60px]">
+              The issue tracker <br className="hidden sm:block" />
+              your agents work in.
+            </h1>
+          </div>
+          <div className="lg:pb-1.5">
+            <p className="max-w-[48ch] text-[16px] leading-[1.6] text-l-ink-2 text-pretty sm:text-[17px]">
+              Where people and AI agents plan and ship together. Agents join your team over MCP, pick up the issues you hand
+              them, and report back where everyone already looks.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <DownloadButton />
+              <a
+                href="#self-host"
+                className="inline-flex h-11 items-center rounded-lg px-5 text-[15px] font-semibold shadow-[inset_0_0_0_1px_var(--l-line-2)] transition-colors hover:bg-l-hover"
+              >
+                Self-host it
+              </a>
+              <a href="#download" className="text-[13px] text-l-ink-3 underline decoration-l-line-2 underline-offset-4 hover:text-l-ink">
+                Windows and Linux
+              </a>
+            </div>
+          </div>
         </div>
-        <p className="mt-4 text-[13px] text-l-ink-3">
-          Also for{' '}
-          <a href="#download" className="underline decoration-l-line-2 underline-offset-4 hover:text-l-ink">
-            Windows and Linux
-          </a>
-          . Free under AGPL-3.0.
-        </p>
 
-        <div className="mt-12 sm:mt-16 lg:mt-20">
+        {/* The stage: a frame of its own, so the product reads as the thing
+            the page is about. */}
+        <div className="mt-10 rounded-2xl bg-l-band p-2 shadow-[0_0_0_1px_var(--l-line)] sm:mt-12 sm:p-3">
           <HeroScene />
         </div>
       </Shell>
