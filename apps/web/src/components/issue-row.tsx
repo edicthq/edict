@@ -2,20 +2,21 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 import type { Agent, Issue, Label, Member, Status } from "@edicthq/client";
 import { Avatar, LabelPill, PriorityIcon, ProgressBadge, StatusIcon, cn, useChangeCount } from "@edicthq/ui";
-import { agentState, plainLine, waitingLine } from "../lib/agents.js";
+import { agentState } from "../lib/agents.js";
 import { useNow } from "../lib/live.js";
 import { ago, statusFill } from "../lib/issues.js";
 import { NoAssignee } from "./issue-fields.js";
 
 // One issue on one row, the same wherever issues are listed: a team's list,
 // My issues, a project. Priority, identifier, status, title, labels, the
-// people on it and how long ago it changed, with the delegate's latest words
-// on a second line. The 3px bar on the leading edge turns the agent color
-// while its run is live.
+// people on it and how long ago it changed. A delegate that is working, needs
+// input or is blocked says so in a small badge after the title; what it said
+// lives in the issue, not the row. The 3px bar on the leading edge turns the
+// agent color while its run is live.
 //
 // On a phone the same cells fall into two lines: the status and a title that
-// wraps, then priority, identifier, two labels and the people under it, with
-// the agent line below that. The age goes.
+// wraps, then priority, identifier, two labels and the people under it. The
+// age goes.
 export const issueRowClass =
   "relative grid min-h-10 w-full grid-cols-[16px_58px_16px_minmax(0,1fr)_auto_auto_30px] items-center gap-x-3 gap-y-1 rounded-sm py-2 ps-4 pe-3 text-start hover-fade hover:bg-hover max-sm:grid-cols-[14px_16px_auto_minmax(0,1fr)_auto] max-sm:gap-x-2 max-sm:gap-y-1.5 max-sm:rounded-none max-sm:border-b max-sm:border-line max-sm:py-3 max-sm:pe-4";
 
@@ -70,6 +71,7 @@ export function IssueRowCells({ issue, statuses, labels, orgMembers, agents, lea
           {issue.title}
         </span>
         {titleAside}
+        <AgentMark issue={issue} agents={agents} className="self-center" />
       </span>
       <IssueLabels issue={issue} labels={labels} className="max-sm:col-start-4 max-sm:row-start-2" />
       <span className="max-sm:col-start-5 max-sm:row-start-2">
@@ -78,7 +80,6 @@ export function IssueRowCells({ issue, statuses, labels, orgMembers, agents, lea
       <time dateTime={issue.updatedAt} className="text-end text-sm text-ink-2 max-sm:hidden">
         {ago(issue.updatedAt)}
       </time>
-      <AgentLine issue={issue} agents={agents} />
     </>
   );
 }
@@ -128,24 +129,16 @@ export function IssuePeople({
   );
 }
 
-// The delegate's latest words under the title: its name, its state and what
-// it last said, or that it has not picked the issue up yet.
-export function AgentLine({ issue, agents }: { issue: Issue; agents: Agent[] }) {
+// The delegate's state, only when it asks for a look: working, waiting on a
+// person, or blocked. Otherwise the agent's avatar beside the assignee is
+// enough.
+export function AgentMark({ issue, agents, className }: { issue: Issue; agents: Agent[]; className?: string }) {
   const now = useNow();
   const agent = agents.find((a) => a.id === issue.delegateId);
   if (!agent) return null;
   const state = agentState(issue, agent, now);
-  const latest = issue.latestProgress?.agentId === agent.id ? issue.latestProgress : null;
-  return (
-    <span className="col-span-4 col-start-4 flex min-w-0 items-center gap-2 text-sm max-sm:col-start-2 max-sm:row-start-3">
-      <span className="shrink-0 font-medium text-agent-ink">{agent.name}</span>
-      <ProgressBadge state={state} />
-      <span className="min-w-0 truncate text-ink-2">
-        {latest && state === "quiet" ? `last update ${ago(latest.createdAt, now)} ago · ` : null}
-        {latest ? plainLine(latest.message) : state === "waiting" ? waitingLine(agent) : null}
-      </span>
-    </span>
-  );
+  if (state !== "working" && state !== "needs_input" && state !== "blocked") return null;
+  return <ProgressBadge state={state} className={cn("h-[18px] px-1.5", className)} />;
 }
 
 // On a phone, two labels as plain dots and names, no outline.

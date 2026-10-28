@@ -90,7 +90,7 @@ export function InboxPage() {
                   <span className="min-w-0 flex-1 text-body font-medium text-ink max-sm:line-clamp-2 sm:truncate">
                     {item.issue ? (
                       <>
-                        <span className={cn("font-semibold", item.actor?.kind === "agent" && "text-agent-ink")}>{item.actor?.name ?? "Someone"}</span>{" "}
+                        <span className="font-semibold">{item.actor?.name ?? "Someone"}</span>{" "}
                         {item.progressState ? progressWords[item.progressState] : typeLine[item.type]}{" "}
                         <span className="font-medium text-ink">{item.issue.identifier}</span>{" "}
                         <span className={cn("text-ink-2 font-normal")}>{item.issue.title}</span>

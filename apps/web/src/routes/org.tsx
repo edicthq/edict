@@ -26,6 +26,8 @@ import { InviteDialog } from "../components/invite-dialog.js";
 import { CommandPalette } from "../components/palette.js";
 import { desktopShell, openSwitcher, useDesktopBridge } from "../lib/desktop.js";
 import { cycleAccent, cycleTheme, isTyping, setOrganizationAccent } from "../lib/appearance.js";
+import { RailContext, useRail, useRailState } from "../lib/rail.js";
+import { RailToggle } from "../components/rail-toggle.js";
 import { UndoProvider } from "../components/undo.js";
 import { VerifyBanner } from "../components/verify-banner.js";
 import { AuthShell, Loading } from "../components/shell.js";
@@ -79,6 +81,7 @@ export function OrgLayout() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [drawer]);
+  const rail = useRailState();
   const current = memberships.data?.find((m) => m.organization.slug === slug);
   useRealtime(current?.organization.id);
   // Members who have not picked an agent color see the organization's.
@@ -95,7 +98,10 @@ export function OrgLayout() {
         return;
       }
       if (isTyping(event) || event.metaKey || event.ctrlKey || event.altKey) return;
-      if (event.key.toLowerCase() === "t") {
+      if (event.key === "[") {
+        event.preventDefault();
+        rail.toggle();
+      } else if (event.key.toLowerCase() === "t") {
         event.preventDefault();
         cycleTheme();
       } else if (event.key.toLowerCase() === "g") {
@@ -105,7 +111,7 @@ export function OrgLayout() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [rail.toggle]);
 
   if (memberships.isPending) return <Loading />;
   const membership = memberships.data?.find((m) => m.organization.slug === slug);
@@ -142,22 +148,42 @@ export function OrgLayout() {
 
   return (
     <UndoProvider orgId={context.orgId}>
+    <RailContext.Provider value={rail}>
     <DesktopBridge slug={context.slug} orgId={context.orgId} />
-    <div className="flex min-h-dvh">
+    <div className="flex min-h-dvh bg-rail">
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:start-2 focus:top-2 focus:z-10 focus:rounded-sm focus:bg-surface focus:px-3 focus:py-2"
       >
         Skip to content
       </a>
-      <Rail context={context} others={memberships.data ?? []} drawer={drawer} />
+      {/* On a wide screen the rail folds away to the leading edge: its column
+          narrows while the rail slides and fades, and the page panel takes the
+          room. Hidden, it leaves the tab order. A phone opens it as a drawer. */}
+      <div
+        className={cn(
+          "shrink-0 overflow-hidden max-md:contents",
+          "transition-[width,visibility] duration-(--duration-slow) ease-standard motion-reduce:transition-none",
+          rail.collapsed ? "md:invisible md:w-0" : "md:w-[240px]",
+        )}
+      >
+        <Rail context={context} others={memberships.data ?? []} drawer={drawer} />
+      </div>
       {drawer ? (
         <div aria-hidden="true" className="motion-fade fixed inset-0 z-30 bg-scrim md:hidden" onClick={() => setDrawer(false)} />
       ) : null}
-      <div className="flex h-dvh min-w-0 flex-1 flex-col">
+      {/* The page: a panel inset from the window, its own surface with an edge,
+          so the rail reads as the frame around it. Full bleed on a phone. */}
+      <div
+        className={cn(
+          "flex h-dvh min-w-0 flex-1 flex-col bg-bg md:my-2 md:me-2 md:h-[calc(100dvh-16px)] md:overflow-hidden md:rounded-md md:shadow-panel",
+          "transition-[margin] duration-(--duration-slow) ease-standard motion-reduce:transition-none",
+          rail.collapsed && "md:ms-2",
+        )}
+      >
         <MobileBar context={context} others={memberships.data ?? []} onMenu={() => setDrawer(true)} />
         <VerifyBanner />
-        <main id="main" className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+        <main id="main" className="relative min-h-0 min-w-0 flex-1 overflow-y-auto">
           <Outlet context={context} />
         </main>
       </div>
@@ -175,6 +201,7 @@ export function OrgLayout() {
         onClose={() => setDialog(null)}
       />
     </div>
+    </RailContext.Provider>
     </UndoProvider>
   );
 }
@@ -229,6 +256,7 @@ function Rail({ context, others, drawer }: { context: OrgContext; others: Member
   const agents = useAgents(orgId).data ?? [];
   const navigate = useNavigate();
   const { teamId: currentTeam } = useParams();
+  const collapsed = useRail()?.collapsed ?? false;
   const newIssue = () => {
     const teamId = currentTeam ?? teams.data?.[0]?.id;
     if (teamId) navigate(`/${slug}/teams/${teamId}?create=1`);
@@ -238,7 +266,9 @@ function Rail({ context, others, drawer }: { context: OrgContext; others: Member
     <nav
       aria-label="Organization"
       className={cn(
-        "sticky top-0 flex h-dvh w-[240px] shrink-0 flex-col gap-4 overflow-y-auto border-e border-line bg-rail px-2 pt-2.5 pb-2",
+        "sticky top-0 flex h-dvh w-[240px] shrink-0 flex-col gap-4 overflow-y-auto bg-rail px-2 pt-2.5 pb-2",
+        "transition-[opacity,translate] duration-(--duration-slow) ease-standard motion-reduce:transition-none",
+        collapsed && "md:-translate-x-6 md:opacity-0",
         drawer ? "motion-drawer max-md:fixed max-md:inset-y-0 max-md:start-0 max-md:z-40 max-md:w-[min(280px,85vw)] max-md:shadow-overlay" : "max-md:hidden",
       )}
     >
@@ -257,6 +287,7 @@ function Rail({ context, others, drawer }: { context: OrgContext; others: Member
               <SquarePen aria-hidden="true" className="size-4" strokeWidth={1.75} />
             </button>
           ) : null}
+          <RailToggle className="max-md:hidden" />
         </div>
         <button
           type="button"
@@ -456,7 +487,7 @@ function AgentRow({ agent, members, slug, orgId }: { agent: Agent; members: Memb
         className={cn(railItem, open ? "bg-hover" : "hover:bg-hover")}
       >
         <Avatar name={agent.name} kind="agent" size={18} />
-        <span className="min-w-0 truncate font-medium text-agent-ink">{agent.name}</span>
+        <span className="min-w-0 truncate">{agent.name}</span>
         {state ? (
           <ProgressBadge state={state} className="ms-auto h-[18px] px-1.5" />
         ) : (
@@ -468,7 +499,7 @@ function AgentRow({ agent, members, slug, orgId }: { agent: Agent; members: Memb
           to={`/${slug}/issue/${live.identifier}`}
           className="flex min-w-0 items-baseline gap-1.5 rounded-xs ps-[34px] pe-2 pb-1 text-sm text-ink-2 hover:text-ink"
         >
-          <span className="shrink-0 font-medium text-agent-ink tabular-nums">{live.identifier}</span>
+          <span className="shrink-0 font-medium tabular-nums">{live.identifier}</span>
           <span className="truncate">{live.title}</span>
         </Link>
       ) : null}
@@ -573,3 +604,4 @@ function NewIssueButton({ slug, orgId }: { slug: string; orgId: string }) {
     </button>
   );
 }
+

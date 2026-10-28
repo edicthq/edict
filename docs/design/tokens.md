@@ -11,7 +11,7 @@ These tokens move into `packages/ui` before any product UI is built. OKLCH is th
 3. **Status and priority stay neutral.** Their icons carry the meaning through shape, not color. Done is ink, not green.
 4. **Amber and red are only for an agent waiting on a human.** Amber means "needs input", red means "blocked". They appear nowhere else.
 5. **One sans for everything.** Monospace is only for code and paths, never for UI copy or agent messages.
-6. **Hairlines separate surfaces.** Shadows are only for things floating above the page: the peek, the agent panel, the palette, menus, dialogs and toasts.
+6. **Depth has three levels.** The window (`rail`), the page panel inset on it, and floating layers over both: the peek, the agent panel, the palette, menus, dialogs and toasts. Hairlines separate things inside a level. Cards on the page take a contact shadow and nothing else does.
 7. **Motion explains what changed.** Things enter, leave and move so the eye can follow them, quickly and once. Only a live agent run loops. (Rule 7 was "motion only means an agent is working now" until the feel pass of 2026-10-21.)
 
 ## Color
@@ -20,8 +20,8 @@ These tokens move into `packages/ui` before any product UI is built. OKLCH is th
 
 | Role | Use | Light | Dark |
 |---|---|---|---|
-| `bg` | Page background | `oklch(0.982 0.003 255)` `#f8f9fb` | `oklch(0.16 0.006 260)` |
-| `rail` | Sidebar | `oklch(0.965 0.004 255)` `#f2f4f6` | `oklch(0.14 0.006 260)` |
+| `bg` | The page panel | `oklch(0.99 0.002 255)` | `oklch(0.17 0.006 260)` |
+| `rail` | The window and the sidebar on it | `oklch(0.958 0.004 255)` | `oklch(0.135 0.006 260)` |
 | `surface` | Cards, settings cards, inputs | `oklch(0.998 0.001 255)` `#fefeff` | `oklch(0.19 0.007 260)` |
 | `raised` | Floating layers: the peek, the agent panel, the palette, menus, dialogs, toasts | `oklch(1 0 0)` | `oklch(0.215 0.008 260)` |
 | `hover` | Hover, selected row, code background, segmented control | `ink` at 5.5% | white at 6% |
@@ -55,7 +55,7 @@ The accent is a hue `H`, a chroma `C` and a light-theme lightness `L`. Every age
 |---|---|---|---|
 | `agent` | Agent avatar fill, live dot, live row bar, pulse ring | `oklch(L C H)` | `oklch(0.64 0.85C H)` |
 | `on-agent` | Initials on the agent avatar | `oklch(0.99 0.01 H)` | `oklch(0.17 0.02 H)` |
-| `agent-ink` | Agent names, "Working" badge text, "N live runs" | `oklch(L−0.06 C H)` | `oklch(0.8 0.6C H)` |
+| `agent-ink` | "Working" badge text, "N live runs", an agent named in running text | `oklch(L−0.06 C H)` | `oklch(0.8 0.6C H)` |
 | `agent-wash` | "Working" badge background, inline code in agent messages, flash after an agent change | `agent` at 9% | `agent` at 15% |
 | `agent-edge` | Outline of live agent cards and the lane's border | `agent` at 45% | `agent` at 55% |
 | `lane` | Agent lane background | `oklch(0.978 0.008 H)` | `oklch(0.185 0.016 H)` |
@@ -96,7 +96,7 @@ Labels keep a hue from their definition. The dot is `oklch(0.66 0.1 h)` in light
 | Token | Size / line height | Weight | Tracking | Use |
 |---|---|---|---|---|
 | `text-meta` | 11 / 1.3 | 400–500 | 0 | Badges, timestamps, counts, kbd |
-| `text-sm` | 12 / 1.45 | 400–600 | 0 | Identifiers, secondary text, section labels, label pills, agent line on rows |
+| `text-sm` | 12 / 1.45 | 400–600 | 0 | Identifiers, secondary text, section labels, label pills |
 | `text-ui` | 13 / 1.45 | 400–600 | 0 | Default UI, agent progress messages, comments in the lane |
 | `text-body` | 14 / 1.6 | 400 | 0 | Row titles (−0.005em), descriptions, comments. Measure capped at 68ch |
 | `text-lg` | 16 / 1.4 | 600 | −0.01em | Palette input, headings inside markdown |
@@ -122,7 +122,7 @@ Section labels are sentence case at `text-sm` 600 in `ink-2`, never uppercase. N
 | Size | Value |
 |---|---|
 | Rail width | 240 |
-| List row | 40 high (8 vertical padding). The agent line adds 20 |
+| List row | 40 high (8 vertical padding) |
 | Group header | 34 |
 | Peek | up to 1000 wide, 8 from the viewport edges. Agent lane 360 |
 | Board column | 256 |
@@ -142,10 +142,14 @@ Agent avatars are rounded squares at 28% of their size (5 at 18, 6 at 22, 9 at 3
 
 ## Elevation
 
-Hairlines (`line`) by default. Only floating layers get a shadow, on `raised`:
+Three levels. The window is `rail`. The page is a panel on it, inset 8px on a wide screen with a 10px radius (full bleed on a phone), and floating layers sit on `raised` over both.
 
-- Light: a 1px `ink` ring at 8%, then `0 1px 2px` at 6%, `0 8px 16px -8px` at 12% and `0 24px 48px -16px` at 22%.
-- Dark: a 1px inner top highlight of white at 5%, a 1px white ring at 8%, then `0 4px 12px -4px` black at 45% and `0 24px 56px -16px` black at 70%.
+- **Panel** (`shadow-panel`). Light: a 1px `ink` ring at 8%, `0 1px 2px` at 4% and `0 4px 14px -6px` at 8%. Dark: a 1px inner top highlight of white at 4%, a 1px white ring at 7%, and `0 8px 24px -12px` black at 50%.
+- **Card** (`shadow-card`, `shadow-card-hover`), on board cards only: a hairline inset ring and a 1–2px contact shadow; hover takes `line-strong` and a slightly deeper drop. Dark adds a white top highlight at 3.5%.
+- **Floating layers** (`shadow-overlay`):
+
+  - Light: a 1px `ink` ring at 8%, then `0 1px 2px` at 6%, `0 8px 16px -8px` at 12% and `0 24px 48px -16px` at 22%.
+  - Dark: a 1px inner top highlight of white at 5%, a 1px white ring at 8%, then `0 4px 12px -4px` black at 45% and `0 24px 56px -16px` black at 70%.
 
 ## Motion
 
@@ -183,7 +187,7 @@ With `prefers-reduced-motion: reduce`, distances and scales drop to zero (`--mot
 
 - **Agent avatar**: rounded square, `agent` fill, `on-agent` initials, the `pulse-live` ring while a run is live.
 - **State badge**: `text-meta` 500, `radius-full`, 20 high, sentence case. Working: `agent-wash` and `agent-ink` with a blinking dot. Needs input: `warn-wash` and `warn`. Blocked: `danger-wash` and `danger`. Quiet (Working with no word from the agent for 30 minutes): `hover` and `ink-2`, no dot, and the row's live bar and the lane's thinking dots stop. Done and Delegated: `hover` and `ink-2`.
-- **Delegated row**: a 3px bar on the leading edge (`line-strong`, or `agent` while live) and a second line with the agent's name in `agent-ink`, the badge, the run timer and the first line of the latest update in `ink-2`.
+- **Delegated row**: a 3px bar on the leading edge (`agent` while live) and, while the agent is working, needs input or is blocked, its state badge after the title.
 - **Agent lane**: `lane` background, `agent-edge` border while live, updates on a 2px `agent-edge` rule (`warn` or `danger` when waiting on a human), links as outlined chips.
 - **Focus**: a 2px `focus` outline, 2px offset, on `:focus-visible` only. Fields instead firm their edge to `ink-2` and take a 3px `focus-soft` halo, since a field you type in stays focused for long. The list cursor is a 1.5px `focus` ring inside the row on a `hover` background.
 - **Controls**: checkboxes, radios and switches are the native inputs drawn in the tokens: `line-strong` when off, `ink` when on, the focus halo. Choosing one of a few values is a `SelectMenu`, the app's menu behind a button; a date is the app's calendar.
@@ -194,6 +198,7 @@ The polish pass before v1.0 settled how screens are put together, on top of thes
 
 ### One page frame
 
+- The page is a panel inset from the window, with the rail as the frame around it. `[` or the button beside New issue folds the rail away: its column narrows while it slides 24px and fades, and the panel takes the room. Folded, the page bar leads with the button that brings it back. It stays as it was left, across reloads.
 - Every page starts with a 48px page bar on a hairline: the title, led by a team key or a breadcrumb (Projects › name), then a status such as a live "Claude is working" pill, then the page's actions. At most one ink button.
 - The bar stays put while the page scrolls. In the desktop app it is also the handle to drag the window by.
 - A page with view options puts them in a toolbar under the bar, at least 44 high. No page has a big title above its content.
@@ -202,13 +207,14 @@ The polish pass before v1.0 settled how screens are put together, on top of thes
 ### One issue row
 
 - An issue looks the same wherever it is listed: a team's list, My issues, a project, the inbox. In order: priority, identifier, status, title, labels, the people on it and how long ago it changed.
-- An issue delegated to an agent gets a second line: the agent's name in `agent-ink`, its state badge and the first line of its latest update. A 3px bar on the leading edge turns `agent` only while the run is live.
+- A row is one line. What an agent said lives in the issue, not the row. A delegate that is working, needs input or is blocked shows its state badge after the title; otherwise its square beside the assignee is enough. A 3px bar on the leading edge turns `agent` only while the run is live.
+- A list's group headings sit on a faint band (`hover` at 60%), so each group reads as one block.
 - The assignee's circle and the delegate's square sit side by side, never overlapping.
 
 ### A calmer rail
 
 - From the top: the workspace button with New issue beside it, the search field, then Inbox, My issues and Projects.
-- Agents follow, one line each, with their state badge and the issue a working agent is on.
+- Agents follow, one line each, with their state badge and the issue a working agent is on. Names are ink; the avatar says agent.
 - Then teams, each opening to Issues and Board. Connect an agent, Members, Trash, Settings and the person's own name sit at the bottom.
 
 ### Agents at a glance
@@ -225,7 +231,7 @@ The polish pass before v1.0 settled how screens are put together, on top of thes
 
 ### On a phone
 
-- Below 640px a row takes two lines: the status and a title that wraps, then priority, identifier, two labels as plain dots and the people. The agent line follows, and the age goes.
+- Below 640px a row takes two lines: the status and a title that wraps, then priority, identifier, two labels as plain dots and the people. The age goes.
 - Below 768px the rail opens as a drawer from a 48px top bar holding the workspace, search, the inbox with its unread count, and the menu.
 - A page's toolbar folds into one View sheet, and New issue is a 52px ink button floating over the lists.
 
@@ -237,7 +243,8 @@ The polish pass before v1.0 settled how screens are put together, on top of thes
 - No native selects, radios, checkboxes or date inputs in the browser's own look. Use `SelectMenu`, the app's calendar, and the drawn `Checkbox`, `Radio` and `Switch`.
 - No hard 2px rings on fields, and no bright outline on a chosen card or swatch. Focus and choice are quiet.
 - No motion that loops unless an agent run is live, no `transition: all`, and nothing that animates on every render.
-- No shadows on cards in the page.
+- No shadows in the page beyond the board cards' contact shadow.
+- No agent names in the agent color beside their avatar. The color is for avatars and live states.
 - No overlapping avatar pairs.
 - No section whose only content is "No X."
 

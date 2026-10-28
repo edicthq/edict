@@ -6,15 +6,18 @@
    - The accent means "agent". Human actions, links, focus and selection never use it.
    - The one filled button on a screen is ink, never the accent.
    - Amber and red only mean an agent is waiting on a human.
-   - Hairlines separate surfaces. Shadows only for floating layers.
+   - Hairlines separate surfaces. Depth comes from three levels: the window
+     (rail), the page panel on it, and floating layers over both. Cards on the
+     page take a contact shadow; nothing else does.
    - Motion explains what changed: things enter, leave and move. Only a live
      agent loops. */
 
 @import "@fontsource-variable/instrument-sans";
 
 :root {
-  --bg: oklch(0.982 0.003 255);
-  --rail: oklch(0.965 0.004 255);
+  /* The window is the rail's color; the page sits on it as a lighter panel. */
+  --bg: oklch(0.99 0.002 255);
+  --rail: oklch(0.958 0.004 255);
   --surface: oklch(0.998 0.001 255);
   /* Floating layers: the peek, the palette, menus, dialogs, toasts. */
   --raised: oklch(1 0 0);
@@ -37,6 +40,12 @@
   --danger-wash: oklch(0.62 0.2 27 / 0.1);
   --overlay-shadow: 0 0 0 1px oklch(0.22 0.02 260 / 0.08), 0 1px 2px oklch(0.2 0.02 260 / 0.06),
     0 8px 16px -8px oklch(0.2 0.02 260 / 0.12), 0 24px 48px -16px oklch(0.2 0.02 260 / 0.22);
+  /* The page panel: an edge and a soft lift off the window. */
+  --panel-shadow: 0 0 0 1px oklch(0.22 0.02 260 / 0.08), 0 1px 2px oklch(0.2 0.02 260 / 0.04),
+    0 4px 14px -6px oklch(0.2 0.02 260 / 0.08);
+  /* A card on the page, like a board card: an edge and a contact shadow. */
+  --card-shadow: inset 0 0 0 1px var(--line), 0 1px 2px oklch(0.2 0.02 260 / 0.05);
+  --card-shadow-hover: inset 0 0 0 1px var(--line-strong), 0 2px 6px -2px oklch(0.2 0.02 260 / 0.1);
   /* Label dots: oklch(label-l label-c hue). Decorative, never a state. */
   --label-l: 0.66;
   --label-c: 0.1;
@@ -66,8 +75,8 @@
 /* Dark follows the system unless the person chose a theme (data-theme on the
    root, set from Appearance in the rail). */
 :root[data-theme="dark"] {
-    --bg: oklch(0.16 0.006 260);
-    --rail: oklch(0.14 0.006 260);
+    --bg: oklch(0.17 0.006 260);
+    --rail: oklch(0.135 0.006 260);
     --surface: oklch(0.19 0.007 260);
     --raised: oklch(0.215 0.008 260);
     --hover: oklch(1 0 0 / 0.06);
@@ -87,6 +96,10 @@
     --danger-wash: oklch(0.7 0.17 25 / 0.15);
     --overlay-shadow: inset 0 1px 0 oklch(1 0 0 / 0.05), 0 0 0 1px oklch(1 0 0 / 0.08),
       0 4px 12px -4px oklch(0 0 0 / 0.45), 0 24px 56px -16px oklch(0 0 0 / 0.7);
+    --panel-shadow: inset 0 1px 0 oklch(1 0 0 / 0.04), 0 0 0 1px oklch(1 0 0 / 0.07),
+      0 8px 24px -12px oklch(0 0 0 / 0.5);
+    --card-shadow: inset 0 1px 0 oklch(1 0 0 / 0.035), inset 0 0 0 1px var(--line), 0 1px 2px oklch(0 0 0 / 0.3);
+    --card-shadow-hover: inset 0 1px 0 oklch(1 0 0 / 0.05), inset 0 0 0 1px var(--line-strong), 0 4px 10px -4px oklch(0 0 0 / 0.5);
     --label-l: 0.72;
     --label-c: 0.09;
     color-scheme: dark;
@@ -103,8 +116,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: oklch(0.16 0.006 260);
-      --rail: oklch(0.14 0.006 260);
+    --bg: oklch(0.17 0.006 260);
+      --rail: oklch(0.135 0.006 260);
       --surface: oklch(0.19 0.007 260);
     --raised: oklch(0.215 0.008 260);
       --hover: oklch(1 0 0 / 0.06);
@@ -124,6 +137,10 @@
       --danger-wash: oklch(0.7 0.17 25 / 0.15);
       --overlay-shadow: inset 0 1px 0 oklch(1 0 0 / 0.05), 0 0 0 1px oklch(1 0 0 / 0.08),
       0 4px 12px -4px oklch(0 0 0 / 0.45), 0 24px 56px -16px oklch(0 0 0 / 0.7);
+      --panel-shadow: inset 0 1px 0 oklch(1 0 0 / 0.04), 0 0 0 1px oklch(1 0 0 / 0.07),
+        0 8px 24px -12px oklch(0 0 0 / 0.5);
+      --card-shadow: inset 0 1px 0 oklch(1 0 0 / 0.035), inset 0 0 0 1px var(--line), 0 1px 2px oklch(0 0 0 / 0.3);
+      --card-shadow-hover: inset 0 1px 0 oklch(1 0 0 / 0.05), inset 0 0 0 1px var(--line-strong), 0 4px 10px -4px oklch(0 0 0 / 0.5);
       --label-l: 0.72;
       --label-c: 0.09;
       color-scheme: dark;
@@ -233,6 +250,9 @@
 
   --shadow-*: initial;
   --shadow-overlay: var(--overlay-shadow);
+  --shadow-panel: var(--panel-shadow);
+  --shadow-card: var(--card-shadow);
+  --shadow-card-hover: var(--card-shadow-hover);
 
   /* Motion (tokens.md). Things enter on a fast-out curve and leave quicker
      than they came, accelerating away. State changes in place use standard. */
@@ -261,7 +281,7 @@
 
 @layer base {
   html {
-    background: var(--bg);
+    background: var(--rail);
     color: var(--ink);
     font-family: var(--font-sans);
     font-size: 13px;

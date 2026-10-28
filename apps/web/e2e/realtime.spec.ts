@@ -79,7 +79,8 @@ test("an agent's progress reaches the lane, the row, the rail and the roster at 
   const soon = { timeout: 1_500 };
   await expect(peek.getByText("Tracing the stale badge")).toBeVisible(soon);
   await expect(peek.getByText(`${agentName} is working`)).toBeVisible(soon);
-  await expect(page.getByRole("button", { name: /ENG-1 Keep the panel current.*Tracing the stale badge/ })).toBeVisible(soon);
+  // The row says the agent is working; what it said stays in the lane.
+  await expect(page.getByRole("button", { name: /ENG-1 Keep the panel current.*Working/ })).toBeVisible(soon);
   for (const window of [page, roster]) {
     const rail = window.getByRole("navigation", { name: "Organization" }).first();
     await expect(rail.getByRole("link", { name: new RegExp(agentName) }).first()).toContainText("Working", soon);
@@ -88,7 +89,7 @@ test("an agent's progress reaches the lane, the row, the rail and the roster at 
   await expect(roster.locator("button[id]", { hasText: agentName })).toContainText("Working", soon);
 
   await post("blocked", "The fixture has no agent.");
-  await expect(page.getByRole("button", { name: /ENG-1 Keep the panel current.*The fixture has no agent/ })).toBeVisible(soon);
+  await expect(page.getByRole("button", { name: /ENG-1 Keep the panel current.*Blocked/ })).toBeVisible(soon);
   await expect(roster.locator("button[id]", { hasText: agentName })).toContainText("Blocked", soon);
 });
 
@@ -161,7 +162,8 @@ test("nothing polls while the socket is up; while it is down the panels poll, an
   down = false;
   await pass(35_000);
   await expect.poll(() => subscriptions).toBe(2);
-  await expect(page.getByRole("button", { name: /ENG-1 Keep the panel current.*Which branch/ })).toBeVisible();
+  await expect(peek.getByText("Which branch should this land on?")).toBeVisible();
+  await expect(page.getByRole("button", { name: /ENG-1 Keep the panel current.*Needs input/ })).toBeVisible();
   const reconnected = requests.length;
   await pass(60_000);
   expect(requests.slice(reconnected)).toEqual([]);
@@ -181,8 +183,9 @@ test("Working turns quiet after half an hour without a word from the agent", asy
   await expect(peek.getByText(`${agentName} is working`)).toBeHidden();
   await expect(peek.getByText("No word from Ferro for 31m")).toBeVisible();
   const row = page.getByRole("button", { name: /ENG-1 Keep the panel current/ });
-  await expect(row).toContainText("Quiet");
+  // A quiet agent asks nothing of anyone, so the row shows no badge.
   await expect(row).not.toContainText("Working");
+  await expect(row).not.toContainText("Quiet");
   const rail = page.getByRole("navigation", { name: "Organization" }).first();
   await expect(rail.getByRole("link", { name: /ENG-1 Keep the panel current/ })).toBeHidden();
 });

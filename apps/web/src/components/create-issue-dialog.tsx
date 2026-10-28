@@ -204,7 +204,7 @@ function CreateIssueForm({
       </div>
       {delegate ? (
         <p className="-mt-2 px-5 pb-4 text-sm text-ink-2">
-          <span className="font-medium text-agent-ink">{delegate.name}</span> · {connectionLine(delegate, orgMembers)}
+          <span className="font-medium">{delegate.name}</span> · {connectionLine(delegate, orgMembers)}
         </p>
       ) : null}
       <div className="flex flex-col gap-3 border-t border-line px-5 py-3">

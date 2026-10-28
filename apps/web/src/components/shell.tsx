@@ -3,6 +3,8 @@ import { Link } from "react-router";
 import { LogoMark, cn } from "@edicthq/ui";
 import { Minus, Square, X } from "lucide-react";
 import { desktopShell, windowCommand } from "../lib/desktop.js";
+import { useRail } from "../lib/rail.js";
+import { RailToggle } from "./rail-toggle.js";
 
 // Sign-in, sign-up, onboarding and invite pages: one narrow column, centered,
 // under a soft light from the top of the page. No card: the mark, the
@@ -20,7 +22,7 @@ export function AuthShell({
   children?: ReactNode;
 }) {
   return (
-    <div className="flex min-h-dvh flex-col bg-[radial-gradient(70%_45%_at_50%_0%,var(--glow),transparent_75%)] px-6">
+    <div className="flex min-h-dvh flex-col bg-bg bg-[radial-gradient(70%_45%_at_50%_0%,var(--glow),transparent_75%)] px-6">
       {desktopShell() ? (
         <div data-tauri-drag-region className="fixed inset-x-0 top-0 z-10 flex h-12 justify-end pe-2">
           <WindowControls />
@@ -67,11 +69,18 @@ export function PageHeader({
   status?: ReactNode;
   actions?: ReactNode;
 }) {
+  // With the rail folded away the bar leads with the button that brings it
+  // back, and in the macOS app it clears the traffic lights the rail held.
+  const collapsed = useRail()?.collapsed ?? false;
   return (
     <header
       data-tauri-drag-region
-      className="app-bar sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2.5 border-b border-line bg-bg ps-6 pe-4"
+      className={cn(
+        "app-bar sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2.5 border-b border-line bg-bg ps-6 pe-4",
+        collapsed && "md:ps-3 md:[[data-title-bar=overlay]_&]:ps-[76px]",
+      )}
     >
+      {collapsed ? <RailToggle className="motion-fade -me-1 max-md:hidden" /> : null}
       <div data-tauri-drag-region className="flex min-w-0 items-center gap-2">
         {lead}
         <h1 data-tauri-drag-region className="truncate text-body font-semibold tracking-[-0.005em]">
