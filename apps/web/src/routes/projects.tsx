@@ -500,7 +500,7 @@ function ProjectIssues({
               ) : null}
             </button>
             {folded ? null : (
-              <ul className="flex flex-col gap-px">
+              <ul className="mt-1 flex flex-col gap-px">
                 {group.issues.map((issue) => (
                   <li key={issue.id}>
                     <IssueRowLink

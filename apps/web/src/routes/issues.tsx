@@ -1068,7 +1068,8 @@ function IssueList({
               <GroupHeading group={group} statuses={statuses} />
             </div>
           </div>
-          <ul className="flex flex-col gap-px">
+          {/* A 4px gap under the band, so a hovered row never runs into it. */}
+          <ul className="mt-1 flex flex-col gap-px">
             {group.issues.map((issue) => {
               const isSelected = selectedIds.has(issue.id);
               return (
@@ -1319,14 +1320,14 @@ function ArchivedIssues({ orgId, team, onOpen }: { orgId: string; team: Team; on
   const list = archived.data?.pages.flat() ?? [];
   return (
     // The bottom padding keeps the last row clear of the bulk-edit bar.
-    <section aria-label="Archived issues" className="px-4 pt-1 pb-28">
+    <section aria-label="Archived issues" className="px-3 pt-1 pb-28">
       {shown ? (
         <>
-          <h2 className="px-4 pb-1 text-sm font-semibold text-ink-2">Archived</h2>
+          <h2 className="px-3 pb-1 text-sm font-semibold text-ink-2">Archived</h2>
           {archived.isPending ? (
             <Loading label="Loading archived issues" />
           ) : list.length === 0 ? (
-            <p className="px-4 text-ui text-ink-2">Nothing is archived in {team.key} yet.</p>
+            <p className="px-3 text-ui text-ink-2">Nothing is archived in {team.key} yet.</p>
           ) : (
             <ul className="flex flex-col gap-px">
               {list.map((issue) => (
