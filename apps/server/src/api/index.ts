@@ -1,6 +1,7 @@
 import type { SignInProviders } from "../env.js";
 import { DEFAULT_MAX_ATTACHMENT_BYTES } from "../env.js";
 import { localDiskStorage } from "../storage.js";
+import { agentHookRoutes } from "./agent-hooks.js";
 import { agentRoutes } from "./agents.js";
 import { attachmentRoutes, type AttachmentDeps } from "./attachments.js";
 import { changeRoutes } from "./changes.js";
@@ -53,6 +54,7 @@ export function createApi(deps: AttachmentDeps & WebhookDeps & { signIn?: SignIn
   api.route("/", labelRoutes(deps));
   api.route("/", relationRoutes(deps));
   api.route("/", agentRoutes(deps));
+  api.route("/", agentHookRoutes(deps));
   api.route("/", connectionRoutes(deps));
   api.route("/", inviteRoutes(deps));
   api.route("/", eventRoutes(deps));

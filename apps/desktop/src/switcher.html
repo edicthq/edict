@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Instances</title>
+    <link rel="stylesheet" href="shell.css" />
+    <style>
+      html, body { height: 100%; overflow: hidden; }
+      body { background: var(--surface); }
+      main { height: 100%; display: flex; flex-direction: column; }
+
+      header { border-bottom: 1px solid var(--line); }
+      #filter {
+        display: block;
+        flex: 1;
+        min-width: 0;
+        height: 100%;
+        padding: 0 16px;
+        border: 0;
+        background: transparent;
+        font-size: 16px;
+        line-height: 1.4;
+      }
+      #filter::placeholder { color: var(--ink-2); }
+      #filter:focus-visible { outline: none; }
+      [data-platform="macos"] #filter { padding-left: 0; }
+
+      #list { flex: 1; margin: 0; padding: 6px; list-style: none; overflow-y: auto; }
+      .row {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 40px;
+        padding: 0 6px 0 10px;
+        border-radius: 6px;
+      }
+      .row[aria-selected="true"] { background: var(--hover); }
+      .label { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+      .name { flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+      .host { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); font-size: 12px; }
+      kbd {
+        flex: none;
+        min-width: 20px;
+        padding: 0 4px;
+        border-radius: 4px;
+        font: 500 11px/18px var(--font);
+        text-align: center;
+        color: var(--ink-2);
+        font-variant-numeric: tabular-nums;
+      }
+      .menu kbd { background: none; }
+      .row[aria-selected="true"] kbd { background: var(--surface); }
+      .check { flex: none; width: 16px; height: 16px; color: var(--ink); }
+      .more {
+        flex: none;
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--ink-2);
+        opacity: 0;
+        transition: opacity 140ms var(--ease), background-color 140ms var(--ease);
+      }
+      .row:hover .more, .row[aria-selected="true"] .more, .more[aria-expanded="true"] { opacity: 1; }
+      .more:hover, .more[aria-expanded="true"] { background: var(--line); color: var(--ink); }
+      .more svg { width: 16px; height: 16px; }
+      .rename { height: 28px; font-weight: 500; }
+      .confirm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .row .quiet { flex: none; }
+      #list:empty { display: none; }
+      #empty { flex: 1; margin: 0; padding: 24px 16px; color: var(--ink-2); text-align: center; text-wrap: pretty; }
+
+      .menu {
+        position: absolute;
+        right: 6px;
+        top: 36px;
+        z-index: 1;
+        min-width: 168px;
+        margin: 0;
+        padding: 4px;
+        list-style: none;
+        border-radius: 10px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+      @media (prefers-color-scheme: light) { .menu { border: 1px solid var(--line); } }
+      .menu button {
+        display: flex;
+        width: 100%;
+        height: 28px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 0 8px;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        text-align: left;
+      }
+      .menu button:hover, .menu button:focus-visible { background: var(--hover); outline: none; }
+
+      footer { flex: none; padding: 12px 16px 16px; border-top: 1px solid var(--line); background: var(--bg); }
+      footer form { display: flex; flex-direction: column; gap: 8px; }
+      footer label { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+      .add { display: flex; gap: 8px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="titlebar" data-tauri-drag-region>
+        <input
+          id="filter"
+          type="text"
+          role="combobox"
+          aria-label="Find an instance"
+          aria-controls="list"
+          aria-expanded="true"
+          aria-autocomplete="list"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          placeholder="Find an instance…"
+          autofocus
+        />
+        <div class="window-controls" id="window-controls"></div>
+      </header>
+      <div id="list" role="listbox" aria-label="Saved instances"></div>
+      <p id="empty" hidden></p>
+      <footer>
+        <form id="add">
+          <label for="address">Add an instance</label>
+          <div class="add">
+            <input class="field" id="address" name="address" type="text" inputmode="url" autocomplete="url" autocapitalize="off" spellcheck="false" placeholder="edict.example.com" required />
+            <button class="primary" type="submit">Add</button>
+          </div>
+          <p id="error" class="error" role="alert"></p>
+        </form>
+      </footer>
+    </main>
+    <script src="chrome.js"></script>
+    <script src="switcher.js"></script>
+  </body>
+</html>

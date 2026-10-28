@@ -12,6 +12,9 @@ export default defineConfig({
   reporter: process.env.CI ? "github" : "list",
   use: {
     trace: "retain-on-failure",
+    // Layers leave at once and nothing slides (tokens.md, Motion), so a test
+    // never meets a menu or peek that is still on its way out.
+    contextOptions: { reducedMotion: "reduce" },
   },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },

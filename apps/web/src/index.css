@@ -11,3 +11,18 @@
   height: 0;
   pointer-events: none;
 }
+
+/* The desktop app (lib/desktop.ts marks the root). Its chrome behaves like an
+   app's: no text selection on bars and the rail, the arrow cursor on controls,
+   and no rubber-band scrolling of the whole window. */
+[data-desktop],
+[data-desktop] body {
+  overscroll-behavior: none;
+}
+[data-desktop] :is(nav, .app-bar, [role="toolbar"], [role="tablist"]) {
+  -webkit-user-select: none;
+  user-select: none;
+}
+[data-desktop] :is(button, summary, [role="tab"], [role="option"], nav a, .app-bar a) {
+  cursor: default;
+}

@@ -4,7 +4,7 @@ import { sql } from "drizzle-orm";
 import { inScope, type Database, type Transaction } from "@edicthq/db";
 import { ErrorResponse, Id, type ErrorCode } from "@edicthq/schema";
 import type { Mailer } from "../email.js";
-import { callerIn, credentialOf, scopeFor, type Caller, type Credential, type SessionUser } from "./callers.js";
+import { callerIn, credentialOf, scopeFor, type Caller, type CallerOptions, type Credential, type SessionUser } from "./callers.js";
 import { errorResponse, forbidden, onApiError, unauthorized } from "./errors.js";
 import { mayActUnverified } from "../instance.js";
 import type { AgentLimits, RequestLimiter } from "./rate-limit.js";
@@ -92,10 +92,11 @@ export function inOrg<T>(
   c: Context<ApiEnv>,
   orgId: string,
   fn: (tx: Transaction, caller: Caller) => Promise<T>,
+  options: CallerOptions = {},
 ): Promise<T> {
   const found = credential(c);
   return inScope(deps.db, { ...scopeFor(found), orgId }, async (tx) => {
-    const result = await fn(tx, await callerIn(tx, orgId, found));
+    const result = await fn(tx, await callerIn(tx, orgId, found, options));
     if (c.req.method !== "GET") {
       const { rows } = await tx.execute<{ change_id: string | null }>(sql`
         SELECT change_id FROM events

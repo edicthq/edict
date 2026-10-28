@@ -35,7 +35,7 @@ test("Milestone 6: the instance admin sees a newer release and can turn the chec
     "https://github.com/edicthq/edict/releases/tag/v99.0.0",
   );
 
-  await updates.getByRole("checkbox", { name: /Check for new releases/ }).uncheck();
+  await updates.getByRole("switch", { name: /Check for new releases/ }).uncheck();
   await expect(updates.getByText("Off. Edict does not look for new releases.")).toBeVisible();
   await expect(updates.getByRole("button", { name: "Check now" })).toHaveCount(0);
 });
@@ -51,9 +51,9 @@ test("Milestone 6: the instance admin sees the exact telemetry payload and turns
   expect(Object.keys(payload).sort()).toEqual(["users", "version"]);
   expect(payload.version).toBe(version);
 
-  const toggle = section.getByRole("checkbox", { name: /Share usage numbers/ });
+  const toggle = section.getByRole("switch", { name: /Share usage numbers/ });
   await expect(toggle).not.toBeChecked();
   await toggle.check();
   await page.reload();
-  await expect(page.getByRole("region", { name: "Telemetry" }).getByRole("checkbox", { name: /Share usage numbers/ })).toBeChecked();
+  await expect(page.getByRole("region", { name: "Telemetry" }).getByRole("switch", { name: /Share usage numbers/ })).toBeChecked();
 });

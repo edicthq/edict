@@ -12,8 +12,8 @@ import { Session } from "./session.js";
 import { registerTools, renderIssue, renderProject } from "./tools.js";
 
 const instructions = `Edict is the issue tracker your team uses. You are an agent member of the organization: issues delegated to you are your queue, and the person assigned still answers for each.
-To do your Edict work: call my_work, then for each issue get_issue, post_progress with state working, do the work, link pull requests, comment with what people should know, update_issue to move its status, and post_progress done.
-Values are names: statuses (or a category like "in progress"), @handles, label names, team keys. A wrong one gets an error listing the valid ones.`;
+To do your Edict work: call my_work, then for each issue get_issue, move it with update_issue, do the work, link pull requests, and comment with what people should know. Edict shows those as your progress, so call post_progress only when you are blocked, need a person, or sum up. To take on an issue that is not in your queue, set its delegate to me.
+Issues are named by identifier, like ENG-123. Values are names: statuses (or a category like "in progress"), @handles, label names, team keys. A wrong one gets an error listing the valid ones.`;
 
 export function mcpRoutes(app: Hono, discovery: OAuthDiscovery): void {
   app.all("/mcp", async (c) => {
@@ -105,7 +105,7 @@ function createServer(session: Session, organizationName: string): McpServer {
           role: "user",
           content: {
             type: "text",
-            text: "Do my Edict work. Call my_work, then take each issue in order: get_issue, post_progress working, do the work, link any pull request, comment with what people should know, move it with update_issue, and post_progress done. If you get stuck, post_progress blocked or needs_input with what you need, and go on to the next issue.",
+            text: "Do my Edict work. Call my_work, then take each issue in order: get_issue, move it to In Progress with update_issue, do the work, link any pull request, comment with what people should know, and move it on with update_issue. If you get stuck, post_progress blocked or needs_input with what you need, and go on to the next issue.",
           },
         },
       ],
@@ -124,7 +124,7 @@ function createServer(session: Session, organizationName: string): McpServer {
           role: "user",
           content: {
             type: "text",
-            text: "Triage my Edict inbox. Call get_inbox, then for each item get_issue to read it. Answer what is asked of you with comment, pick up work delegated to you with post_progress working, and tell me in one line each what you did and what needs me.",
+            text: "Triage my Edict inbox. Call get_inbox, then for each item get_issue to read it. Answer what is asked of you with comment, pick up work delegated to you by moving it to In Progress with update_issue, and tell me in one line each what you did and what needs me.",
           },
         },
       ],

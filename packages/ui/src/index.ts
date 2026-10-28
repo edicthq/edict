@@ -1,10 +1,13 @@
 export { Avatar } from "./avatar.js";
 export { Badge, Count, ProgressBar, ProgressBadge, ProjectStatusBadge, TeamKey, type AgentState } from "./badge.js";
-export { Button, Kbd, type ButtonProps } from "./button.js";
+export { Button, Kbd, buttonClass, type ButtonProps } from "./button.js";
 export { cn } from "./cn.js";
+export { Checkbox, Radio, SelectMenu, Switch } from "./controls.js";
 export { Dialog } from "./dialog.js";
-export { Field, Input, Select, type FieldProps } from "./field.js";
+export { Field, Input, type FieldProps } from "./field.js";
 export { LogoMark } from "./logo.js";
 export { PriorityIcon, StatusIcon } from "./issue-icons.js";
 export { Menu, type MenuItem } from "./menu.js";
+export { useChangeCount, usePresence } from "./presence.js";
+export { Tabs, type TabItem } from "./tabs.js";
 export { LabelDot, LabelPill } from "./label.js";

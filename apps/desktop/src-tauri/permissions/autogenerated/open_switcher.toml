@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-open-switcher"
+description = "Enables the open_switcher command without any pre-configured scope."
+commands.allow = ["open_switcher"]
+
+[[permission]]
+identifier = "deny-open-switcher"
+description = "Denies the open_switcher command without any pre-configured scope."
+commands.deny = ["open_switcher"]

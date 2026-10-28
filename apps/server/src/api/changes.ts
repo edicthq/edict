@@ -26,6 +26,14 @@ import { visibleProject } from "./projects.js";
 type EventRow = typeof events.$inferSelect;
 type FieldChange = { from: unknown; to: unknown };
 
+function undoable(event: EventRow): boolean {
+  if (event.type === "progress.posted") {
+    const source = (event.data as { source?: string }).source;
+    return source === "activity" || source === "hook";
+  }
+  return !!inverses[event.type];
+}
+
 // Undo applies the inverse of each event of a change, newest first, as a new
 // change whose events say which change they undo (ADR 0019). Undoing an undo
 // redoes. Anything the change touched that changed since makes the whole undo
@@ -48,6 +56,9 @@ const inverses: Record<string, (tx: Transaction, caller: Caller, event: EventRow
     await restoreIssues(tx, caller, [issue.id], mark.data);
   },
   "issue.updated": (tx, caller, event, mark) => setIssueBack(tx, caller, event, mark),
+  // Progress is a record. The updates Edict and hooks wrote alongside a change
+  // stay when it is undone (ADR 0029); undoable() turns away an agent's own.
+  "progress.posted": async () => {},
   "link.created": (tx, caller, event, mark) => unlink(tx, caller, event.subjectId, mark.data),
   "link.deleted": (tx, caller, event, mark) =>
     relink(tx, caller, event.subjectId, event.data as Parameters<typeof relink>[3], mark.data),
@@ -473,7 +484,7 @@ export function changeRoutes(deps: ApiDeps) {
       if (rows.some((row) => row.actorId !== caller.id)) {
         throw forbidden("Only the member who made a change can undo it.");
       }
-      const unsupported = [...new Set(rows.map((row) => row.type).filter((type) => !inverses[type]))];
+      const unsupported = [...new Set(rows.filter((row) => !undoable(row)).map((row) => row.type))];
       if (unsupported.length > 0) {
         throw invalid(`This change can't be undone: undo does not cover ${unsupported.join(", ")} yet.`);
       }

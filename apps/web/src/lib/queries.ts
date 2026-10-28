@@ -1,6 +1,7 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Accent, Agent, AgentPower, Attachment, Comment, InboxItem, InstanceStatus, Issue, Label, paths, ProjectStatus, RelationType, Role, SavedView, SavedViewQuery, SignUpMode, Webhook, WebLink } from "@edicthq/client";
+import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { Accent, Agent, AgentPower, ApiKeyScope, Attachment, Comment, InboxItem, InstanceStatus, Issue, Label, paths, ProjectStatus, RelationType, Role, SavedView, SavedViewQuery, SignUpMode, Status, Webhook, WebLink } from "@edicthq/client";
 import { ApiFailure, api, unwrap } from "./api.js";
+import { usePollWhileDown } from "./live.js";
 
 export const keys = {
   memberships: ["memberships"] as const,
@@ -54,6 +55,16 @@ export function useTeams(orgId: string) {
   return useQuery({
     queryKey: keys.teams(orgId),
     queryFn: () => unwrap(api.GET("/organizations/{orgId}/teams", org(orgId))),
+  });
+}
+
+// Open work and members per team. Issue changes elsewhere don't patch it, so
+// it refetches each time the Teams page opens.
+export function useTeamOverview(orgId: string) {
+  return useQuery({
+    queryKey: ["org", orgId, "team-overview"] as const,
+    queryFn: () => unwrap(api.GET("/organizations/{orgId}/team-overview", org(orgId))),
+    refetchOnMount: "always",
   });
 }
 
@@ -275,6 +286,32 @@ export function useStatuses(orgId: string, teamId: string) {
       unwrap(api.GET("/organizations/{orgId}/teams/{teamId}/statuses", { params: { path: { orgId, teamId } } })),
     staleTime: 5 * 60_000,
   });
+}
+
+// Every team's statuses and labels at once, for lists that mix teams like My
+// issues and a project. Each team's query is the one its own page uses, so
+// they share one cache.
+export function useOrgIssueContext(orgId: string): { statuses: Status[]; labels: Label[] } {
+  const teams = useTeams(orgId).data ?? [];
+  const statuses = useQueries({
+    queries: teams.map((team) => ({
+      queryKey: keys.statuses(orgId, team.id),
+      queryFn: () =>
+        unwrap(api.GET("/organizations/{orgId}/teams/{teamId}/statuses", { params: { path: { orgId, teamId: team.id } } })),
+      staleTime: 5 * 60_000,
+    })),
+  });
+  const labels = useQueries({
+    queries: teams.map((team) => ({
+      queryKey: keys.teamLabels(orgId, team.id),
+      queryFn: () =>
+        unwrap(api.GET("/organizations/{orgId}/teams/{teamId}/labels", { params: { path: { orgId, teamId: team.id } } })),
+      staleTime: 5 * 60_000,
+    })),
+  });
+  const byId = new Map<string, Label>();
+  for (const result of labels) for (const label of result.data ?? []) byId.set(label.id, label);
+  return { statuses: statuses.flatMap((result) => result.data ?? []), labels: [...byId.values()] };
 }
 
 // One issue by id or any identifier it has had. Used to resolve links; the
@@ -759,7 +796,7 @@ export function useApiKeys(orgId: string, agentId: string, enabled = true) {
 export function useCreateApiKey(orgId: string, agentId: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (body: { name: string; teamIds: string[] | null }) =>
+    mutationFn: (body: { name: string; teamIds: string[] | null; scope?: ApiKeyScope }) =>
       unwrap(api.POST("/organizations/{orgId}/agents/{agentId}/api-keys", { params: { path: { orgId, agentId } }, body })),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.apiKeys(orgId, agentId) }),
   });
@@ -787,8 +824,8 @@ export function useProgress(orgId: string, issueId: string) {
           params: { path: { orgId, issueRef: issueId }, query: { limit: 100 } },
         }),
       ),
-    // Agents post while the peek is open.
-    refetchInterval: 5000,
+    // Agents post while the peek is open; realtime brings their updates.
+    refetchInterval: usePollWhileDown(5000),
   });
 }
 
@@ -922,7 +959,7 @@ export function useAgentQueue(orgId: string, agentId: string) {
           params: { path: { orgId }, query: { delegateId: agentId, include: "open", limit: 5 } },
         }),
       ),
-    refetchInterval: 15_000,
+    refetchInterval: usePollWhileDown(15_000),
   });
 }
 
@@ -1082,7 +1119,7 @@ export function useInboxUnreadCount(orgId: string) {
   return useQuery({
     queryKey: keys.inboxUnread(orgId),
     queryFn: () => unwrap(api.GET("/organizations/{orgId}/inbox/unread-count", org(orgId))),
-    refetchInterval: 15_000,
+    refetchInterval: usePollWhileDown(15_000),
   });
 }
 

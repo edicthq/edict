@@ -7,7 +7,8 @@
    - The one filled button on a screen is ink, never the accent.
    - Amber and red only mean an agent is waiting on a human.
    - Hairlines separate surfaces. Shadows only for floating layers.
-   - Motion only means an agent is working now. */
+   - Motion explains what changed: things enter, leave and move. Only a live
+     agent loops. */
 
 @import "@fontsource-variable/instrument-sans";
 
@@ -15,9 +16,16 @@
   --bg: oklch(0.982 0.003 255);
   --rail: oklch(0.965 0.004 255);
   --surface: oklch(0.998 0.001 255);
-  --hover: oklch(0.948 0.005 255);
-  --line: oklch(0.91 0.006 255);
-  --line-strong: oklch(0.85 0.008 255);
+  /* Floating layers: the peek, the palette, menus, dialogs, toasts. */
+  --raised: oklch(1 0 0);
+  /* Hover, hairlines and focus are ink at low alpha, so they read the same on
+     every surface they sit on. */
+  --hover: oklch(0.22 0.02 260 / 0.055);
+  --line: oklch(0.22 0.02 260 / 0.1);
+  --line-strong: oklch(0.22 0.02 260 / 0.17);
+  --focus: oklch(0.22 0.016 260 / 0.45);
+  --focus-soft: oklch(0.22 0.016 260 / 0.1);
+  --glow: oklch(1 0 0 / 0.9);
   --ink: oklch(0.22 0.016 260);
   --ink-2: oklch(0.47 0.014 260);
   --ink-3: oklch(0.65 0.01 260);
@@ -27,7 +35,8 @@
   --warn-wash: oklch(0.82 0.14 80 / 0.25);
   --danger: oklch(0.52 0.19 27);
   --danger-wash: oklch(0.62 0.2 27 / 0.1);
-  --overlay-shadow: 0 1px 2px oklch(0.2 0.02 260 / 0.06), 0 20px 48px -16px oklch(0.2 0.02 260 / 0.28);
+  --overlay-shadow: 0 0 0 1px oklch(0.22 0.02 260 / 0.08), 0 1px 2px oklch(0.2 0.02 260 / 0.06),
+    0 8px 16px -8px oklch(0.2 0.02 260 / 0.12), 0 24px 48px -16px oklch(0.2 0.02 260 / 0.22);
   /* Label dots: oklch(label-l label-c hue). Decorative, never a state. */
   --label-l: 0.66;
   --label-c: 0.1;
@@ -57,12 +66,16 @@
 /* Dark follows the system unless the person chose a theme (data-theme on the
    root, set from Appearance in the rail). */
 :root[data-theme="dark"] {
-    --bg: oklch(0.165 0.006 260);
-    --rail: oklch(0.145 0.006 260);
-    --surface: oklch(0.198 0.008 260);
-    --hover: oklch(0.235 0.009 260);
-    --line: oklch(0.262 0.009 260);
-    --line-strong: oklch(0.33 0.011 260);
+    --bg: oklch(0.16 0.006 260);
+    --rail: oklch(0.14 0.006 260);
+    --surface: oklch(0.19 0.007 260);
+    --raised: oklch(0.215 0.008 260);
+    --hover: oklch(1 0 0 / 0.06);
+    --line: oklch(1 0 0 / 0.075);
+    --line-strong: oklch(1 0 0 / 0.14);
+    --focus: oklch(0.95 0.004 255 / 0.4);
+    --focus-soft: oklch(0.95 0.004 255 / 0.08);
+    --glow: oklch(1 0 0 / 0.045);
     --ink: oklch(0.95 0.004 255);
     --ink-2: oklch(0.74 0.009 255);
     --ink-3: oklch(0.56 0.009 255);
@@ -72,7 +85,8 @@
     --warn-wash: oklch(0.8 0.14 80 / 0.14);
     --danger: oklch(0.76 0.14 25);
     --danger-wash: oklch(0.7 0.17 25 / 0.15);
-    --overlay-shadow: 0 0 0 1px oklch(1 0 0 / 0.05), 0 20px 56px -16px oklch(0 0 0 / 0.75);
+    --overlay-shadow: inset 0 1px 0 oklch(1 0 0 / 0.05), 0 0 0 1px oklch(1 0 0 / 0.08),
+      0 4px 12px -4px oklch(0 0 0 / 0.45), 0 24px 56px -16px oklch(0 0 0 / 0.7);
     --label-l: 0.72;
     --label-c: 0.09;
     color-scheme: dark;
@@ -89,12 +103,16 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: oklch(0.165 0.006 260);
-      --rail: oklch(0.145 0.006 260);
-      --surface: oklch(0.198 0.008 260);
-      --hover: oklch(0.235 0.009 260);
-      --line: oklch(0.262 0.009 260);
-      --line-strong: oklch(0.33 0.011 260);
+    --bg: oklch(0.16 0.006 260);
+      --rail: oklch(0.14 0.006 260);
+      --surface: oklch(0.19 0.007 260);
+    --raised: oklch(0.215 0.008 260);
+      --hover: oklch(1 0 0 / 0.06);
+      --line: oklch(1 0 0 / 0.075);
+      --line-strong: oklch(1 0 0 / 0.14);
+    --focus: oklch(0.95 0.004 255 / 0.4);
+    --focus-soft: oklch(0.95 0.004 255 / 0.08);
+    --glow: oklch(1 0 0 / 0.045);
       --ink: oklch(0.95 0.004 255);
       --ink-2: oklch(0.74 0.009 255);
       --ink-3: oklch(0.56 0.009 255);
@@ -104,7 +122,8 @@
       --warn-wash: oklch(0.8 0.14 80 / 0.14);
       --danger: oklch(0.76 0.14 25);
       --danger-wash: oklch(0.7 0.17 25 / 0.15);
-      --overlay-shadow: 0 0 0 1px oklch(1 0 0 / 0.05), 0 20px 56px -16px oklch(0 0 0 / 0.75);
+      --overlay-shadow: inset 0 1px 0 oklch(1 0 0 / 0.05), 0 0 0 1px oklch(1 0 0 / 0.08),
+      0 4px 12px -4px oklch(0 0 0 / 0.45), 0 24px 56px -16px oklch(0 0 0 / 0.7);
       --label-l: 0.72;
       --label-c: 0.09;
       color-scheme: dark;
@@ -156,6 +175,9 @@
   --color-bg: var(--bg);
   --color-rail: var(--rail);
   --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-focus: var(--focus);
+  --color-focus-soft: var(--focus-soft);
   --color-hover: var(--hover);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
@@ -181,6 +203,8 @@
   --font-code: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
 
   --text-*: initial;
+  /* Code inside text: relative to the text around it. */
+  --text-code: 0.88em;
   --text-meta: 11px;
   --text-meta--line-height: 1.3;
   --text-sm: 12px;
@@ -210,9 +234,29 @@
   --shadow-*: initial;
   --shadow-overlay: var(--overlay-shadow);
 
+  /* Motion (tokens.md). Things enter on a fast-out curve and leave quicker
+     than they came, accelerating away. State changes in place use standard. */
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
   --default-transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
-  --default-transition-duration: 140ms;
+  --default-transition-duration: 120ms;
+}
+
+:root {
+  --duration-exit: 100ms;
+  --duration-fast: 120ms;
+  --duration-base: 160ms;
+  --duration-slow: 200ms;
+  /* 1, or 0 under reduced motion: distances and scales multiply by it, so
+     slides and pops become plain fades. */
+  --motion: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion: 0;
+  }
 }
 
 @layer base {
@@ -227,19 +271,12 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--ink);
+    outline: 2px solid var(--focus);
     outline-offset: 2px;
   }
 
   ::selection {
     background: var(--hover);
-  }
-}
-
-@keyframes dialog-rise {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
   }
 }
 
@@ -250,9 +287,138 @@
   transition: none !important;
 }
 
-@keyframes peek-slide {
+/* Enter and exit. A layer sets the distances it travels; [data-leaving] plays
+   the exit while usePresence keeps it mounted. */
+@keyframes enter {
   from {
     opacity: 0;
-    transform: translateX(16px);
+    transform: translate3d(var(--enter-x, 0), var(--enter-y, 0), 0) scale(var(--enter-scale, 1));
   }
 }
+
+@keyframes exit {
+  to {
+    opacity: 0;
+    transform: translate3d(var(--exit-x, 0), var(--exit-y, 0), 0) scale(var(--exit-scale, 1));
+  }
+}
+
+/* Menus and popovers: a small pop from where they open. */
+.motion-pop {
+  --enter-scale: calc(1 - 0.03 * var(--motion));
+  --exit-scale: calc(1 - 0.02 * var(--motion));
+  animation: enter var(--duration-base) var(--ease-enter);
+}
+
+/* Side panels: in from the edge they sit on. */
+.motion-slide {
+  --enter-x: calc(16px * var(--motion));
+  --exit-x: calc(10px * var(--motion));
+  animation: enter var(--duration-slow) var(--ease-enter);
+}
+
+/* Scrims and quiet layers: a plain fade. */
+.motion-fade {
+  animation: enter var(--duration-base) var(--ease-enter);
+}
+
+/* The rail as a phone's drawer: in from the leading edge. */
+@media (max-width: 767.98px) {
+  .motion-drawer {
+    --enter-x: calc(-24px * var(--motion));
+    animation: enter var(--duration-slow) var(--ease-enter);
+  }
+}
+
+/* Toasts: up from the corner. */
+.motion-rise {
+  --enter-y: calc(8px * var(--motion));
+  --enter-scale: calc(1 - 0.02 * var(--motion));
+  --exit-scale: calc(1 - 0.02 * var(--motion));
+  animation: enter var(--duration-base) var(--ease-enter);
+}
+
+:is(.motion-pop, .motion-slide, .motion-rise)[data-leaving] {
+  animation: exit var(--duration-exit) var(--ease-exit) forwards;
+  pointer-events: none;
+}
+
+/* The native <dialog> closes at once, so focus and the inert page come back
+   at once; the box and its backdrop fade out on a discrete transition. */
+dialog.motion-dialog,
+dialog.motion-dialog::backdrop {
+  transition:
+    opacity var(--duration-exit) var(--ease-exit),
+    transform var(--duration-exit) var(--ease-exit),
+    overlay var(--duration-exit) allow-discrete,
+    display var(--duration-exit) allow-discrete;
+}
+dialog.motion-dialog[open],
+dialog.motion-dialog[open]::backdrop {
+  transition-duration: var(--duration-base);
+  transition-timing-function: var(--ease-enter);
+}
+dialog.motion-dialog:not([open]) {
+  opacity: 0;
+  transform: scale(calc(1 - 0.02 * var(--motion)));
+}
+dialog.motion-dialog:not([open])::backdrop {
+  opacity: 0;
+}
+@starting-style {
+  dialog.motion-dialog[open] {
+    opacity: 0;
+    transform: translateY(calc(4px * var(--motion))) scale(calc(1 - 0.03 * var(--motion)));
+  }
+  dialog.motion-dialog[open]::backdrop {
+    opacity: 0;
+  }
+}
+
+/* Hover comes at once and fades on the way out, so moving down a list leaves
+   a short trail instead of a flicker. */
+.hover-fade {
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+.hover-fade:hover {
+  transition-duration: 0ms;
+}
+
+/* A status icon that just changed. */
+@keyframes status-pop {
+  from {
+    opacity: 0.3;
+    transform: scale(calc(1 - 0.4 * var(--motion)));
+  }
+}
+.status-pop {
+  animation: status-pop var(--duration-slow) var(--ease-enter);
+}
+
+/* A row that just arrived in a list, or moved into another group. */
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-4px * var(--motion)));
+  }
+}
+@keyframes row-flash {
+  from {
+    background-color: var(--hover);
+  }
+}
+.row-in {
+  animation:
+    row-in var(--duration-slow) var(--ease-enter),
+    row-flash 1.2s var(--ease-standard);
+}
+
+/* Sign-in style pages: their parts rise in one after another, once. */
+.stagger > * {
+  --enter-y: calc(6px * var(--motion));
+  animation: enter 320ms var(--ease-enter) both;
+}
+.stagger > :nth-child(2) { animation-delay: 40ms; }
+.stagger > :nth-child(3) { animation-delay: 80ms; }
+.stagger > :nth-child(4) { animation-delay: 120ms; }
+.stagger > :nth-child(n + 5) { animation-delay: 160ms; }

@@ -1,0 +1,166 @@
+/* The tokens the app's own pages share (docs/design/tokens.md). An instance's
+   pages bring their own; these are only for the connect page and the switcher. */
+
+@font-face {
+  font-family: "Instrument Sans";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 700;
+  src: url("fonts/instrument-sans-latin-wght-normal.woff2") format("woff2-variations");
+}
+
+:root {
+  color-scheme: light dark;
+  --bg: oklch(0.982 0.003 255);
+  --surface: oklch(0.998 0.001 255);
+  --hover: oklch(0.948 0.005 255);
+  --line: oklch(0.91 0.006 255);
+  --line-strong: oklch(0.85 0.008 255);
+  --ink: oklch(0.22 0.016 260);
+  --ink-2: oklch(0.47 0.014 260);
+  --ink-3: oklch(0.65 0.01 260);
+  --on-human: oklch(0.985 0.003 255);
+  --shadow: 0 1px 2px oklch(0.2 0.02 260 / 0.06), 0 20px 48px -16px oklch(0.2 0.02 260 / 0.28);
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --font: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: oklch(0.165 0.006 260);
+    --surface: oklch(0.198 0.008 260);
+    --hover: oklch(0.235 0.009 260);
+    --line: oklch(0.262 0.009 260);
+    --line-strong: oklch(0.33 0.011 260);
+    --ink: oklch(0.95 0.004 255);
+    --ink-2: oklch(0.74 0.009 255);
+    --ink-3: oklch(0.56 0.009 255);
+    --on-human: oklch(0.17 0.008 260);
+    --shadow: 0 0 0 1px oklch(1 0 0 / 0.05), 0 20px 56px -16px oklch(0 0 0 / 0.75);
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 13px/1.45 var(--font);
+  -webkit-font-smoothing: antialiased;
+  /* Chrome, as in a native app: no text selection, no hand cursor. */
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+input, .error { user-select: text; -webkit-user-select: text; }
+
+button { cursor: default; }
+
+/* The 48px strip at the top of every window. It drags the window (only where
+   nothing else sits on it), leaves room for the macOS traffic lights and holds
+   the page's own window buttons on Windows and Linux. */
+.titlebar {
+  display: flex;
+  align-items: center;
+  height: 48px;
+  flex: none;
+}
+
+[data-platform="macos"] .titlebar { padding-left: 84px; }
+
+.window-controls { display: flex; align-self: stretch; margin-left: auto; }
+
+.window-controls:empty { display: none; }
+
+.window-button {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  transition: background-color 140ms var(--ease), color 140ms var(--ease);
+}
+
+.window-button:hover { background: var(--hover); color: var(--ink); }
+
+.window-button svg { width: 16px; height: 16px; }
+
+input, button { font: inherit; color: inherit; }
+
+.field {
+  height: 32px;
+  width: 100%;
+  min-width: 0;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.field::placeholder { color: var(--ink-2); }
+
+/* The one filled button on a screen: ink, inverted in dark. */
+.primary {
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--on-human);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Disabled is a quiet surface, not a faded ink block. */
+.primary:disabled {
+  background: var(--hover);
+  color: var(--ink-2);
+  cursor: default;
+}
+
+.quiet {
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.quiet:hover { background: var(--hover); }
+
+:focus { outline: none; }
+
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+.field:focus-visible { outline-offset: 0; border-color: var(--ink); outline-width: 1px; }
+
+/* As the web app shows a failed request: ink on hover, no red (red is for an
+   agent that is blocked). */
+.error {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--hover);
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+.error:empty { display: none; }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

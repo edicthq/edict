@@ -13,13 +13,23 @@ export const markdownClass =
   "[&_blockquote]:my-2 [&_blockquote]:border-s-2 [&_blockquote]:border-line-strong [&_blockquote]:ps-3 [&_blockquote]:text-ink-2 " +
   "[&_hr]:my-3 [&_hr]:border-line " +
   "[&_a]:underline [&_a]:decoration-line-strong [&_a]:underline-offset-2 hover:[&_a]:decoration-ink " +
-  "[&_code]:rounded-[3px] [&_code]:bg-bg [&_code]:px-1 [&_code]:py-px [&_code]:font-mono [&_code]:text-code " +
-  "[&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:bg-bg [&_pre]:p-3 [&_pre]:font-mono [&_pre]:text-code [&_pre]:shadow-[inset_0_0_0_1px_var(--line)] [&_pre]:rounded-sm " +
-  "[&_pre_code]:bg-transparent [&_pre_code]:p-0 " +
+  "[&_code]:rounded-xs [&_code]:bg-hover [&_code]:px-1 [&_code]:py-px [&_code]:font-code [&_code]:text-code [&_code]:font-medium " +
+  "[&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:bg-bg [&_pre]:p-3 [&_pre]:font-code [&_pre]:text-code [&_pre]:shadow-[inset_0_0_0_1px_var(--line)] [&_pre]:rounded-sm " +
+  "[&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-[1em] [&_pre_code]:font-normal " +
   "[&_table]:w-full [&_th]:text-start [&_th]:font-semibold [&_td]:align-top " +
   "[&_table]:text-ui [&_table]:border-collapse [&_th]:border-b [&_th]:border-line-strong [&_td]:border-b [&_td]:border-line [&_th]:p-1.5 [&_td]:p-1.5 " +
   "[&_img]:max-h-[24rem] [&_img]:max-w-full [&_img]:rounded-sm [&_img]:shadow-[0_0_0_1px_var(--line)] " +
   "[&_ul[data-type=taskList]]:list-none [&_ul[data-type=taskList]]:ps-0 [&_li[data-type=taskItem]]:flex [&_li[data-type=taskItem]]:gap-2 ";
+
+// A project card or a notification needs one line of a markdown description.
+export function plainText(markdown: string): string {
+  return markdown
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/[`*_>#~]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 // Descriptions and comments are markdown end to end (ADR 0009). The stored
 // text renders here, and the Tiptap editor edits it (markdown-editor.tsx).

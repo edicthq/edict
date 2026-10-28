@@ -50,6 +50,24 @@ test("Milestone 5: Projects cross-team tracking, progress metrics, and My Issues
   await expect(page.getByText("0% completed")).toBeVisible();
   await expect(page.getByText("No issues in this project yet")).toBeVisible();
 
+  // Status, lead and target date are app menus in the page bar.
+  await page.getByRole("button", { name: /Set project status/ }).click();
+  await page.getByRole("option", { name: "Paused" }).click();
+  await expect(page.getByRole("button", { name: "Status: Paused. Set project status" })).toBeVisible();
+  await page.getByRole("button", { name: /Set lead/ }).click();
+  await page.getByRole("option").nth(1).click();
+  await expect(page.getByRole("button", { name: /^Lead: (?!none).+\. Set lead$/ })).toBeVisible();
+  const now = new Date();
+  const target = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 15));
+  const targetLabel = target.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+  await page.getByRole("button", { name: /Set target date/ }).click();
+  await page.getByRole("dialog", { name: "Target date" }).getByRole("button", { name: "Next month" }).click();
+  await page.getByRole("button", { name: targetLabel, exact: true }).click();
+  await expect(page.getByRole("button", { name: `Target date: ${targetLabel}. Set target date` })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("button", { name: `Target date: ${targetLabel}. Set target date` })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Status: Paused. Set project status" })).toBeVisible();
+
   // Get project ID
   const projectsRes = await (
     await page.request.get(`/api/v1/organizations/${orgId}/projects`, { headers })

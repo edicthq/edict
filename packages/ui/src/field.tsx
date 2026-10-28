@@ -3,14 +3,16 @@ import {
   useId,
   type InputHTMLAttributes,
   type ReactNode,
-  type SelectHTMLAttributes,
 } from "react";
 import { cn } from "./cn.js";
 
+// Focus is a firmer edge and a soft halo, not the 2px outline: a field you
+// type in is focused for long, and a hard ring there shouts.
 const control =
   "w-full rounded-sm bg-surface px-3 text-ink shadow-[inset_0_0_0_1px_var(--line-strong)] " +
-  "placeholder:text-ink-2 transition-[box-shadow] duration-[140ms] ease-standard " +
-  "hover:shadow-[inset_0_0_0_1px_var(--ink-3)] focus-visible:shadow-[inset_0_0_0_1px_var(--ink)] " +
+  "placeholder:text-ink-2 transition-[box-shadow] duration-(--duration-fast) ease-standard " +
+  "hover:shadow-[inset_0_0_0_1px_var(--ink-3)] focus-visible:outline-none " +
+  "focus:shadow-[inset_0_0_0_1px_var(--ink-2),0_0_0_3px_var(--focus-soft)] " +
   "aria-[invalid=true]:shadow-[inset_0_0_0_1px_var(--ink)] " +
   // 16px on small screens so iOS does not zoom into the field.
   "h-10 text-lg sm:h-9 sm:text-body";
@@ -20,13 +22,6 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
   ref,
 ) {
   return <input ref={ref} className={cn(control, className)} {...props} />;
-});
-
-export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(function Select(
-  { className, ...props },
-  ref,
-) {
-  return <select ref={ref} className={cn(control, "appearance-auto pe-2", className)} {...props} />;
 });
 
 export interface FieldProps {

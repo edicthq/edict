@@ -1,34 +1,43 @@
 import { useState } from "react";
 import { MarkdownEditor } from "../components/markdown-editor.js";
+import { Markdown, plainText } from "../components/markdown.js";
 import { Link, useNavigate, useParams } from "react-router";
-import type { ProjectStatus } from "@edicthq/client";
-import { Avatar, Button, ProgressBar, ProjectStatusBadge, PriorityIcon, TeamKey, cn } from "@edicthq/ui";
-import { ArrowLeft, Calendar, Plus, Trash2, } from "lucide-react";
+import type { Agent, Issue, Label, Member, ProjectStatus, Status, StatusCategory } from "@edicthq/client";
+import { Avatar, Button, Menu, ProgressBar, ProjectStatusBadge, StatusIcon, Tabs, cn } from "@edicthq/ui";
+import { Calendar, ChevronRight, FolderKanban, Plus, Trash2 } from "lucide-react";
 import { CreateProjectDialog } from "../components/create-project-dialog.js";
-import { EmptyState, GroupHeader, Loading, PageBody, PageHeader, rowClass } from "../components/shell.js";
+import { DateMenu, formatDay } from "../components/date-menu.js";
+import { NoAssignee, chipClass } from "../components/issue-fields.js";
+import { IssueRowLink } from "../components/issue-row.js";
+import { EmptyState, Loading, PageBody, PageHeader } from "../components/shell.js";
 import {
+  useAgents,
   useDeleteProject,
   useMembers,
+  useOrgIssueContext,
   useProject,
   useProjectIssues,
   useProjects,
-  useTeams,
   useUpdateProject,
 } from "../lib/queries.js";
 import { useOrg } from "./org.js";
 
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "No date";
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
+const projectStatuses: ProjectStatus[] = ["planned", "in_progress", "paused", "completed", "canceled"];
+const projectStatusLabel: Record<ProjectStatus, string> = {
+  planned: "Planned",
+  in_progress: "In Progress",
+  paused: "Paused",
+  completed: "Completed",
+  canceled: "Canceled",
+};
+const noLead = "none";
 
 export function ProjectsPage() {
   const { orgId, slug, membership } = useOrg();
   const projects = useProjects(orgId);
   const members = useMembers(orgId);
   const [createOpen, setCreateOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "completed">("all");
 
   const memberMap = new Map((members.data ?? []).map((m) => [m.id, m]));
 
@@ -58,38 +67,16 @@ export function ProjectsPage() {
           <Loading label="Loading projects" />
         ) : projects.data?.length ? (
           <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-1 border-b border-line px-3 pb-2 text-ui">
-              <button
-                type="button"
-                onClick={() => setStatusFilter("all")}
-                className={cn(
-                  "rounded-sm px-2.5 py-1 text-sm font-medium transition-[color,background-color]",
-                  statusFilter === "all" ? "bg-hover text-ink" : "text-ink-2 hover:text-ink",
-                )}
-              >
-                All ({projects.data.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatusFilter("active")}
-                className={cn(
-                  "rounded-sm px-2.5 py-1 text-sm font-medium transition-[color,background-color]",
-                  statusFilter === "active" ? "bg-hover text-ink" : "text-ink-2 hover:text-ink",
-                )}
-              >
-                Active
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatusFilter("completed")}
-                className={cn(
-                  "rounded-sm px-2.5 py-1 text-sm font-medium transition-[color,background-color]",
-                  statusFilter === "completed" ? "bg-hover text-ink" : "text-ink-2 hover:text-ink",
-                )}
-              >
-                Completed
-              </button>
-            </div>
+            <Tabs
+              label="Project status"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              items={[
+                { value: "all", label: "All", count: projects.data.length },
+                { value: "active", label: "Active" },
+                { value: "completed", label: "Completed" },
+              ]}
+            />
 
             <ul className="flex flex-col gap-2">
               {filtered.map((proj) => {
@@ -106,7 +93,7 @@ export function ProjectsPage() {
                           <span className="truncate text-base font-semibold tracking-[-0.01em] text-ink">
                             {proj.name}
                           </span>
-                          <span className="text-sm text-ink-3">#{proj.slug}</span>
+                          <span className="text-sm text-ink-2">#{proj.slug}</span>
                           <ProjectStatusBadge status={proj.status} />
                         </div>
                         <div className="flex items-center gap-4 text-sm text-ink-2">
@@ -119,7 +106,7 @@ export function ProjectsPage() {
                           {proj.targetDate ? (
                             <div className="flex items-center gap-1">
                               <Calendar aria-hidden="true" className="size-3.5 text-ink-3" />
-                              <span>{formatDate(proj.targetDate)}</span>
+                              <span>{formatDay(proj.targetDate)}</span>
                             </div>
                           ) : null}
                         </div>
@@ -127,7 +114,7 @@ export function ProjectsPage() {
 
                       {proj.description ? (
                         <p className="line-clamp-2 text-ui text-ink-2 text-pretty">
-                          {proj.description}
+                          {plainText(proj.description)}
                         </p>
                       ) : null}
 
@@ -138,11 +125,11 @@ export function ProjectsPage() {
                         <span className="text-sm text-ink-2 tabular-nums font-medium">
                           {percentage}%
                         </span>
-                        <span className="text-sm text-ink-3 tabular-nums">
+                        <span className="text-sm text-ink-2 tabular-nums">
                           {completed} of {total} {total === 1 ? "issue" : "issues"}
                         </span>
                         {proj.progress.estimate.total > 0 ? (
-                          <span className="ms-auto text-sm text-ink-3 tabular-nums">
+                          <span className="ms-auto text-sm text-ink-2 tabular-nums">
                             {proj.progress.estimate.completed}/{proj.progress.estimate.total} pts
                           </span>
                         ) : null}
@@ -155,6 +142,8 @@ export function ProjectsPage() {
           </div>
         ) : (
           <EmptyState
+            layout="page"
+            icon={<FolderKanban aria-hidden="true" />}
             title="No projects yet"
             body="Projects group issues from across teams toward high-level milestones and product launches."
             action={
@@ -184,7 +173,8 @@ export function ProjectDetailPage() {
   const projectQuery = useProject(orgId, projectRef);
   const issuesQuery = useProjectIssues(orgId, projectRef);
   const members = useMembers(orgId);
-  const teams = useTeams(orgId);
+  const agents = useAgents(orgId);
+  const issueContext = useOrgIssueContext(orgId);
   const updateProject = useUpdateProject(orgId, projectRef);
   const deleteProject = useDeleteProject(orgId);
 
@@ -194,14 +184,15 @@ export function ProjectDetailPage() {
   const project = projectQuery.data;
   const issues = issuesQuery.data ?? [];
   const humans = (members.data ?? []).filter((m) => m.kind === "human");
-  const memberMap = new Map((members.data ?? []).map((m) => [m.id, m]));
-  const teamMap = new Map((teams.data ?? []).map((t) => [t.id, t]));
+  const lead = humans.find((m) => m.id === project?.leadId);
 
   if (projectQuery.isPending) return <Loading label="Loading project" />;
   if (!project) {
     return (
       <PageBody className="pt-6">
         <EmptyState
+          layout="page"
+          icon={<FolderKanban aria-hidden="true" />}
           title="Project not found"
           body="It may have been deleted, moved, or the address is mistyped."
           action={
@@ -228,11 +219,8 @@ export function ProjectDetailPage() {
     });
   };
 
-  const handleTargetDateChange = async (dateStr: string) => {
-    await updateProject.mutateAsync({
-      version: project.version,
-      targetDate: dateStr ? new Date(dateStr).toISOString() : null,
-    });
+  const handleTargetDateChange = async (targetDate: string | null) => {
+    await updateProject.mutateAsync({ version: project.version, targetDate });
   };
 
   const handleSaveDescription = async () => {
@@ -251,75 +239,89 @@ export function ProjectDetailPage() {
 
   const { total, completed, percentage, byCategory, estimate } = project.progress;
 
+  // The project's own fields, as chips that open app menus. They sit in the
+  // page bar, and on a phone, where the bar has room only for the name, in a
+  // row under it.
+  const fields = (
+    <>
+            <Menu
+              label="Set project status"
+              value={project.status}
+              onSelect={(next) => void handleStatusChange(next)}
+              items={projectStatuses.map((status) => ({ value: status, label: projectStatusLabel[status] }))}
+              trigger={(props) => (
+                <button type="button" {...props} className={chipClass} aria-label={`Status: ${projectStatusLabel[project.status]}. Set project status`}>
+                  {projectStatusLabel[project.status]}
+                </button>
+              )}
+            />
+            <Menu
+              label="Set lead"
+              value={project.leadId ?? noLead}
+              onSelect={(id) => void handleLeadChange(id === noLead ? "" : id)}
+              items={[
+                { value: noLead, label: "No lead", icon: <NoAssignee /> },
+                ...humans.map((h) => ({ value: h.id, label: h.name, keywords: h.email ?? "", icon: <Avatar name={h.name} size={18} /> })),
+              ]}
+              trigger={(props) => (
+                <button type="button" {...props} className={chipClass} aria-label={`Lead: ${lead?.name ?? "none"}. Set lead`}>
+                  {lead ? <Avatar name={lead.name} size={18} /> : <NoAssignee />}
+                  {lead?.name ?? "Lead"}
+                </button>
+              )}
+            />
+            <DateMenu
+              label="Target date"
+              value={project.targetDate ?? null}
+              onChange={(next) => void handleTargetDateChange(next)}
+              trigger={(props) => (
+                <button
+                  type="button"
+                  {...props}
+                  className={chipClass}
+                  aria-label={`Target date: ${project.targetDate ? formatDay(project.targetDate) : "none"}. Set target date`}
+                >
+                  <Calendar aria-hidden="true" className="size-3.5 text-ink-2" strokeWidth={1.75} />
+                  {project.targetDate ? formatDay(project.targetDate) : "Target date"}
+                </button>
+              )}
+            />
+    </>
+  );
+
   return (
     <>
-      <header className="flex flex-col gap-3 border-b border-line px-6 pt-5 pb-4">
-        <div className="flex items-center gap-2 text-sm text-ink-2">
-          <Link to={`/${slug}/projects`} className="hover:text-ink flex items-center gap-1">
-            <ArrowLeft aria-hidden="true" className="size-3.5" />
-            Projects
-          </Link>
-          <span className="text-ink-3">/</span>
-          <span className="text-ink font-medium">{project.name}</span>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">{project.name}</h1>
-            <span className="text-ui text-ink-3">#{project.slug}</span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Status Picker */}
-            <select
-              value={project.status}
-              onChange={(e) => void handleStatusChange(e.target.value as ProjectStatus)}
-              className="h-8 rounded-sm border border-line bg-surface px-2.5 text-ui font-medium text-ink outline-none hover:border-line-strong cursor-pointer"
-            >
-              <option value="planned">Planned</option>
-              <option value="in_progress">In Progress</option>
-              <option value="paused">Paused</option>
-              <option value="completed">Completed</option>
-              <option value="canceled">Canceled</option>
-            </select>
-
-            {/* Lead Picker */}
-            <select
-              value={project.leadId ?? ""}
-              onChange={(e) => void handleLeadChange(e.target.value)}
-              className="h-8 rounded-sm border border-line bg-surface px-2.5 text-ui text-ink-2 outline-none hover:border-line-strong cursor-pointer"
-            >
-              <option value="">No lead</option>
-              {humans.map((h) => (
-                <option key={h.id} value={h.id}>
-                  Lead: {h.name}
-                </option>
-              ))}
-            </select>
-
-            {/* Target Date Picker */}
-            <input
-              type="date"
-              value={project.targetDate ? project.targetDate.slice(0, 10) : ""}
-              onChange={(e) => void handleTargetDateChange(e.target.value)}
-              className="h-8 rounded-sm border border-line bg-surface px-2 text-ui text-ink-2 outline-none hover:border-line-strong cursor-pointer"
-              title="Target date"
-            />
-
+      <PageHeader
+        lead={
+          <>
+            <Link to={`/${slug}/projects`} className="text-body text-ink-2 hover:text-ink">
+              Projects
+            </Link>
+            <ChevronRight aria-hidden="true" className="size-3.5 text-ink-3" strokeWidth={1.75} />
+          </>
+        }
+        title={project.name}
+        actions={
+          <>
+            <div className="flex items-center gap-2 max-sm:hidden">{fields}</div>
             {canManage ? (
               <Button
                 variant="ghost"
-                title="Move to trash"
-                aria-label="Move to trash"
-                className="size-8 px-0 text-ink-3 hover:text-danger"
+                title="Move to trash…"
+                aria-label="Move project to trash"
+                className="size-8 px-0 text-ink-2 hover:text-ink"
                 onClick={() => void handleDelete()}
               >
-                <Trash2 aria-hidden="true" className="size-4" />
+                <Trash2 aria-hidden="true" className="size-4" strokeWidth={1.75} />
               </Button>
             ) : null}
-          </div>
-        </div>
-      </header>
+          </>
+        }
+      />
+
+      <div role="toolbar" aria-label="Project fields" className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2.5 sm:hidden">
+        {fields}
+      </div>
 
       <PageBody className="pt-5 flex flex-col gap-6">
         {/* Progress & Metrics Card */}
@@ -332,7 +334,7 @@ export function ProjectDetailPage() {
                 ({completed} of {total} issues)
               </span>
               {estimate.total > 0 ? (
-                <span className="text-ink-3 tabular-nums">
+                <span className="text-ink-2 tabular-nums">
                   · {estimate.completed} of {estimate.total} points
                 </span>
               ) : null}
@@ -341,28 +343,27 @@ export function ProjectDetailPage() {
 
           <ProgressBar percentage={percentage} className="h-2" />
 
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 pt-1">
-            <div className="rounded-sm bg-hover/60 p-2.5 text-center">
-              <p className="text-xs font-medium text-ink-2 uppercase tracking-wide">Backlog</p>
-              <p className="mt-1 text-base font-semibold text-ink tabular-nums">{byCategory.backlog}</p>
-            </div>
-            <div className="rounded-sm bg-hover/60 p-2.5 text-center">
-              <p className="text-xs font-medium text-ink-2 uppercase tracking-wide">Todo</p>
-              <p className="mt-1 text-base font-semibold text-ink tabular-nums">{byCategory.todo}</p>
-            </div>
-            <div className="rounded-sm bg-hover/60 p-2.5 text-center">
-              <p className="text-xs font-medium text-ink-2 uppercase tracking-wide">In Progress</p>
-              <p className="mt-1 text-base font-semibold text-ink tabular-nums">{byCategory.in_progress}</p>
-            </div>
-            <div className="rounded-sm bg-hover/60 p-2.5 text-center">
-              <p className="text-xs font-medium text-ink-2 uppercase tracking-wide">Done</p>
-              <p className="mt-1 text-base font-semibold text-ink tabular-nums">{byCategory.done}</p>
-            </div>
-            <div className="rounded-sm bg-hover/60 p-2.5 text-center">
-              <p className="text-xs font-medium text-ink-2 uppercase tracking-wide">Canceled</p>
-              <p className="mt-1 text-base font-semibold text-ink-3 tabular-nums">{byCategory.canceled}</p>
-            </div>
-          </div>
+          <dl className="grid grid-cols-2 gap-2 pt-1 sm:grid-cols-5">
+            {(
+              [
+                ["backlog", "Backlog"],
+                ["todo", "Todo"],
+                ["in_progress", "In Progress"],
+                ["done", "Done"],
+                ["canceled", "Canceled"],
+              ] as const
+            ).map(([category, name]) => (
+              <div key={category} className="flex flex-col gap-1 rounded-sm border border-line px-3 py-2.5">
+                <dt className="flex items-center gap-1.5 text-sm text-ink-2">
+                  <StatusIcon category={category} />
+                  {name}
+                </dt>
+                <dd className={cn("text-lg font-semibold tabular-nums", category === "canceled" ? "text-ink-2" : "text-ink")}>
+                  {byCategory[category]}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </section>
 
         {/* Description */}
@@ -407,71 +408,116 @@ export function ProjectDetailPage() {
               </div>
             </div>
           ) : project.description ? (
-            <p className="rounded-md border border-line/60 bg-surface/50 p-3 text-ui text-ink-2 whitespace-pre-wrap text-pretty">
-              {project.description}
-            </p>
-          ) : (
-            <p className="text-sm text-ink-3 italic">No description provided.</p>
-          )}
+            <div className="rounded-md border border-line/60 bg-surface/50 p-4">
+              <Markdown text={project.description} />
+            </div>
+          ) : null}
         </section>
 
-        {/* Cross-Team Issues */}
-        <section className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <GroupHeader count={issues.length}>Issues</GroupHeader>
-          </div>
-
-          {issuesQuery.isPending ? (
-            <Loading label="Loading issues" />
-          ) : issues.length ? (
-            <ul className="flex flex-col gap-px">
-              {issues.map((issue) => {
-                const team = teamMap.get(issue.teamId);
-                const assignee = issue.assigneeId ? memberMap.get(issue.assigneeId) : null;
-                return (
-                  <li key={issue.id}>
-                    <Link
-                      to={`/${slug}/teams/${issue.teamId}?peek=${issue.identifier}`}
-                      className={cn(rowClass, "grid grid-cols-[auto_16px_minmax(0,1fr)_auto_auto] items-center gap-3")}
-                    >
-                      <div className="flex items-center gap-2">
-                        {team ? <TeamKey>{team.key}</TeamKey> : null}
-                        <span className="text-sm font-medium text-ink-2 tabular-nums">
-                          {issue.identifier}
-                        </span>
-                      </div>
-
-                      <PriorityIcon priority={issue.priority} />
-
-                      <span className="truncate text-body tracking-[-0.005em] text-ink font-medium">
-                        {issue.title}
-                      </span>
-
-                      {assignee ? (
-                        <div className="flex items-center gap-1.5 text-sm text-ink-2" title={`Assignee: ${assignee.name}`}>
-                          <Avatar name={assignee.name} />
-                          <span className="truncate max-w-[100px] hidden sm:inline">{assignee.name}</span>
-                        </div>
-                      ) : null}
-
-                      {issue.estimate !== null ? (
-                        <span className="text-xs text-ink-3 tabular-nums font-mono">
-                          {issue.estimate} pts
-                        </span>
-                      ) : null}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <EmptyState
-              title="No issues in this project yet"
-              body="Issues from any team can be linked to this project by selecting it in the issue's project field."
-            />
-          )}
-        </section>
+        {/* Cross-team issues, open ones first. */}
+        {issuesQuery.isPending ? (
+          <Loading label="Loading issues" />
+        ) : issues.length ? (
+          <ProjectIssues
+            issues={issues}
+            slug={slug}
+            statuses={issueContext.statuses}
+            labels={issueContext.labels}
+            orgMembers={members.data ?? []}
+            agents={agents.data ?? []}
+          />
+        ) : (
+          <EmptyState
+            title="No issues in this project yet"
+            body="Issues from any team can be linked to this project by selecting it in the issue's project field."
+          />
+        )}
       </PageBody>
     </>
+  );
+}
+
+const categoryOrder: { category: StatusCategory; name: string }[] = [
+  { category: "in_progress", name: "In Progress" },
+  { category: "todo", name: "Todo" },
+  { category: "backlog", name: "Backlog" },
+  { category: "done", name: "Done" },
+  { category: "canceled", name: "Canceled" },
+];
+
+// A project's issues by status category, like a team's list: what is moving,
+// then what is next, then the backlog. Done and Canceled fold away while
+// anything is still open, so the open work isn't buried under finished work.
+function ProjectIssues({
+  issues,
+  slug,
+  statuses,
+  labels,
+  orgMembers,
+  agents,
+}: {
+  issues: Issue[];
+  slug: string;
+  statuses: Status[];
+  labels: Label[];
+  orgMembers: Member[];
+  agents: Agent[];
+}) {
+  const categoryOf = (issue: Issue) => statuses.find((status) => status.id === issue.statusId)?.category ?? "backlog";
+  const groups = categoryOrder
+    .map((group) => ({ ...group, issues: issues.filter((issue) => categoryOf(issue) === group.category) }))
+    .filter((group) => group.issues.length > 0);
+  const anyOpen = groups.some((group) => group.category !== "done" && group.category !== "canceled");
+  const [unfolded, setUnfolded] = useState<Set<StatusCategory>>(new Set());
+  return (
+    <div className="flex flex-col gap-3">
+      {groups.map((group) => {
+        const closed = group.category === "done" || group.category === "canceled";
+        const folded = closed && anyOpen && !unfolded.has(group.category);
+        return (
+          <section key={group.category} aria-label={group.name}>
+            <button
+              type="button"
+              aria-expanded={!folded}
+              onClick={() => {
+                const next = new Set(unfolded);
+                if (folded) next.add(group.category);
+                else next.delete(group.category);
+                setUnfolded(next);
+              }}
+              disabled={!closed || !anyOpen}
+              className="hover-fade flex h-[34px] w-full items-center gap-2 rounded-sm px-3 text-sm font-semibold enabled:hover:bg-hover"
+            >
+              <StatusIcon category={group.category} />
+              {group.name}
+              <span className="font-normal text-ink-2 tabular-nums">{group.issues.length}</span>
+              {closed && anyOpen ? (
+                <ChevronRight
+                  aria-hidden="true"
+                  className={cn("ms-auto size-3.5 text-ink-2 transition-transform duration-(--duration-fast) ease-standard", !folded && "rotate-90")}
+                  strokeWidth={2}
+                />
+              ) : null}
+            </button>
+            {folded ? null : (
+              <ul className="flex flex-col gap-px">
+                {group.issues.map((issue) => (
+                  <li key={issue.id}>
+                    <IssueRowLink
+                      to={`/${slug}/teams/${issue.teamId}?issue=${issue.identifier}`}
+                      issue={issue}
+                      statuses={statuses.filter((s) => s.teamId === issue.teamId)}
+                      labels={labels}
+                      orgMembers={orgMembers}
+                      agents={agents}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        );
+      })}
+    </div>
   );
 }

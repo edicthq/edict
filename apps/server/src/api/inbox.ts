@@ -76,6 +76,9 @@ async function itemsFor(tx: Transaction, event: EventRow): Promise<NewItem[]> {
     }
     case "progress.posted": {
       if (typeof data.issueId !== "string") return [];
+      // ADR 0029: activity already told people through its own event, and a
+      // hook speaks up only when the work is done.
+      if (data.source === "activity" || (data.source === "hook" && data.state !== "done")) return [];
       const [issue] = await tx.select({ assigneeId: issues.assigneeId }).from(issues).where(eq(issues.id, data.issueId));
       return issue?.assigneeId ? [{ recipientId: issue.assigneeId, type: "progress_posted", issueId: data.issueId }] : [];
     }

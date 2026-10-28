@@ -57,6 +57,26 @@ describe("realtime", () => {
     await expect(connect(t.baseUrl)).rejects.toThrow("upgrade answered 401");
   });
 
+  it("answers a ping with a pong, so a browser can tell a dead socket from a quiet one", async () => {
+    const t = await startTestServer();
+    const { owner } = await orgWithOwner(t.baseUrl);
+    const socket = await connect(t.baseUrl, owner.cookie);
+    socket.send(JSON.stringify({ type: "ping" }));
+    expect(await nextMessage(socket)).toEqual({ type: "pong" });
+  });
+
+  it("survives a socket that closes while its subscription is being checked", async () => {
+    const t = await startTestServer();
+    const { owner, orgId } = await orgWithOwner(t.baseUrl);
+    for (let i = 0; i < 5; i++) {
+      const socket = await connect(t.baseUrl, owner.cookie);
+      socket.send(JSON.stringify({ type: "subscribe", orgId }));
+      socket.terminate();
+    }
+    const after = await connect(t.baseUrl, owner.cookie);
+    expect(await subscribeAndAwait(after, orgId)).toMatchObject({ type: "subscribed", orgId });
+  });
+
   it("refuses to subscribe someone who is not a member", async () => {
     const t = await startTestServer();
     const { owner, orgId } = await orgWithOwner(t.baseUrl);

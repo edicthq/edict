@@ -10,6 +10,8 @@ import { PostgreSqlContainer } from "@testcontainers/postgresql";
 // A fresh Edict instance per worker, which means per browser: Postgres plus the
 // built server (apps/server/dist) serving the built web app (apps/web/dist),
 // the way the Docker image runs. `pnpm e2e` builds both first.
+// Spec files run in name order on that one instance. m1-exit sets up a fresh
+// instance, so a spec that signs someone up must sort after it.
 // biome-ignore lint/complexity/noBannedTypes: Playwright types "no test fixtures" as {}
 export const test = base.extend<{}, { instance: Instance; instanceUrl: string }>({
   instance: [

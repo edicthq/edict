@@ -13,6 +13,8 @@ interface Toast {
   id: number;
   message: string;
   action?: ToastAction;
+  // Playing its exit before it goes.
+  leaving?: boolean;
 }
 
 type ShowToast = (message: string, action?: ToastAction) => void;
@@ -24,7 +26,11 @@ const ToastContext = createContext<ShowToast>(() => {});
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const next = useRef(0);
-  const dismiss = useCallback((id: number) => setToasts((list) => list.filter((toast) => toast.id !== id)), []);
+  // A toast fades out before it goes (motion-rise in tokens.css).
+  const dismiss = useCallback((id: number) => {
+    setToasts((list) => list.map((toast) => (toast.id === id ? { ...toast, leaving: true } : toast)));
+    setTimeout(() => setToasts((list) => list.filter((toast) => toast.id !== id)), 120);
+  }, []);
   const show = useCallback<ShowToast>(
     (message, action) => {
       const id = next.current++;
@@ -45,7 +51,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className="pointer-events-auto flex max-w-[480px] items-center gap-3 rounded-md bg-surface py-2.5 ps-3.5 pe-2.5 text-ui text-ink shadow-overlay outline outline-1 outline-line motion-safe:animate-[dialog-rise_220ms_var(--ease-standard)]"
+            data-leaving={toast.leaving || undefined}
+            className="motion-rise pointer-events-auto flex min-h-11 max-w-[480px] origin-bottom-right items-center gap-3 rounded-md bg-raised py-2 ps-4 pe-2 text-ui text-ink shadow-overlay"
           >
             <span className="min-w-0 text-pretty">{toast.message}</span>
             {toast.action ? (
@@ -55,7 +62,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   toast.action!.run();
                   dismiss(toast.id);
                 }}
-                className="ms-auto inline-flex shrink-0 items-center gap-1.5 rounded-sm bg-hover px-2 py-1 font-semibold text-ink"
+                className="hover-fade ms-auto inline-flex h-7 shrink-0 items-center gap-1.5 rounded-sm bg-hover px-2.5 font-semibold text-ink hover:bg-line"
               >
                 {toast.action.label}
                 {toast.action.kbd ? <Kbd>{toast.action.kbd}</Kbd> : null}

@@ -1,0 +1,19 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "switcher",
+  "description": "The bundled switcher window (ADR 0028): it lists, adds, renames and removes the saved instances, and switches the main window between them. No instance's page runs in it.",
+  "windows": [
+    "switcher"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-close",
+    "allow-list-instances",
+    "allow-add-instance",
+    "allow-switch-instance",
+    "allow-remove-instance",
+    "allow-rename-instance",
+    "core:window:allow-start-dragging",
+    "core:window:allow-internal-toggle-maximize"
+  ]
+}

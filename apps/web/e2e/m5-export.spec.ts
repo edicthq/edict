@@ -28,7 +28,7 @@ test("Milestone 5: an owner downloads the organization export from settings", as
     data: { title: "First" },
   });
 
-  await page.goto("/edictco/settings");
+  await page.goto("/edictco/settings/organization");
   const button = page.getByRole("button", { name: "Download export" });
   await expect(button).toBeVisible();
 

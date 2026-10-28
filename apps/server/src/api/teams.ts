@@ -1,7 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { and, asc, eq, isNull } from "drizzle-orm";
-import { emit, members, teamKeys, teamMembers, teams, type Transaction } from "@edicthq/db";
-import { AddTeamMember, CreateTeam, Id, Member, Team, UpdateTeam } from "@edicthq/schema";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { emit, issues, members, statuses, teamKeys, teamMembers, teams, type Transaction } from "@edicthq/db";
+import { AddTeamMember, CreateTeam, Id, Member, Team, TeamOverview, UpdateTeam } from "@edicthq/schema";
 import {
   activeMember,
   loadMember,
@@ -41,6 +41,18 @@ const listTeams = createRoute({
   request: { params: OrgParams },
   responses: {
     200: json(z.array(Team), "Visible teams, by key"),
+    ...errors("unauthorized", "not_found"),
+  },
+});
+
+const teamOverview = createRoute({
+  method: "get",
+  path: "/organizations/{orgId}/team-overview",
+  tags: ["Teams"],
+  summary: "Open work and members of each team the caller can see",
+  request: { params: OrgParams },
+  responses: {
+    200: json(z.array(TeamOverview), "One row per visible team, by key"),
     ...errors("unauthorized", "not_found"),
   },
 });
@@ -197,6 +209,54 @@ export function teamRoutes(deps: ApiDeps) {
         .orderBy(asc(teams.key)),
     );
     return c.json(rows.map(toTeam), 200);
+  });
+
+  app.openapi(teamOverview, async (c) => {
+    const { orgId } = c.req.valid("param");
+    const rows = await inOrg(deps, c, orgId, async (tx, caller) => {
+      const visible = await tx
+        .select({ id: teams.id })
+        .from(teams)
+        .where(and(eq(teams.orgId, orgId), teamVisibility(tx, caller)))
+        .orderBy(asc(teams.key));
+      const ids = visible.map((team) => team.id);
+      if (ids.length === 0) return [];
+      const counts = await tx
+        .select({
+          teamId: issues.teamId,
+          open: sql<number>`count(*)::int`,
+          inProgress: sql<number>`(count(*) filter (where ${statuses.category} = 'in_progress'))::int`,
+          delegated: sql<number>`(count(*) filter (where ${issues.delegateId} is not null))::int`,
+        })
+        .from(issues)
+        .innerJoin(statuses, eq(statuses.id, issues.statusId))
+        .where(
+          and(
+            inArray(issues.teamId, ids),
+            isNull(issues.deletedAt),
+            isNull(issues.archivedAt),
+            sql`${statuses.category} not in ('done', 'canceled')`,
+          ),
+        )
+        .groupBy(issues.teamId);
+      const people = await tx
+        .select({ teamId: teamMembers.teamId, memberId: teamMembers.memberId })
+        .from(teamMembers)
+        .innerJoin(members, eq(members.id, teamMembers.memberId))
+        .where(and(inArray(teamMembers.teamId, ids), isNull(members.removedAt)))
+        .orderBy(asc(teamMembers.createdAt));
+      return ids.map((teamId) => {
+        const count = counts.find((row) => row.teamId === teamId);
+        return {
+          teamId,
+          open: count?.open ?? 0,
+          inProgress: count?.inProgress ?? 0,
+          delegated: count?.delegated ?? 0,
+          memberIds: people.filter((row) => row.teamId === teamId).map((row) => row.memberId),
+        };
+      });
+    });
+    return c.json(rows, 200);
   });
 
   app.openapi(listTeamMembers, async (c) => {

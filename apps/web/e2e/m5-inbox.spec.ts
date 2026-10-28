@@ -87,7 +87,7 @@ test("Milestone 5: the inbox gathers assignments and mentions, and clearing it",
 
   // A row opens the issue and reads the notification.
   await page.getByText("Write the migration guide").click();
-  await expect(page).toHaveURL(/peek=/);
+  await expect(page).toHaveURL(/issue=/);
   await expect(nav.getByRole("link", { name: /Inbox/ }).filter({ hasText: "1" })).toBeVisible();
 
   // Mark all read empties the unread view and clears the badge.
@@ -97,6 +97,6 @@ test("Milestone 5: the inbox gathers assignments and mentions, and clearing it",
   await expect(nav.getByRole("link", { name: "Inbox" })).not.toContainText(/\d/);
 
   // The all view keeps what was read.
-  await page.getByRole("button", { name: "All", exact: true }).click();
+  await page.getByRole("tab", { name: "All", exact: true }).click();
   await expect(page.getByText("Write the migration guide")).toBeVisible();
 });

@@ -1,7 +1,7 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { Agent, Attachment, Comment, Issue, Label, LinkedIssue, Member, RelationType, Status, Team } from "@edicthq/client";
-import { Avatar, Button, Dialog, Kbd, Menu, PriorityIcon, Select, StatusIcon, TeamKey } from "@edicthq/ui";
-import { CornerLeftUp, Link2, Paperclip, Plus, Trash2, X } from "lucide-react";
+import { Avatar, Button, Dialog, Kbd, Menu, PriorityIcon, StatusIcon, TeamKey, SelectMenu } from "@edicthq/ui";
+import { ArrowLeftRight, CornerDownRight, CornerLeftUp, Link2, Paperclip, Trash2, X } from "lucide-react";
 import { ApiFailure } from "../lib/api.js";
 import { ago, priorityLabel } from "../lib/issues.js";
 import {
@@ -53,6 +53,7 @@ export function IssuePeek({
   onClose,
   onOpen,
   onAddSubIssue,
+  leaving = false,
 }: {
   orgId: string;
   slug: string;
@@ -76,6 +77,8 @@ export function IssuePeek({
   // Opens another issue, maybe in another team.
   onOpen: (identifier: string) => void;
   onAddSubIssue: () => void;
+  // Closed, and sliding out: it takes no input.
+  leaving?: boolean;
 }) {
   const update = useUpdateIssue(orgId);
   const remove = useDeleteIssue(orgId);
@@ -102,6 +105,15 @@ export function IssuePeek({
     return undefined;
   };
   const [merge, setMerge] = useState<{ field: "title" | "description"; mine: string; theirs: Issue } | null>(null);
+  // The relation or link being added; another issue starts with neither.
+  const [adding, setAdding] = useState<"relation" | "link" | null>(null);
+  const [addingFor, setAddingFor] = useState(issue.id);
+  if (addingFor !== issue.id) {
+    setAddingFor(issue.id);
+    setAdding(null);
+  }
+  // Opens the file picker of the Files section, which owns the upload.
+  const pickFile = useRef<() => void>(() => {});
 
   const save = (changes: IssueChanges) =>
     update.mutate(
@@ -128,10 +140,33 @@ export function IssuePeek({
       },
     );
 
+  // A click on the page outside the peek closes it. Menus and dialogs render
+  // in portals or <dialog>, outside the page, and a click on another issue row
+  // opens that issue instead, so neither counts. It listens for click rather
+  // than pointerdown, so a field being edited has blurred and saved first.
+  const panel = useRef<HTMLElement>(null);
+  const close = useRef(onClose);
+  close.current = leaving ? () => {} : onClose;
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      const target = event.target as Element | null;
+      if (!target?.isConnected || panel.current?.contains(target)) return;
+      if (!target.closest("#main, nav")) return;
+      if (target.closest('dialog, [role="dialog"], [role="toolbar"], [id^="issue-"], [data-opens-issue]')) return;
+      close.current();
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, []);
+
   return (
     <aside
+      ref={panel}
       aria-label={`${issue.identifier} ${issue.title}`}
-      className="absolute inset-2 z-20 flex flex-col overflow-hidden rounded-md bg-surface shadow-overlay outline outline-line md:start-auto md:w-[min(760px,calc(100%-96px))] lg:w-[min(1100px,calc(100%-96px))] motion-safe:animate-[peek-slide_220ms_cubic-bezier(0.2,0,0,1)]"
+      data-leaving={leaving || undefined}
+      inert={leaving || undefined}
+      aria-hidden={leaving || undefined}
+      className="motion-slide absolute inset-2 z-20 flex flex-col overflow-hidden rounded-md bg-raised shadow-overlay md:start-auto md:w-[min(760px,calc(100%-96px))] lg:w-[min(1100px,calc(100%-96px))]"
     >
       <header className="flex h-[46px] shrink-0 items-center gap-2 border-b border-line ps-6 pe-3">
         {parent.data ? (
@@ -264,13 +299,48 @@ export function IssuePeek({
         </div>
         <DescriptionField key={`${issue.id}-description`} issue={issue} onSave={(description) => save({ description })} />
 
-        <SubIssues orgId={orgId} issue={issue} orgMembers={orgMembers} onOpen={onOpen} onAdd={onAddSubIssue} />
-        <Relations orgId={orgId} issue={issue} orgMembers={orgMembers} onOpen={onOpen} />
-        <Links orgId={orgId} issue={issue} />
-        <Attachments orgId={orgId} issue={issue} />
+        {/* One row of quiet actions instead of a heading per empty section. A
+        section shows once it has something in it, or while one is added. */}
+        <div className="mt-4 -ms-2 flex flex-wrap items-center gap-0.5">
+          <Button variant="ghost" aria-label="Add sub-issue" onClick={onAddSubIssue}>
+            <CornerDownRight aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+            Sub-issue
+          </Button>
+          <Button variant="ghost" aria-label="Add relation" onClick={() => setAdding("relation")}>
+            <ArrowLeftRight aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+            Relation
+          </Button>
+          <Button variant="ghost" aria-label="Add link" onClick={() => setAdding("link")}>
+            <Link2 aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+            Link
+          </Button>
+          <Button variant="ghost" aria-label="Attach file" onClick={() => pickFile.current()}>
+            <Paperclip aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+            File
+          </Button>
+        </div>
+
+        <SubIssues orgId={orgId} issue={issue} orgMembers={orgMembers} onOpen={onOpen} />
+        <Relations
+          orgId={orgId}
+          issue={issue}
+          orgMembers={orgMembers}
+          onOpen={onOpen}
+          adding={adding === "relation"}
+          onAdding={(open) => setAdding(open ? "relation" : null)}
+        />
+        <Links orgId={orgId} issue={issue} adding={adding === "link"} onAdding={(open) => setAdding(open ? "link" : null)} />
+        <Attachments orgId={orgId} issue={issue} pick={pickFile} />
         <Discussion orgId={orgId} myId={myId} issue={issue} orgMembers={orgMembers} />
       </div>
-      <AgentLane orgId={orgId} slug={slug} issue={issue} agents={agents} members={orgMembers} />
+      <AgentLane
+        orgId={orgId}
+        slug={slug}
+        issue={issue}
+        agents={agents}
+        members={orgMembers}
+        onDelegate={(delegateId) => save({ delegateId })}
+      />
       </div>
       {merge ? (
         <MergeDialog
@@ -289,9 +359,33 @@ export function IssuePeek({
   );
 }
 
+function growToText(element: HTMLTextAreaElement) {
+  element.style.height = "auto";
+  element.style.height = `${element.scrollHeight}px`;
+}
+
 function TitleField({ issue, onSave }: { issue: Issue; onSave: (title: string) => void }) {
   const [draft, setDraft] = useState(issue.title);
   useEffect(() => setDraft(issue.title), [issue.title]);
+  // Grows with the title. WebKit has no field-sizing, so the height is set
+  // here: when the text changes, and when the peek's width does.
+  const field = useRef<HTMLTextAreaElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the height follows the text, which the field holds rather than this closure
+  useLayoutEffect(() => {
+    if (field.current) growToText(field.current);
+  }, [draft]);
+  useEffect(() => {
+    const element = field.current;
+    if (!element) return;
+    let width = element.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (element.clientWidth === width) return;
+      width = element.clientWidth;
+      growToText(element);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
   const commit = () => {
     const title = draft.trim();
     if (!title) setDraft(issue.title);
@@ -303,6 +397,7 @@ function TitleField({ issue, onSave }: { issue: Issue; onSave: (title: string) =
         Title
       </label>
       <textarea
+        ref={field}
         id="peek-title"
         value={draft}
         rows={1}
@@ -321,7 +416,7 @@ function TitleField({ issue, onSave }: { issue: Issue; onSave: (title: string) =
             requestAnimationFrame(() => field.blur());
           }
         }}
-        className="field-sizing-content w-full resize-none bg-transparent text-2xl font-semibold text-ink text-balance focus-visible:outline-none"
+        className="block w-full resize-none overflow-hidden bg-transparent text-2xl font-semibold text-ink text-balance focus-visible:outline-none"
       />
     </>
   );
@@ -435,48 +530,35 @@ function SubIssues({
   issue,
   orgMembers,
   onOpen,
-  onAdd,
 }: {
   orgId: string;
   issue: Issue;
   orgMembers: Member[];
   onOpen: (identifier: string) => void;
-  onAdd: () => void;
 }) {
   const subs = useSubIssues(orgId, issue.id);
   const list = subs.data ?? [];
+  if (list.length === 0) return null;
   const done = list.filter((s) => s.status.category === "done").length;
   return (
     <section className="mt-8" aria-labelledby="peek-subs">
       <SectionHeading
         id="peek-subs"
         aside={
-          <>
-            {list.length ? (
-              <span className="text-sm text-ink-2 tabular-nums">
-                {done}/{list.length}
-              </span>
-            ) : null}
-            <Button variant="ghost" className="ms-auto" onClick={onAdd}>
-              <Plus aria-hidden="true" className="size-3.5" strokeWidth={2} />
-              Add sub-issue
-            </Button>
-          </>
+          <span className="text-sm text-ink-2 tabular-nums">
+            {done}/{list.length}
+          </span>
         }
       >
         Sub-issues
       </SectionHeading>
-      {list.length ? (
-        <ul className="flex flex-col">
-          {list.map((sub) => (
-            <li key={sub.id}>
-              <LinkedRow linked={sub} orgMembers={orgMembers} onOpen={onOpen} />
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-sm text-ink-2">No sub-issues.</p>
-      )}
+      <ul className="flex flex-col">
+        {list.map((sub) => (
+          <li key={sub.id}>
+            <LinkedRow linked={sub} orgMembers={orgMembers} onOpen={onOpen} />
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -495,36 +577,31 @@ function Relations({
   issue,
   orgMembers,
   onOpen,
+  adding,
+  onAdding,
 }: {
   orgId: string;
   issue: Issue;
   orgMembers: Member[];
   onOpen: (identifier: string) => void;
+  adding: boolean;
+  onAdding: (adding: boolean) => void;
 }) {
   const relations = useRelations(orgId, issue.id);
   const create = useCreateRelation(orgId, issue.id);
   const remove = useDeleteRelation(orgId, issue.id);
   const toast = useToast();
-  const [adding, setAdding] = useState(false);
+  const setAdding = onAdding;
   const [type, setType] = useState<RelationType>("blocks");
   const [other, setOther] = useState("");
   const list = [...(relations.data ?? [])].sort(
     (a, b) => relationOrder.indexOf(a.type) - relationOrder.indexOf(b.type),
   );
 
+  if (list.length === 0 && !adding) return null;
   return (
     <section className="mt-8" aria-labelledby="peek-relations">
-      <SectionHeading
-        id="peek-relations"
-        aside={
-          <Button variant="ghost" className="ms-auto" onClick={() => setAdding(true)}>
-            <Plus aria-hidden="true" className="size-3.5" strokeWidth={2} />
-            Add relation
-          </Button>
-        }
-      >
-        Relations
-      </SectionHeading>
+      <SectionHeading id="peek-relations">Relations</SectionHeading>
       {list.length ? (
         <ul className="flex flex-col">
           {list.map((relation) => (
@@ -542,8 +619,6 @@ function Relations({
             </li>
           ))}
         </ul>
-      ) : !adding ? (
-        <p className="text-sm text-ink-2">No relations.</p>
       ) : null}
       {adding ? (
         <form
@@ -563,21 +638,13 @@ function Relations({
             );
           }}
         >
-          <label className="sr-only" htmlFor="relation-type">
-            Relation
-          </label>
-          <Select
-            id="relation-type"
-            className="w-36 sm:h-[30px]"
+          <SelectMenu
+            label="Relation"
+            className="h-[30px] w-36"
             value={type}
-            onChange={(event) => setType(event.target.value as RelationType)}
-          >
-            {relationOrder.map((t) => (
-              <option key={t} value={t}>
-                {relationLabel[t]}
-              </option>
-            ))}
-          </Select>
+            onChange={setType}
+            options={relationOrder.map((t) => ({ value: t, label: relationLabel[t] }))}
+          />
           <label className="sr-only" htmlFor="relation-issue">
             Issue
           </label>
@@ -611,36 +678,27 @@ function Relations({
 // descriptions and comments can link at /files paths, and markdown shows
 // images by their path.
 // URLs attached to the issue, such as pull requests agents link.
-function Links({ orgId, issue }: { orgId: string; issue: Issue }) {
+function Links({
+  orgId,
+  issue,
+  adding,
+  onAdding: setAdding,
+}: {
+  orgId: string;
+  issue: Issue;
+  adding: boolean;
+  onAdding: (adding: boolean) => void;
+}) {
   const links = useLinks(orgId, issue.id);
   const add = useAddLink(orgId, issue.id);
   const remove = useRemoveLink(orgId, issue.id);
   const toast = useToast();
-  const [adding, setAdding] = useState(false);
   const [url, setUrl] = useState("");
   const list = links.data ?? [];
-  if (list.length === 0 && !adding) {
-    return (
-      <div className="mt-8">
-        <Button variant="ghost" onClick={() => setAdding(true)}>
-          <Link2 aria-hidden="true" className="size-3.5" strokeWidth={2} />
-          Add link
-        </Button>
-      </div>
-    );
-  }
+  if (list.length === 0 && !adding) return null;
   return (
     <section className="mt-8" aria-labelledby="peek-links">
-      <SectionHeading
-        id="peek-links"
-        aside={
-          <Button variant="ghost" aria-label="Add link" className="size-7 px-0" onClick={() => setAdding(true)}>
-            <Plus aria-hidden="true" className="size-3.5" strokeWidth={2} />
-          </Button>
-        }
-      >
-        Links
-      </SectionHeading>
+      <SectionHeading id="peek-links">Links</SectionHeading>
       <ul className="mt-2 flex flex-col gap-px">
         {list.map((link) => (
           <li key={link.id} className="group flex min-h-9 items-center gap-2 rounded-sm px-2 hover:bg-hover">
@@ -702,7 +760,7 @@ function Links({ orgId, issue }: { orgId: string; issue: Issue }) {
   );
 }
 
-function Attachments({ orgId, issue }: { orgId: string; issue: Issue }) {
+function Attachments({ orgId, issue, pick }: { orgId: string; issue: Issue; pick: React.MutableRefObject<() => void> }) {
   const attachments = useAttachments(orgId, issue.id);
   const create = useCreateAttachment(orgId, issue.id);
   const toast = useToast();
@@ -720,19 +778,8 @@ function Attachments({ orgId, issue }: { orgId: string; issue: Issue }) {
     if (input.current) input.current.value = "";
   };
 
-  return (
-    <section className="mt-8" aria-labelledby="peek-attachments">
-      <SectionHeading
-        id="peek-attachments"
-        aside={
-          <Button variant="ghost" className="ms-auto" onClick={() => input.current?.click()}>
-            <Paperclip aria-hidden="true" className="size-3.5" strokeWidth={2} />
-            Attach file
-          </Button>
-        }
-      >
-        Files
-      </SectionHeading>
+  pick.current = () => input.current?.click();
+  const picker = (
       <input
         ref={input}
         type="file"
@@ -749,18 +796,20 @@ function Attachments({ orgId, issue }: { orgId: string; issue: Issue }) {
           upload(event.target.files);
         }}
       />
+  );
+  if (list.length === 0 && !create.isPending) return picker;
+  return (
+    <section className="mt-8" aria-labelledby="peek-attachments">
+      <SectionHeading id="peek-attachments">Files</SectionHeading>
+      {picker}
       {create.isPending ? <p className="text-sm text-ink-2">Uploading…</p> : null}
-      {list.length ? (
-        <ul className="flex flex-col gap-1.5">
-          {list.map((attachment) => (
-            <li key={attachment.id}>
-              <FileRow attachment={attachment} />
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-sm text-ink-2">No files.</p>
-      )}
+      <ul className="flex flex-col gap-1.5">
+        {list.map((attachment) => (
+          <li key={attachment.id}>
+            <FileRow attachment={attachment} />
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -779,7 +828,7 @@ function FileRow({ attachment }: { attachment: Attachment }) {
         {image ? (
           <img src={attachment.path} alt="" loading="lazy" className="size-full object-cover" />
         ) : (
-          <span className="grid size-full place-items-center font-mono text-[10px] text-ink-2 uppercase">
+          <span className="grid size-full place-items-center font-code text-[10px] text-ink-2 uppercase">
             {extension(attachment)}
           </span>
         )}

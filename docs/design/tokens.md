@@ -11,8 +11,8 @@ These tokens move into `packages/ui` before any product UI is built. OKLCH is th
 3. **Status and priority stay neutral.** Their icons carry the meaning through shape, not color. Done is ink, not green.
 4. **Amber and red are only for an agent waiting on a human.** Amber means "needs input", red means "blocked". They appear nowhere else.
 5. **One sans for everything.** Monospace is only for code and paths, never for UI copy or agent messages.
-6. **Hairlines separate surfaces.** Shadows are only for things floating above the page: the peek, the palette, toasts.
-7. **Motion only means "an agent is working now".** Nothing loops unless an agent run is live.
+6. **Hairlines separate surfaces.** Shadows are only for things floating above the page: the peek, the agent panel, the palette, menus, dialogs and toasts.
+7. **Motion explains what changed.** Things enter, leave and move so the eye can follow them, quickly and once. Only a live agent run loops. (Rule 7 was "motion only means an agent is working now" until the feel pass of 2026-10-21.)
 
 ## Color
 
@@ -20,17 +20,23 @@ These tokens move into `packages/ui` before any product UI is built. OKLCH is th
 
 | Role | Use | Light | Dark |
 |---|---|---|---|
-| `bg` | Page background | `oklch(0.982 0.003 255)` `#f8f9fb` | `oklch(0.165 0.006 260)` `#0d0e11` |
-| `rail` | Sidebar | `oklch(0.965 0.004 255)` `#f2f4f6` | `oklch(0.145 0.006 260)` `#090a0d` |
-| `surface` | Cards, peek, palette, inputs | `oklch(0.998 0.001 255)` `#fefeff` | `oklch(0.198 0.008 260)` `#131619` |
-| `hover` | Hover, selected row, code background, segmented control | `oklch(0.948 0.005 255)` `#eceef1` | `oklch(0.235 0.009 260)` `#1c1e22` |
-| `line` | Hairline borders, dividers | `oklch(0.91 0.006 255)` `#dfe1e5` | `oklch(0.262 0.009 260)` `#222529` |
-| `line-strong` | Control borders, label outlines, inactive delegate bar | `oklch(0.85 0.008 255)` `#caced3` | `oklch(0.33 0.011 260)` `#32363b` |
+| `bg` | Page background | `oklch(0.982 0.003 255)` `#f8f9fb` | `oklch(0.16 0.006 260)` |
+| `rail` | Sidebar | `oklch(0.965 0.004 255)` `#f2f4f6` | `oklch(0.14 0.006 260)` |
+| `surface` | Cards, settings cards, inputs | `oklch(0.998 0.001 255)` `#fefeff` | `oklch(0.19 0.007 260)` |
+| `raised` | Floating layers: the peek, the agent panel, the palette, menus, dialogs, toasts | `oklch(1 0 0)` | `oklch(0.215 0.008 260)` |
+| `hover` | Hover, selected row, code background, segmented control | `ink` at 5.5% | white at 6% |
+| `line` | Hairline borders, dividers | `ink` at 10% | white at 7.5% |
+| `line-strong` | Control borders, label outlines, inactive delegate bar | `ink` at 17% | white at 14% |
+| `focus` | The focus ring, the list cursor | `ink` at 45% | `ink` at 40% |
+| `focus-soft` | The halo around a focused field | `ink` at 10% | `ink` at 8% |
+| `glow` | The light at the top of sign-in pages | white at 90% | white at 4.5% |
 | `ink` | Primary text, filled human buttons, focus ring, done icons | `oklch(0.22 0.016 260)` `#161b22` | `oklch(0.95 0.004 255)` `#edeff1` |
 | `ink-2` | Secondary text, identifiers, timestamps, placeholders | `oklch(0.47 0.014 260)` `#565b63` | `oklch(0.74 0.009 255)` `#a7abb0` |
 | `ink-3` | Icons only (backlog/todo status, empty priority). Never text | `oklch(0.65 0.01 260)` `#8c8f95` | `oklch(0.56 0.009 255)` `#71757a` |
 | `on-human` | Text on `ink` fills | `oklch(0.985 0.003 255)` | `oklch(0.17 0.008 260)` |
 | `scrim` | Behind the palette and modals | `oklch(0.25 0.02 260 / 0.2)` | `oklch(0 0 0 / 0.45)` |
+
+Hover, hairlines and focus are ink (or white, in dark) at low alpha rather than solid grays, so they read the same on every surface they sit on: the rail, the page, a card, a floating layer. Dark mode gets its depth from steps of lightness, `rail` < `bg` < `surface` < `raised`, plus a faint top highlight on floating layers.
 
 ### Agent waiting on a human
 
@@ -115,7 +121,7 @@ Section labels are sentence case at `text-sm` 600 in `ink-2`, never uppercase. N
 
 | Size | Value |
 |---|---|
-| Rail width | 252 |
+| Rail width | 240 |
 | List row | 40 high (8 vertical padding). The agent line adds 20 |
 | Group header | 34 |
 | Peek | up to 1000 wide, 8 from the viewport edges. Agent lane 360 |
@@ -136,34 +142,104 @@ Agent avatars are rounded squares at 28% of their size (5 at 18, 6 at 22, 9 at 3
 
 ## Elevation
 
-Hairlines (`line`) by default. Only floating layers get a shadow:
+Hairlines (`line`) by default. Only floating layers get a shadow, on `raised`:
 
-- Light: `0 1px 2px oklch(0.2 0.02 260 / 0.06), 0 20px 48px -16px oklch(0.2 0.02 260 / 0.28)`
-- Dark: `0 0 0 1px oklch(1 0 0 / 0.05), 0 20px 56px -16px oklch(0 0 0 / 0.75)`
+- Light: a 1px `ink` ring at 8%, then `0 1px 2px` at 6%, `0 8px 16px -8px` at 12% and `0 24px 48px -16px` at 22%.
+- Dark: a 1px inner top highlight of white at 5%, a 1px white ring at 8%, then `0 4px 12px -4px` black at 45% and `0 24px 56px -16px` black at 70%.
 
 ## Motion
 
-Easing for everything: `cubic-bezier(0.2, 0, 0, 1)`. Transitions name their properties, never `all`.
+Motion is functional: it shows where something came from, where it went and what just changed. It is quick, it runs once, and it never asks to be watched. Only a live agent run loops.
 
 | Token | Value | Use |
 |---|---|---|
-| `duration-fast` | 140ms | Hover, scrim fade, toggles |
-| `duration-base` | 220ms | Peek slide-in (16px from the right plus fade), palette rise (6px plus fade), toasts |
-| `duration-flash` | 1.6s | `agent-wash` fading out of a row an agent just changed |
-| `pulse-live` | 2s loop | Ring growing from the avatar of an agent with a live run, 1 → 1.35 scale while fading |
+| `ease-enter` | `cubic-bezier(0.16, 1, 0.3, 1)` | Anything arriving: fast out, long settle |
+| `ease-exit` | `cubic-bezier(0.4, 0, 1, 1)` | Anything leaving: accelerates away |
+| `ease-standard` | `cubic-bezier(0.2, 0, 0, 1)` | State changing in place: hover, toggles, colors |
+| `duration-exit` | 100ms | Every exit. Leaving is quicker than arriving |
+| `duration-fast` | 120ms | Hover fading out, toggles, checkboxes |
+| `duration-base` | 160ms | Menus, the palette, dialogs and toasts arriving |
+| `duration-slow` | 200ms | The peek and the agent panel sliding in, a row arriving, a status icon popping |
+| `duration-flash` | 1.2–1.6s | A wash fading out of a row that just arrived or that an agent just changed |
+| `pulse-live` | 2s loop | Ring growing from the avatar of an agent with a live run |
 | `blink-live` | 1.6s loop | Dot in the "Working" badge |
 | `thinking` | 1.2s loop, 150ms stagger | Three dots under the last update while the agent works |
 | `stream` | about 110 characters a second | A new progress update types itself in, with a caret in `agent` |
 
-Animations run once when an element appears, not on every re-render. With `prefers-reduced-motion: reduce`, loops stop, updates appear whole, and slides become plain fades.
+What moves, and how (`packages/ui/src/tokens.css`):
+
+- **Menus, the palette and dialogs** pop: scale from 0.97 and fade in on `duration-base`, from the corner nearest their trigger; on close they fade to 0.98 on `duration-exit`. The native `<dialog>` closes at once, so focus and the page come back at once, and fades out on a discrete transition (`@starting-style`, `allow-discrete`).
+- **The peek and the agent panel** slide 16px in from their edge on `duration-slow` and 10px out on `duration-exit`. While they leave they are inert.
+- **Toasts** rise 8px from their corner and fade out.
+- **Rows** take hover at once and fade it out on `duration-fast`, so moving down a list leaves a short trail. A row that arrives, or moves into another group, eases down 4px with a fading wash. A status icon that changes pops from 0.6. Neither plays on first render, and a change of view (filter, grouping) moves nothing.
+- **Sign-in, sign-up and setup** pages rise in part by part, 40ms apart, the first time they show.
+- **The phone's drawer** slides in from the leading edge over a fading scrim.
+
+Transitions name their properties, never `all`. Animations run once when something appears or changes, never on every render. Layers that leave stay mounted for their exit only (`usePresence`).
+
+With `prefers-reduced-motion: reduce`, distances and scales drop to zero (`--motion: 0`), so slides and pops become plain fades, layers leave at once, loops stop, and updates appear whole. The e2e suite runs that way.
 
 ## Components these tokens imply
 
 - **Agent avatar**: rounded square, `agent` fill, `on-agent` initials, the `pulse-live` ring while a run is live.
-- **State badge**: `text-meta` 500, `radius-full`, 20 high, sentence case. Working: `agent-wash` and `agent-ink` with a blinking dot. Needs input: `warn-wash` and `warn`. Blocked: `danger-wash` and `danger`. Done and Delegated: `hover` and `ink-2`.
+- **State badge**: `text-meta` 500, `radius-full`, 20 high, sentence case. Working: `agent-wash` and `agent-ink` with a blinking dot. Needs input: `warn-wash` and `warn`. Blocked: `danger-wash` and `danger`. Quiet (Working with no word from the agent for 30 minutes): `hover` and `ink-2`, no dot, and the row's live bar and the lane's thinking dots stop. Done and Delegated: `hover` and `ink-2`.
 - **Delegated row**: a 3px bar on the leading edge (`line-strong`, or `agent` while live) and a second line with the agent's name in `agent-ink`, the badge, the run timer and the first line of the latest update in `ink-2`.
 - **Agent lane**: `lane` background, `agent-edge` border while live, updates on a 2px `agent-edge` rule (`warn` or `danger` when waiting on a human), links as outlined chips.
-- **Focus**: 2px `ink` outline, 2px offset, on `:focus-visible` only. The list cursor is the same ring inside the row on a `hover` background.
+- **Focus**: a 2px `focus` outline, 2px offset, on `:focus-visible` only. Fields instead firm their edge to `ink-2` and take a 3px `focus-soft` halo, since a field you type in stays focused for long. The list cursor is a 1.5px `focus` ring inside the row on a `hover` background.
+- **Controls**: checkboxes, radios and switches are the native inputs drawn in the tokens: `line-strong` when off, `ink` when on, the focus halo. Choosing one of a few values is a `SelectMenu`, the app's menu behind a button; a date is the app's calendar.
+
+## Direction: calm desk, live agents
+
+The polish pass before v1.0 settled how screens are put together, on top of these tokens. It was approved on 2026-10-20. Humans get a quiet, dense workspace in ink. The only color on screen comes from agents doing work, and the only thing that loops is a live agent run.
+
+### One page frame
+
+- Every page starts with a 48px page bar on a hairline: the title, led by a team key or a breadcrumb (Projects › name), then a status such as a live "Claude is working" pill, then the page's actions. At most one ink button.
+- The bar stays put while the page scrolls. In the desktop app it is also the handle to drag the window by.
+- A page with view options puts them in a toolbar under the bar, at least 44 high. No page has a big title above its content.
+- Fields that belong to the page, like a project's status, lead and target date, sit in the bar as chips that open app menus.
+
+### One issue row
+
+- An issue looks the same wherever it is listed: a team's list, My issues, a project, the inbox. In order: priority, identifier, status, title, labels, the people on it and how long ago it changed.
+- An issue delegated to an agent gets a second line: the agent's name in `agent-ink`, its state badge and the first line of its latest update. A 3px bar on the leading edge turns `agent` only while the run is live.
+- The assignee's circle and the delegate's square sit side by side, never overlapping.
+
+### A calmer rail
+
+- From the top: the workspace button with New issue beside it, the search field, then Inbox, My issues and Projects.
+- Agents follow, one line each, with their state badge and the issue a working agent is on.
+- Then teams, each opening to Issues and Board. Connect an agent, Members, Trash, Settings and the person's own name sit at the bottom.
+
+### Agents at a glance
+
+- The agents page is a roster: each agent's state, queue, current issue and last activity on one row. Picking a row opens a side panel with its work, powers and access, and editing happens there.
+- The Teams page is a roster too: each team's open, in-progress and delegated issues, its members and its agents.
+
+### Show, don't announce
+
+- An empty section folds into one quiet add-action. A heading appears once the section has content.
+- Settings are split into your own preferences and the organization's, with a subnav. Members and the instance settings live in the same frame, as cards of rows with the control on the trailing side.
+- A page that reads as one document, like the trash or Connect an agent, sits in one centered column, so a wide window doesn't strand it on one side.
+- ⌘K opens on what you are likely to do next: New issue, the issues you opened last, then Go to.
+
+### On a phone
+
+- Below 640px a row takes two lines: the status and a title that wraps, then priority, identifier, two labels as plain dots and the people. The agent line follows, and the age goes.
+- Below 768px the rail opens as a drawer from a 48px top bar holding the workspace, search, the inbox with its unread count, and the menu.
+- A page's toolbar folds into one View sheet, and New issue is a 52px ink button floating over the lists.
+
+### Don'ts
+
+- No accent on human actions, links, selection or focus. Ink only.
+- No amber or red outside an agent waiting on a human. A paused project is neutral.
+- No UPPERCASE labels, and no `ink-3` text.
+- No native selects, radios, checkboxes or date inputs in the browser's own look. Use `SelectMenu`, the app's calendar, and the drawn `Checkbox`, `Radio` and `Switch`.
+- No hard 2px rings on fields, and no bright outline on a chosen card or swatch. Focus and choice are quiet.
+- No motion that loops unless an agent run is live, no `transition: all`, and nothing that animates on every render.
+- No shadows on cards in the page.
+- No overlapping avatar pairs.
+- No section whose only content is "No X."
 
 ## Logo
 

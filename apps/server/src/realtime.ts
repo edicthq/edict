@@ -184,7 +184,7 @@ export async function startRealtime(server: ServerType, deps: RealtimeDeps): Pro
         wss.handleUpgrade(request, socket, head, (ws) => {
           sockets.set(ws, { userId: person.id, orgs: new Set(), headers });
           ws.on("message", (raw) => {
-            void subscribe(ws, person.id, String(raw));
+            subscribe(ws, person.id, String(raw)).catch((error) => console.error("realtime subscribe:", error));
           });
           ws.on("close", () => leave(ws));
           ws.on("error", () => leave(ws));
@@ -199,6 +199,12 @@ export async function startRealtime(server: ServerType, deps: RealtimeDeps): Pro
       message = JSON.parse(raw);
     } catch {
       message = {};
+    }
+    // The browser pings when it wakes or after a quiet spell; no pong means a
+    // dead socket it should replace.
+    if (message.type === "ping") {
+      ws.send(JSON.stringify({ type: "pong" }));
+      return;
     }
     if (message.type === "unsubscribe" && typeof message.orgId === "string") {
       const meta = sockets.get(ws);
@@ -224,7 +230,10 @@ export async function startRealtime(server: ServerType, deps: RealtimeDeps): Pro
       ws.close(1008, "not a member");
       return;
     }
-    sockets.get(ws)!.orgs.add(orgId);
+    // The socket may have closed while membership was checked.
+    const meta = sockets.get(ws);
+    if (!meta) return;
+    meta.orgs.add(orgId);
     const room = rooms.get(orgId) ?? new Set();
     room.add(ws);
     rooms.set(orgId, room);

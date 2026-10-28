@@ -1,5 +1,6 @@
 import type { InboxItem } from "@edicthq/client";
-import { Avatar, TeamKey, cn } from "@edicthq/ui";
+import { Avatar, Tabs, cn } from "@edicthq/ui";
+import { Inbox } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import { Button } from "@edicthq/ui";
@@ -46,28 +47,16 @@ export function InboxPage() {
         title="Inbox"
         actions={
           <>
-            <div className="flex items-center gap-1 rounded-sm border border-line bg-surface p-0.5 text-ui">
-              <button
-                type="button"
-                onClick={() => setFilter("unread")}
-                className={cn(
-                  "rounded-xs px-2.5 py-1 text-sm font-medium transition-[background-color,color]",
-                  filter === "unread" ? "bg-hover text-ink" : "text-ink-2 hover:text-ink",
-                )}
-              >
-                Unread
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilter("all")}
-                className={cn(
-                  "rounded-xs px-2.5 py-1 text-sm font-medium transition-[background-color,color]",
-                  filter === "all" ? "bg-hover text-ink" : "text-ink-2 hover:text-ink",
-                )}
-              >
-                All
-              </button>
-            </div>
+            <Tabs
+              label="Notifications"
+              variant="segmented"
+              value={filter}
+              onChange={setFilter}
+              items={[
+                { value: "unread", label: "Unread" },
+                { value: "all", label: "All" },
+              ]}
+            />
             <Button
               variant="ghost"
               onClick={() => markAll.mutate()}
@@ -89,20 +78,20 @@ export function InboxPage() {
                 <Link
                   to={
                     item.issue
-                      ? `/${slug}/teams/${item.issue.teamId}?peek=${item.issue.identifier}`
+                      ? `/${slug}/teams/${item.issue.teamId}?issue=${item.issue.identifier}`
                       : `/${slug}/agents`
                   }
                   onClick={() => open(item)}
                   className={cn(rowClass, "min-w-0")}
                   aria-current={item.readAt ? undefined : "true"}
                 >
-                  {item.actor && item.issue ? <Avatar name={item.actor.name} /> : null}
-                  <span className="min-w-0 flex-1 truncate text-body font-medium text-ink">
+                  {item.actor && item.issue ? <Avatar name={item.actor.name} kind={item.actor.kind === "agent" ? "agent" : "human"} /> : null}
+                  {/* A phone gives the line two rows, so the issue's title stays readable. */}
+                  <span className="min-w-0 flex-1 text-body font-medium text-ink max-sm:line-clamp-2 sm:truncate">
                     {item.issue ? (
                       <>
-                        <span className="font-semibold">{item.actor?.name ?? "Someone"}</span>{" "}
+                        <span className={cn("font-semibold", item.actor?.kind === "agent" && "text-agent-ink")}>{item.actor?.name ?? "Someone"}</span>{" "}
                         {item.progressState ? progressWords[item.progressState] : typeLine[item.type]}{" "}
-                        <TeamKey>{item.issue.identifier.split("-")[0]}</TeamKey>{" "}
                         <span className="font-medium text-ink">{item.issue.identifier}</span>{" "}
                         <span className={cn("text-ink-2 font-normal")}>{item.issue.title}</span>
                       </>
@@ -115,8 +104,9 @@ export function InboxPage() {
                       </>
                     )}
                   </span>
-                  {!item.readAt ? <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-ink" /> : null}
-                  <time dateTime={item.createdAt} className="shrink-0 text-end text-sm text-ink-3">
+                  {/* The dot keeps its place when read, and the time a fixed width, so both line up down the list. */}
+                  <span aria-hidden="true" className={cn("size-1.5 shrink-0 rounded-full bg-ink", item.readAt && "invisible")} />
+                  <time dateTime={item.createdAt} className="w-8 shrink-0 text-end text-sm text-ink-2 tabular-nums">
                     {ago(item.createdAt)}
                   </time>
                 </Link>
@@ -125,11 +115,13 @@ export function InboxPage() {
           </ul>
         ) : (
           <EmptyState
-            title="Nothing here"
+            layout="page"
+            icon={<Inbox aria-hidden="true" />}
+            title={filter === "unread" ? "You're all caught up" : "Nothing here yet"}
             body={
               filter === "unread"
-                ? "No unread notifications. Work that involves you shows up here."
-                : "You have no notifications about work yet."
+                ? "Mentions, assignments, delegations and agent progress land here."
+                : "Work that involves you shows up here once someone assigns, delegates or mentions you."
             }
           />
         )}

@@ -4,7 +4,7 @@
 // for an edict:// link (ADR 0027). This page sends notifications back. In a
 // browser none of this runs.
 import type { InboxItem } from "@edicthq/client";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { progressWords, typeLine } from "../routes/inbox.js";
 import { api, unwrap } from "./api.js";
@@ -17,6 +17,42 @@ interface TauriGlobal {
 
 export function tauri(): TauriGlobal | undefined {
   return (window as { __TAURI__?: TauriGlobal }).__TAURI__;
+}
+
+// What the shell says about itself, set before any page script runs. On macOS
+// the traffic lights float over the page ("overlay"); on Windows and Linux the
+// window has no frame and the page draws its own controls ("custom").
+export interface DesktopShell {
+  platform: "macos" | "windows" | "linux";
+  titleBar: "overlay" | "custom";
+  version?: string;
+}
+
+export function desktopShell(): DesktopShell | undefined {
+  const shell = (window as { __EDICT_DESKTOP__?: DesktopShell }).__EDICT_DESKTOP__;
+  return shell && tauri() ? shell : undefined;
+}
+
+// Marks the root so CSS can give the desktop app its chrome: the title strip,
+// unselectable chrome and the default cursor.
+export function markDesktop(): void {
+  const shell = desktopShell();
+  if (!shell) return;
+  document.documentElement.dataset.desktop = shell.platform;
+  document.documentElement.dataset.titleBar = shell.titleBar;
+}
+
+// The window controls a frameless window draws itself (Windows and Linux).
+export function windowCommand(command: "minimize" | "toggle_maximize" | "close"): void {
+  void tauri()
+    ?.core.invoke(`plugin:window|${command}`, { label: "main" })
+    .catch(() => undefined);
+}
+
+// Opens the shell's instance switcher (ADR 0028). It returns nothing, so a
+// page never learns which other instances are saved.
+export function openSwitcher(): void {
+  void tauri()?.core.invoke("open_switcher").catch(() => undefined);
 }
 
 // Where an edict:// link opens in an organization: the same URIs as the MCP
@@ -87,6 +123,17 @@ export function useDesktopBridge(slug: string, orgId: string): void {
   const latest = useRef({ slug, pathname: location.pathname, search: location.search, teams: teams.data });
   latest.current = { slug, pathname: location.pathname, search: location.search, teams: teams.data };
 
+  // The team on screen, or the first one, with its new-issue dialog open.
+  const quickCreate = useCallback(() => {
+    const { slug, pathname, search, teams } = latest.current;
+    const onTeam = new RegExp(`^/${slug}/teams/([^/]+)$`).exec(pathname)?.[1];
+    const teamId = onTeam ?? teams?.[0]?.id;
+    if (!teamId) return;
+    const params = new URLSearchParams(onTeam ? search : "");
+    params.set("create", "1");
+    navigate(`/${slug}/teams/${teamId}?${params}`);
+  }, [navigate]);
+
   useEffect(() => {
     const link = takeDeepLink();
     const path = link ? deepLinkPath(link, slug) : null;
@@ -101,25 +148,49 @@ export function useDesktopBridge(slug: string, orgId: string): void {
         const path = deepLinkPath(String(payload), latest.current.slug);
         if (path) navigate(path);
       }),
-      // The team on screen, or the first one, with its new-issue dialog open.
-      shell.event.listen("quick-create", () => {
-        const { slug, pathname, search, teams } = latest.current;
-        const onTeam = new RegExp(`^/${slug}/teams/([^/]+)$`).exec(pathname)?.[1];
-        const teamId = onTeam ?? teams?.[0]?.id;
-        if (!teamId) return;
-        const params = new URLSearchParams(onTeam ? search : "");
-        params.set("create", "1");
-        navigate(`/${slug}/teams/${teamId}?${params}`);
-      }),
+      shell.event.listen("quick-create", () => quickCreate()),
     ];
     void shell.core.invoke("plugin:notification|request_permission").catch(() => undefined);
     return () => {
       for (const off of offs) void off.then((stop) => stop());
     };
-  }, [navigate]);
+  }, [navigate, quickCreate]);
+
+  // The desktop app's own shortcuts: back and forward, settings, a new issue.
+  // Browsers keep these keys for themselves, so only the app takes them.
+  useEffect(() => {
+    if (!desktopShell()) return;
+    const onKey = (event: KeyboardEvent) => {
+      const command = event.metaKey || event.ctrlKey;
+      if (!command || event.altKey) return;
+      const { slug } = latest.current;
+      if (event.key === "[") {
+        event.preventDefault();
+        navigate(-1);
+      } else if (event.key === "]") {
+        event.preventDefault();
+        navigate(1);
+      } else if (event.key === ",") {
+        event.preventDefault();
+        navigate(`/${slug}/settings`);
+      } else if (event.key.toLowerCase() === "n" && !event.shiftKey) {
+        event.preventDefault();
+        quickCreate();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [navigate, quickCreate]);
 
   const seen = useRef<number | undefined>(undefined);
   const count = unread.data?.unreadCount;
+  // The unread count on the dock or taskbar icon.
+  useEffect(() => {
+    if (count === undefined || !desktopShell()) return;
+    void tauri()
+      ?.core.invoke("plugin:window|set_badge_count", { label: "main", value: count > 0 ? count : null })
+      .catch(() => undefined);
+  }, [count]);
   useEffect(() => {
     if (count === undefined) return;
     const before = seen.current;
