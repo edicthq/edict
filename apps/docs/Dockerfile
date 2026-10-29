@@ -10,6 +10,9 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/docs/package.json apps/docs/
 RUN pnpm install --frozen-lockfile --filter @edicthq/docs
 COPY apps/docs ./apps/docs
+# The public URL, for canonical links, Open Graph and the sitemap.
+ARG SITE_URL=https://edict.dev
+ENV SITE_URL=$SITE_URL
 RUN pnpm --filter @edicthq/docs run build
 
 FROM nginx:1.29-alpine

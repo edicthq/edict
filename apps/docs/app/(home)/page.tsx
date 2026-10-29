@@ -24,11 +24,34 @@ import { ClientTabs, CopyBlock, DownloadButton } from '@/components/landing/inte
 import { Reveal } from '@/components/landing/motion';
 import { Timeline } from '@/components/landing/timeline';
 import { composeCommands, downloads, releasesUrl, repo, version } from '@/lib/release';
+import { ogImage, siteUrl } from '@/lib/shared';
+
+const title = 'Edict · The issue tracker your agents work in';
+const description =
+  'Edict is an open-source, self-hosted issue tracker where AI agents are members of your team. Connect Claude Code, Codex, Cursor or any MCP client by pasting one URL.';
 
 export const metadata: Metadata = {
-  title: { absolute: 'Edict · The issue tracker your agents work in' },
-  description:
-    'Edict is an open-source, self-hosted issue tracker where AI agents are members of your team. Connect Claude Code, Codex, Cursor or any MCP client by pasting one URL.',
+  title: { absolute: title },
+  description,
+  alternates: { canonical: '/' },
+  // A page's openGraph replaces the layout's whole, so it repeats siteName.
+  openGraph: { type: 'website', siteName: 'Edict', locale: 'en_US', url: '/', title, description, images: [ogImage] },
+  twitter: { card: 'summary_large_image', title, description, images: [ogImage] },
+};
+
+// Tells search engines what Edict is, for a richer result than the page alone.
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'Edict',
+  description,
+  url: siteUrl,
+  applicationCategory: 'BusinessApplication',
+  operatingSystem: 'macOS, Windows, Linux, Docker',
+  softwareVersion: version,
+  license: 'https://www.gnu.org/licenses/agpl-3.0.html',
+  codeRepository: repo,
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
 };
 
 const reads = [
@@ -53,6 +76,11 @@ const writes = [
 export default function HomePage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: a constant object, serialized
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
       <Nav />
       <main id="main">
         <Hero />
