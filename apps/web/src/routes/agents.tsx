@@ -1,9 +1,25 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router";
 import type { Agent, AgentPower, Issue, Member, Webhook, WebhookDelivery } from "@edicthq/client";
-import { type AgentState, Avatar, Badge, Button, Checkbox, Dialog, Field, Input, ProgressBadge, Tabs, buttonClass, cn, usePresence } from "@edicthq/ui";
+import {
+  type AgentState,
+  Avatar,
+  Badge,
+  Button,
+  Checkbox,
+  Dialog,
+  Field,
+  Input,
+  ProgressBadge,
+  Skeleton,
+  SkeletonGroup,
+  Tabs,
+  buttonClass,
+  cn,
+  usePresence,
+} from "@edicthq/ui";
 import { Plus, X } from "lucide-react";
-import { EmptyState, FormError, GroupHeader, Loading, PageBody, PageHeader } from "../components/shell.js";
+import { EmptyState, FormError, GroupHeader, PageBody, PageHeader } from "../components/shell.js";
 import { useToast } from "../components/toast.js";
 import { agentState, connectionLine, firstName, plainLine } from "../lib/agents.js";
 import { useNow } from "../lib/live.js";
@@ -110,7 +126,7 @@ export function AgentsPage() {
       ) : null}
 
       {agents.isPending ? (
-        <Loading label="Loading agents" />
+        <RosterSkeleton />
       ) : shown.length ? (
         <div className="px-3 pt-1">
           <div aria-hidden="true" className="grid h-9 grid-cols-[minmax(0,1.4fr)_120px_64px_minmax(0,1.3fr)_72px] items-center gap-4 px-3 text-sm font-medium text-ink-2 max-md:hidden">
@@ -165,6 +181,50 @@ export function AgentsPage() {
       ) : null}
       {canManage ? <NewAgentDialog open={creating} onClose={() => setCreating(false)} onCreated={(agent) => select(agent.id)} /> : null}
     </div>
+  );
+}
+
+const rosterGrid = "grid-cols-[minmax(0,1.4fr)_120px_64px_minmax(0,1.3fr)_72px]";
+
+// The roster while it loads: its header, then a row per agent with its face,
+// name and connection, state, queue, current issue and when it was active.
+function RosterSkeleton() {
+  return (
+    <SkeletonGroup label="Loading agents" className="px-3 pt-1">
+      <div className={cn("grid h-9 items-center gap-4 px-3 max-md:hidden", rosterGrid)}>
+        <Skeleton className="w-10" />
+        <Skeleton className="w-9" />
+        <Skeleton className="ms-auto w-10" />
+        <Skeleton className="w-16" />
+        <Skeleton className="ms-auto w-10" />
+      </div>
+      <div className="flex flex-col gap-px">
+        {[0, 1, 2].map((row) => (
+          <div
+            key={row}
+            className={cn(
+              "grid min-h-12 items-center gap-4 px-3 py-1.5 max-md:grid-cols-[minmax(0,1fr)_auto] max-md:gap-x-3 max-md:gap-y-1 max-md:py-2.5",
+              rosterGrid,
+            )}
+          >
+            <span className="flex min-w-0 items-center gap-2.5">
+              <Skeleton className="size-[22px] shrink-0 rounded-[6px]" />
+              <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <Skeleton style={{ width: `${50 + ((row * 19) % 30)}%` }} />
+                <Skeleton className="h-2.5" style={{ width: `${40 + ((row * 23) % 30)}%` }} />
+              </span>
+            </span>
+            <Skeleton className="h-5 w-16 rounded-full" />
+            <Skeleton className="ms-auto w-4 max-md:hidden" />
+            <span className="flex min-w-0 items-center gap-1.5 max-md:col-span-2 max-md:ps-[34px]">
+              <Skeleton className="w-11 shrink-0" />
+              <Skeleton style={{ width: `${40 + ((row * 29) % 35)}%` }} />
+            </span>
+            <Skeleton className="ms-auto w-8 max-md:hidden" />
+          </div>
+        ))}
+      </div>
+    </SkeletonGroup>
   );
 }
 
@@ -676,7 +736,19 @@ function Deliveries({ webhookId }: { webhookId: string }) {
   const redeliver = useRedeliver(orgId, webhookId);
   const toast = useToast();
   const [open, setOpen] = useState<string | null>(null);
-  if (deliveries.isPending) return <p className="border-t border-line px-3 py-2 text-sm text-ink-2">Loading deliveries…</p>;
+  if (deliveries.isPending) {
+    return (
+      <SkeletonGroup label="Loading deliveries" className="border-t border-line">
+        {["w-28", "w-36", "w-24"].map((width) => (
+          <div key={width} className="flex min-h-[37px] items-center gap-3 border-b border-line px-3 py-2 last:border-b-0">
+            <Skeleton className="w-10 shrink-0 me-6" />
+            <Skeleton className={width} />
+            <Skeleton className="ms-auto w-32" />
+          </div>
+        ))}
+      </SkeletonGroup>
+    );
+  }
   if (!deliveries.data?.length) return <p className="border-t border-line px-3 py-2 text-sm text-ink-2">No deliveries in the last 30 days.</p>;
   return (
     <ul className="border-t border-line">

@@ -4,7 +4,8 @@ import type { Agent } from "@edicthq/client";
 import { Link } from "react-router";
 import { Avatar, Button, SelectMenu, cn } from "@edicthq/ui";
 import { Check, ChevronRight, Copy, Minus, Plus } from "lucide-react";
-import { AuthShell, FormError, Loading, MarkTile, PageColumn, PageHeader } from "../components/shell.js";
+import { AuthShell, FormError, MarkTile, PageColumn, PageHeader } from "../components/shell.js";
+import { AuthSkeleton } from "../components/skeletons.js";
 import { connectionLine, firstName } from "../lib/agents.js";
 import { useAgents, useApiKeys, useChooseConnectionOrganization, useCreateApiKey, useMembers, useMemberships } from "../lib/queries.js";
 import { useOrg } from "./org.js";
@@ -443,7 +444,7 @@ export function ConsentPage() {
     if (!orgId && memberships.data?.[0]) setOrgId(memberships.data[0].organization.id);
   }, [memberships.data, orgId]);
 
-  if (memberships.isPending || client.isPending) return <Loading />;
+  if (memberships.isPending || client.isPending) return <AuthSkeleton label="Loading the connection" body="card" />;
   // As the server names agents: without the "(<server name>)" Claude Code adds.
   const name = (client.data?.client_name ?? client.data?.name ?? "").replace(/\s*\([^()]*\)\s*$/, "").trim() || "An MCP client";
   const me = memberships.data?.find((m) => m.organization.id === orgId)?.member;

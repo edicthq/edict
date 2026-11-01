@@ -4,7 +4,8 @@ import { Inbox } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import { Button } from "@edicthq/ui";
-import { EmptyState, Loading, PageBody, PageHeader, rowClass } from "../components/shell.js";
+import { EmptyState, PageBody, PageHeader, rowClass } from "../components/shell.js";
+import { RowsSkeleton } from "../components/skeletons.js";
 import { useInbox, useMarkAllInboxRead, useMarkInboxItem } from "../lib/queries.js";
 import { ago } from "../lib/issues.js";
 import { useOrg } from "./org.js";
@@ -70,7 +71,7 @@ export function InboxPage() {
 
       <PageBody>
         {inbox.isPending ? (
-          <Loading label="Loading the inbox" />
+          <RowsSkeleton label="Loading the inbox" avatar />
         ) : items.length ? (
           <ul className="flex flex-col gap-px">
             {items.map((item) => (

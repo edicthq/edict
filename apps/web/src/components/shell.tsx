@@ -224,11 +224,3 @@ export function FormError({ message }: { message?: string | null }) {
     </p>
   );
 }
-
-export function Loading({ label = "Loading" }: { label?: string }) {
-  return (
-    <p role="status" className="px-6 py-8 text-ui text-ink-2">
-      {label}…
-    </p>
-  );
-}

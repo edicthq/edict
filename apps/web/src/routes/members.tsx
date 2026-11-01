@@ -1,7 +1,7 @@
 import type { Member, Role } from "@edicthq/client";
-import { Avatar, Badge, Button, SelectMenu } from "@edicthq/ui";
+import { Avatar, Badge, Button, SelectMenu, SkeletonGroup } from "@edicthq/ui";
 import { SettingsCard, SettingsFrame } from "../components/settings-frame.js";
-import { Loading } from "../components/shell.js";
+import { SettingsCardSkeleton } from "../components/skeletons.js";
 import { allRoles, roleLabel } from "../lib/labels.js";
 import { useInvites, useMembers, useRemoveMember, useRevokeInvite, useUpdateMemberRole } from "../lib/queries.js";
 import { useOrg } from "./org.js";
@@ -24,7 +24,9 @@ export function MembersPage() {
       }
     >
       {members.isPending ? (
-        <Loading label="Loading members" />
+        <SkeletonGroup label="Loading members">
+          <SettingsCardSkeleton kind="person" rows={4} />
+        </SkeletonGroup>
       ) : (
         <>
           <SettingsCard title="Humans" count={humans.length}>

@@ -2,7 +2,8 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { DbProvider } from "@tanstack/react-db";
 import { Link, Navigate, Outlet, RouterProvider, createBrowserRouter, useLocation } from "react-router";
 import { db, queryClient } from "./lib/db.js";
-import { AuthShell, Loading } from "./components/shell.js";
+import { AuthShell } from "./components/shell.js";
+import { AppSkeleton, AuthSkeleton } from "./components/skeletons.js";
 import { ToastProvider } from "./components/toast.js";
 import { useSession } from "./lib/auth.js";
 import { useInstance } from "./lib/queries.js";
@@ -23,11 +24,18 @@ import { ProjectDetailPage, ProjectsPage } from "./routes/projects.js";
 import { MyIssuesPage } from "./routes/my-issues.js";
 import { InboxPage } from "./routes/inbox.js";
 
+const authStylePaths = new Set(["/new", "/oauth/consent"]);
+
 // Pages for signed-in users. Others go to sign-in, or to sign-up on a fresh instance.
 function SignedIn() {
   const session = useSession();
   const instance = useInstance();
-  if (session.isPending || (!session.data && instance.isPending)) return <Loading />;
+  const location = useLocation();
+  if (session.isPending || (!session.data && instance.isPending)) {
+    // Creating an organization and approving a client are sign-in style pages;
+    // everything else opens in the app's frame.
+    return authStylePaths.has(location.pathname) ? <AuthSkeleton /> : <AppSkeleton />;
+  }
   if (!session.data) {
     // A fresh instance has no one to sign in yet: its first visitor sets it up.
     return <Navigate to={instance.data?.setUp === false ? "/sign-up" : "/sign-in"} replace />;
@@ -39,7 +47,7 @@ function SignedIn() {
 function SignedOut() {
   const session = useSession();
   const location = useLocation();
-  if (session.isPending) return <Loading />;
+  if (session.isPending) return <AuthSkeleton />;
   if (session.data && !new URLSearchParams(location.search).has("invite")) return <Navigate to="/" replace />;
   return <Outlet />;
 }

@@ -30,7 +30,8 @@ import { RailToggle } from "../components/rail-toggle.js";
 import { UndoProvider } from "../components/undo.js";
 import { DesktopBar } from "../components/desktop-bar.js";
 import { VerifyBanner } from "../components/verify-banner.js";
-import { AuthShell, Loading } from "../components/shell.js";
+import { AuthShell } from "../components/shell.js";
+import { AppSkeleton } from "../components/skeletons.js";
 import { authClient, useSession } from "../lib/auth.js";
 import { mod } from "../lib/labels.js";
 import { useRealtime } from "../lib/realtime.js";
@@ -110,7 +111,7 @@ export function OrgLayout() {
     return () => window.removeEventListener("keydown", onKey);
   }, [rail.toggle]);
 
-  if (memberships.isPending) return <Loading />;
+  if (memberships.isPending) return <AppSkeleton />;
   const membership = memberships.data?.find((m) => m.organization.slug === slug);
   if (!membership) {
     return (

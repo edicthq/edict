@@ -1,8 +1,9 @@
 import type { SignUpMode } from "@edicthq/client";
-import { Avatar, Badge, Button, Input, Radio, Switch, cn } from "@edicthq/ui";
+import { Avatar, Badge, Button, Input, Radio, SkeletonGroup, Switch, cn } from "@edicthq/ui";
 import { type ReactNode, useState } from "react";
 import { SettingRow, SettingsCard, SettingsFrame, SettingsLead } from "../components/settings-frame.js";
-import { FormError, Loading } from "../components/shell.js";
+import { FormError } from "../components/shell.js";
+import { SettingsCardSkeleton } from "../components/skeletons.js";
 import { ago } from "../lib/issues.js";
 import { useCheckForUpdate, useInstance, useInstanceStatus, useInstanceUsers, useUpdateInstance } from "../lib/queries.js";
 
@@ -31,7 +32,9 @@ export function InstancePage() {
     <SettingsFrame title="Instance settings">
       <SettingsLead>These settings cover every organization on this instance. Only instance admins see them.</SettingsLead>
       {instance.isPending ? (
-        <Loading />
+        <SkeletonGroup label="Loading instance settings">
+          <SettingsCardSkeleton kind="choice" />
+        </SkeletonGroup>
       ) : (
         <fieldset disabled={setMode.isPending} className="contents">
           <SettingsCard title="Who can sign up">
