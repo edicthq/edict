@@ -1,3 +1,4 @@
+export { ActionMenu, actionMenuItemClass } from "./action-menu.js";
 export { Avatar } from "./avatar.js";
 export { Badge, Count, ProgressBar, ProgressBadge, ProjectStatusBadge, TeamKey, type AgentState } from "./badge.js";
 export { Button, Kbd, buttonClass, type ButtonProps } from "./button.js";

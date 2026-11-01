@@ -18,7 +18,7 @@ import {
 import { useEffect, useState, type ReactNode } from "react";
 import type { Membership } from "@edicthq/client";
 import { Link, NavLink, Outlet, useLocation, useNavigate, useOutletContext, useParams } from "react-router";
-import { type AgentState, Avatar, Kbd, LogoMark, ProgressBadge, TeamKey, cn } from "@edicthq/ui";
+import { ActionMenu, type AgentState, Avatar, Kbd, LogoMark, ProgressBadge, TeamKey, actionMenuItemClass, cn } from "@edicthq/ui";
 import { CreateTeamDialog } from "../components/create-team-dialog.js";
 import { InviteDialog } from "../components/invite-dialog.js";
 import { CommandPalette } from "../components/palette.js";
@@ -262,7 +262,7 @@ function Rail({ context, others, drawer }: { context: OrgContext; others: Member
     >
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-1">
-          <Workspace context={context} others={others} />
+          <OrganizationMenu context={context} others={others} />
           {teams.data?.length ? (
             <button
               type="button"
@@ -494,52 +494,61 @@ function AgentRow({ agent, members, slug, orgId }: { agent: Agent; members: Memb
   );
 }
 
-// The workspace button: the organization on screen, the others to switch to,
-// and in the desktop app the instance switcher (ADR 0028).
-function Workspace({ context, others }: { context: OrgContext; others: Membership[] }) {
+// The organization button: the organization on screen, the others to switch
+// to, and in the desktop app the instance switcher (ADR 0028). Its menu floats
+// over the page, so the sidebar never cuts it off.
+function OrganizationMenu({ context, others }: { context: OrgContext; others: Membership[] }) {
   const current = context.membership;
   const inApp = Boolean(desktopShell());
   return (
-    <details className="group relative min-w-0 flex-1">
-      <summary
-        className="flex h-8 cursor-pointer list-none items-center gap-2 rounded-sm px-1.5 hover:bg-hover [&::-webkit-details-marker]:hidden"
-        aria-label={`Organization: ${current.organization.name}. Switch organization`}
-      >
-        <span aria-hidden="true" className="grid size-5 shrink-0 place-items-center rounded-[5px] bg-ink text-on-human">
-          <LogoMark size={14} className="text-on-human" />
-        </span>
-        <span className="truncate text-ui font-semibold">{current.organization.name}</span>
-        <ChevronDown aria-hidden="true" className="size-3 shrink-0 text-ink-3" strokeWidth={2} />
-      </summary>
-      <div className="motion-pop absolute start-0 top-9 z-20 flex w-60 origin-top-left flex-col gap-0.5 rounded-md bg-raised p-1 shadow-overlay">
-        {others.map((m) => (
-          <NavLink
-            key={m.organization.id}
-            to={`/${m.organization.slug}`}
-            className="flex h-8 items-center gap-2 rounded-sm px-2 text-ui hover:bg-hover aria-[current=page]:font-semibold"
-            end
-          >
-            <span className="truncate">{m.organization.name}</span>
-            <span className="ms-auto text-sm text-ink-2">{m.organization.slug}</span>
-          </NavLink>
-        ))}
-        <NavLink to="/new" className="flex h-8 items-center gap-2 rounded-sm px-2 text-ui text-ink-2 hover:bg-hover hover:text-ink">
-          <Plus aria-hidden="true" className="size-3.5" strokeWidth={2} />
-          New organization
+    <ActionMenu
+      label="Switch organization"
+      trigger={(props) => (
+        <button
+          {...props}
+          type="button"
+          aria-label={`Organization: ${current.organization.name}. Switch organization`}
+          className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-sm px-1.5 text-start hover:bg-hover aria-expanded:bg-hover"
+        >
+          <span aria-hidden="true" className="grid size-5 shrink-0 place-items-center rounded-[5px] bg-ink text-on-human">
+            <LogoMark size={14} className="text-on-human" />
+          </span>
+          <span className="truncate text-ui font-semibold">{current.organization.name}</span>
+          <ChevronDown aria-hidden="true" className="size-3 shrink-0 text-ink-3" strokeWidth={2} />
+        </button>
+      )}
+    >
+      {others.map((m) => (
+        <NavLink
+          key={m.organization.id}
+          to={`/${m.organization.slug}`}
+          role="menuitem"
+          tabIndex={-1}
+          className={cn(actionMenuItemClass, "aria-[current=page]:font-semibold")}
+          end
+        >
+          <span className="min-w-0 truncate">{m.organization.name}</span>
+          <span className="ms-auto max-w-[50%] shrink-0 truncate text-sm text-ink-2">{m.organization.slug}</span>
         </NavLink>
-        {inApp ? (
-          <button
-            type="button"
-            onClick={openSwitcher}
-            className="flex h-8 items-center gap-2 rounded-sm border-t border-line px-2 text-ui text-ink-2 hover:bg-hover hover:text-ink"
-          >
-            <ArrowLeftRight aria-hidden="true" className="size-3.5" strokeWidth={2} />
-            Switch instance…
-            <Kbd className="ms-auto">{`${mod}⇧O`}</Kbd>
-          </button>
-        ) : null}
-      </div>
-    </details>
+      ))}
+      <NavLink to="/new" role="menuitem" tabIndex={-1} className={cn(actionMenuItemClass, "text-ink-2 hover:text-ink focus:text-ink")}>
+        <Plus aria-hidden="true" className="size-3.5" strokeWidth={2} />
+        New organization
+      </NavLink>
+      {inApp ? (
+        <button
+          type="button"
+          role="menuitem"
+          tabIndex={-1}
+          onClick={openSwitcher}
+          className={cn(actionMenuItemClass, "border-t border-line text-ink-2 hover:text-ink focus:text-ink")}
+        >
+          <ArrowLeftRight aria-hidden="true" className="size-3.5" strokeWidth={2} />
+          Switch instance…
+          <Kbd className="ms-auto">{`${mod}⇧O`}</Kbd>
+        </button>
+      ) : null}
+    </ActionMenu>
   );
 }
 
@@ -551,7 +560,7 @@ function MobileBar({ context, others, onMenu }: { context: OrgContext; others: M
   const icon = "relative grid size-9 shrink-0 place-items-center rounded-sm text-ink-2 hover:bg-hover hover:text-ink";
   return (
     <header className="flex h-12 shrink-0 items-center gap-1 border-b border-line bg-rail ps-2 pe-1.5 md:hidden">
-      <Workspace context={context} others={others} />
+      <OrganizationMenu context={context} others={others} />
       <button type="button" aria-label="Search or command" className={icon} onClick={context.openPalette}>
         <Search aria-hidden="true" className="size-[18px]" strokeWidth={1.75} />
       </button>

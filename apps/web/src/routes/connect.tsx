@@ -514,19 +514,20 @@ export function ConsentPage() {
     >
       <div className="flex flex-col gap-5">
         <div className="flex flex-col divide-y divide-line rounded-md border border-line bg-surface text-ui">
-          <div className="flex min-h-12 items-center gap-3 px-4 py-2.5">
-            <span className="text-ink-2">Organization</span>
+          {/* The label above, the picker the card's width: a long name
+              truncates instead of squeezing beside the label. */}
+          <div className="flex min-w-0 flex-col gap-1.5 px-4 py-3">
+            <span className="text-sm text-ink-2">Organization</span>
             {memberships.data.length > 1 ? (
               <SelectMenu
                 label="Organization"
                 value={orgId}
                 onChange={setOrgId}
                 options={memberships.data.map((m) => ({ value: m.organization.id, label: m.organization.name }))}
-                align="end"
-                className="ms-auto max-w-[60%]"
+                fullWidth
               />
             ) : (
-              <span className="ms-auto font-medium">{memberships.data[0]!.organization.name}</span>
+              <span className="truncate font-medium">{memberships.data[0]!.organization.name}</span>
             )}
           </div>
           <ul aria-label="What it can do" className="flex flex-col gap-2.5 px-4 py-3.5">
