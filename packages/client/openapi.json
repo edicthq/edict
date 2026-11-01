@@ -3032,6 +3032,17 @@
               "configured": {
                 "type": "boolean"
               },
+              "transport": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "smtp",
+                  "resend",
+                  null
+                ]
+              },
               "from": {
                 "type": [
                   "string",
@@ -3041,6 +3052,7 @@
             },
             "required": [
               "configured",
+              "transport",
               "from"
             ]
           },

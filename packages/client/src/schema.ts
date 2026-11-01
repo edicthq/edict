@@ -8165,6 +8165,8 @@ export interface components {
         InstanceStatus: {
             email: {
                 configured: boolean;
+                /** @enum {string|null} */
+                transport: "smtp" | "resend" | null;
                 from: string | null;
             };
             storage: {

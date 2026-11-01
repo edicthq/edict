@@ -576,7 +576,13 @@ export type Telemetry = z.infer<typeof Telemetry>;
 // How the instance is set up, for its admins.
 export const InstanceStatus = z
   .object({
-    email: z.object({ configured: z.boolean(), from: z.string().nullable() }),
+    email: z.object({
+      configured: z.boolean(),
+      // How it goes out: over SMTP (SMTP_URL) or through Resend's API
+      // (RESEND_API_KEY). Null without email.
+      transport: z.enum(["smtp", "resend"]).nullable(),
+      from: z.string().nullable(),
+    }),
     storage: z.object({
       kind: z.enum(["disk", "s3"]),
       // The directory, or the bucket and its endpoint.

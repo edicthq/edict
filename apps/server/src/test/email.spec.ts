@@ -37,6 +37,7 @@ describe("invite emails", () => {
 
   it("a failed send keeps the invite and says it was not sent", async () => {
     const mailer: Mailer = {
+      transport: "smtp",
       send: async () => {
         throw new Error("SMTP said no");
       },

@@ -158,6 +158,16 @@ describe("OpenAPI document", () => {
     );
   });
 
+  it("says which transport the instance status's email goes through", async () => {
+    const t = await startTestServer();
+    const doc = (await (await fetch(`${t.baseUrl}/api/v1/openapi.json`)).json()) as {
+      components: { schemas: { InstanceStatus: { properties: { email: { properties: Record<string, unknown>; required: string[] } } } } };
+    };
+    const email = doc.components.schemas.InstanceStatus.properties.email;
+    expect(email.required).toEqual(["configured", "transport", "from"]);
+    expect(email.properties.transport).toEqual({ type: ["string", "null"], enum: ["smtp", "resend", null] });
+  });
+
   it("matches the document packages/client was generated from", async () => {
     const t = await startTestServer();
     const served = await (await fetch(`${t.baseUrl}/api/v1/openapi.json`)).json();

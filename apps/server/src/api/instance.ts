@@ -97,7 +97,11 @@ export function instanceRoutes(deps: InstanceDeps) {
     const settings = await readInstanceSettings(deps.db);
     return c.json(
       {
-        email: { configured: Boolean(deps.mailer), from: deps.instanceInfo?.emailFrom ?? null },
+        email: {
+          configured: Boolean(deps.mailer),
+          transport: deps.mailer?.transport ?? null,
+          from: deps.instanceInfo?.emailFrom ?? null,
+        },
         storage: deps.instanceInfo?.storage ?? { kind: "disk" as const, location: "" },
         version: VERSION,
         updates: updateCheckOf(settings),
@@ -159,7 +163,7 @@ export function instanceRoutes(deps: InstanceDeps) {
     }
     const input = c.req.valid("json");
     if (input.signUpMode === "domain" && !deps.mailer) {
-      throw invalid("The domain sign-up mode needs email, so Edict can verify that an address really is at the domain. Set SMTP_URL first.");
+      throw invalid("The domain sign-up mode needs email, so Edict can verify that an address really is at the domain. Set SMTP_URL or RESEND_API_KEY first.");
     }
     if (input.signUpMode === "domain" && !(input.signUpDomains ?? (await readInstanceSettings(deps.db)).signUpDomains).length) {
       throw invalid("Name at least one domain for the domain sign-up mode.");

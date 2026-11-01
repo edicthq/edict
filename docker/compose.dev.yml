@@ -1,0 +1,33 @@
+# The services `pnpm dev` expects, for development only: `pnpm dev:services`
+# starts them, `docker compose -f docker/compose.dev.yml down` stops them.
+# apps/server/.env.example points at both.
+name: edict-dev
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: edict
+      POSTGRES_PASSWORD: edict
+      POSTGRES_DB: edict
+      PGDATA: /var/lib/postgresql/data
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U edict -d edict"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  # Catches every email the server sends: SMTP on 2525, the inbox at
+  # http://localhost:8025. Nothing leaves your machine.
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "2525:1025"
+      - "8025:8025"
+
+volumes:
+  db-data:

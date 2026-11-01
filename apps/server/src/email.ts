@@ -7,22 +7,60 @@ export interface EmailMessage {
   html: string;
 }
 
+// How an instance sends email: over SMTP, or through Resend's HTTP API.
+export type EmailTransport = "smtp" | "resend";
+
 // Sends one email or throws. Email is optional (Postgres is the only required
 // service), so callers treat a missing mailer and a failed send alike: the
 // person gets a link to share by hand.
 export interface Mailer {
+  transport: EmailTransport;
   send: (message: EmailMessage) => Promise<void>;
 }
 
-// Any provider that speaks SMTP: Resend, Postmark, SES, Mailgun or a local
-// relay. url is like smtps://user:password@smtp.example.com:465.
+// Any provider that speaks SMTP: Postmark, SES, Mailgun, Resend or a local
+// relay like Mailpit. url is like smtps://user:password@smtp.example.com:465.
 export function createSmtpMailer(url: string, from: string): Mailer {
   const transport = createTransport(url);
   return {
+    transport: "smtp",
     send: async (message) => {
       await transport.sendMail({ from, ...message });
     },
   };
+}
+
+export const RESEND_API_URL = "https://api.resend.com";
+
+// Resend over HTTPS, for hosts that block outbound SMTP ports. apiUrl is
+// Resend's API; tests point it at a stand-in.
+export function createResendMailer(apiKey: string, from: string, apiUrl = RESEND_API_URL): Mailer {
+  const endpoint = new URL("/emails", apiUrl).toString();
+  return {
+    transport: "resend",
+    send: async ({ to, subject, text, html }) => {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+        body: JSON.stringify({ from, to: [to], subject, text, html }),
+      });
+      if (!res.ok) {
+        throw new Error(`Resend refused the email (${res.status}): ${await resendError(res)}`);
+      }
+    },
+  };
+}
+
+// Resend answers a refusal with { statusCode, name, message }.
+async function resendError(res: Response): Promise<string> {
+  const raw = await res.text();
+  try {
+    const body = JSON.parse(raw) as { message?: unknown };
+    if (typeof body.message === "string" && body.message) return body.message;
+  } catch {
+    // Not JSON: a proxy's error page, say.
+  }
+  return raw.trim().slice(0, 200) || res.statusText || "no message";
 }
 
 function escapeHtml(value: string): string {
