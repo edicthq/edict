@@ -66,6 +66,7 @@ describe("/mcp", () => {
     expect(tools).toEqual([
       "comment",
       "create_issue",
+      "create_project",
       "get_inbox",
       "get_issue",
       "get_project",
@@ -76,6 +77,7 @@ describe("/mcp", () => {
       "post_progress",
       "relate_issues",
       "search_issues",
+      "unrelate_issues",
       "update_issue",
     ]);
     const templates = (await client.listResourceTemplates()).resourceTemplates.map((r) => r.uriTemplate);
@@ -85,13 +87,15 @@ describe("/mcp", () => {
   });
 
   // ADR 0029: every session pays for the tool definitions, so they stay lean.
-  // Measured on 2026-10-20 at 8,637 characters (about 2.2k tokens).
+  // Measured on 2026-10-20 at 8,637 characters (about 2.2k tokens), then
+  // trimmed under 5,000 for 13 tools; create_project and unrelate_issues
+  // (PRO-3) took 15 tools to 5,637.
   it("keeps the tool definitions small and post_progress optional", async () => {
     const { t, owner, orgId } = await seed();
     const { client } = await mcpClient(t.baseUrl, (await connect(t.baseUrl, owner, orgId)).accessToken);
     const { tools } = await client.listTools();
     const size = JSON.stringify(tools).length;
-    expect(size).toBeLessThanOrEqual(5000);
+    expect(size).toBeLessThanOrEqual(5700);
     expect(JSON.stringify(tools)).not.toContain("$schema");
     expect(JSON.stringify(tools)).not.toContain("9007199254740991");
     const progress = tools.find((tool) => tool.name === "post_progress")!;
@@ -290,5 +294,132 @@ describe("/mcp", () => {
 
     const resource = await client.readResource({ uri: `edict://issue/${issue.identifier}` });
     expect((resource.contents[0] as { text: string }).text).toContain("Fix the login redirect");
+  });
+
+  it("creates a project, and answers with the one already named so", async () => {
+    const { t, owner, org, ownerId, eng } = await seed();
+    const ferro = await runner(t.baseUrl, owner, org, [eng.id]);
+    const { call } = await mcpClient(t.baseUrl, ferro.secret);
+    // seed's organization is acme.
+    const orgSlug = "acme";
+
+    const created = await call("create_project", {
+      name: "Instagram DMs",
+      description: "## Goal\n\nReply from Edict.",
+      lead: "@amirali",
+      target_date: "2027-01-31",
+    });
+    expect(created.error, created.text).toBe(false);
+    expect(created.text).toBe(`Created project Instagram DMs (instagram-dms): ${t.baseUrl}/${orgSlug}/projects/instagram-dms`);
+    const project = (await owner.get(`${org}/projects/instagram-dms`)).body;
+    expect(project).toMatchObject({
+      name: "Instagram DMs",
+      description: "## Goal\n\nReply from Edict.",
+      leadId: ownerId,
+      targetDate: "2027-01-31T00:00:00.000Z",
+    });
+
+    // The same name again, in any case, is the same project: a retry makes no second one.
+    const again = await call("create_project", { name: "instagram dms" });
+    expect(again.error, again.text).toBe(false);
+    expect(again.text).toContain("Project Instagram DMs (instagram-dms) already exists");
+    expect(again.text).toContain(`/${orgSlug}/projects/instagram-dms`);
+    expect((await owner.get(`${org}/projects`)).body).toHaveLength(1);
+
+    // The project takes issues at once.
+    const issue = await call("create_issue", { team: "ENG", title: "Send a reply", project: "instagram-dms" });
+    expect(issue.error, issue.text).toBe(false);
+    expect((await call("get_project", { project: "Instagram DMs" })).text).toContain("Send a reply");
+
+    const badLead = await call("create_project", { name: "Billing", lead: "@nobody" });
+    expect(badLead.error).toBe(true);
+    expect(badLead.text).toContain("@amirali");
+    const badDate = await call("create_project", { name: "Billing", target_date: "next month" });
+    expect(badDate.error).toBe(true);
+    expect(badDate.text).toContain("2027-01-31");
+    expect((await owner.get(`${org}/projects`)).body).toHaveLength(1);
+  });
+
+  it("creates projects only for callers who can use them", async () => {
+    const { t, owner, org, eng } = await seed();
+    // A guest works only in its teams' issues, so it cannot start a project.
+    const guest = await runner(t.baseUrl, owner, org, [eng.id], "Guest bot");
+    const role = await owner.patch(`${org}/agents/${guest.id}`, { version: 1, role: "guest" });
+    expect(role.status, JSON.stringify(role.body)).toBe(200);
+    const refused = await mcpClient(t.baseUrl, guest.secret).then(({ call }) => call("create_project", { name: "Launch" }));
+    expect(refused.error).toBe(true);
+    expect(refused.text).toMatch(/Guests cannot create projects/);
+    expect((await owner.get(`${org}/projects`)).body).toHaveLength(0);
+
+    // A key narrowed to some teams sees a project only once it holds an issue
+    // in one of them: the tool says so instead of answering with a project
+    // the agent cannot use.
+    const ferro = await runner(t.baseUrl, owner, org, [eng.id]);
+    const narrow = await owner.post(`${org}/agents/${ferro.id}/api-keys`, { name: "eng", teamIds: [eng.id] });
+    const { call } = await mcpClient(t.baseUrl, narrow.body.secret);
+    const hidden = await call("create_project", { name: "Launch" });
+    expect(hidden.error).toBe(true);
+    expect(hidden.text).toContain("Created project Launch (launch), but your API key is narrowed");
+    const launch = (await owner.get(`${org}/projects/launch`)).body as { id: string };
+    expect((await owner.post(`${org}/teams/${eng.id}/issues`, { title: "Plan the launch", projectId: launch.id })).status).toBe(201);
+    const found = await call("create_project", { name: "Launch" });
+    expect(found.error, found.text).toBe(false);
+    expect(found.text).toContain("Project Launch (launch) already exists");
+    expect((await owner.get(`${org}/projects`)).body).toHaveLength(1);
+  });
+
+  it("removes a relation named from either side, and says when there is none", async () => {
+    const { t, owner, org, eng, issue } = await seed();
+    const other = (await owner.post(`${org}/teams/${eng.id}/issues`, { title: "Refresh tokens expire early" })).body;
+    const ferro = await runner(t.baseUrl, owner, org, [eng.id]);
+    const { call } = await mcpClient(t.baseUrl, ferro.secret);
+    const relations = async (ref: string) => (await owner.get(`${org}/issues/${ref}/relations`)).body as { type: string }[];
+
+    expect((await call("relate_issues", { issue: issue.identifier, relation: "blocks", other: other.identifier })).error).toBe(false);
+    expect((await call("relate_issues", { issue: issue.identifier, relation: "related", other: other.identifier })).error).toBe(false);
+
+    // Removing is deleting, which an agent does only with the delete power.
+    const withoutPower = await call("unrelate_issues", { issue: other.identifier, relation: "blocked_by", other: issue.identifier });
+    expect(withoutPower.error).toBe(true);
+    expect(withoutPower.text).toContain('"delete" power');
+    expect(await relations(issue.identifier)).toHaveLength(2);
+    const agent = (await owner.get(`${org}/agents/${ferro.id}`)).body as { version: number };
+    expect((await owner.patch(`${org}/agents/${ferro.id}`, { version: agent.version, grants: ["delete"] })).status).toBe(200);
+
+    // The wrong direction is no relation, and the answer lists the ones there are.
+    const wrongWay = await call("unrelate_issues", { issue: issue.identifier, relation: "blocked_by", other: other.identifier });
+    expect(wrongWay.error).toBe(true);
+    expect(wrongWay.text).toBe(
+      `${issue.identifier} has no "blocked by" relation to ${other.identifier}. Its relations: blocks ${other.identifier}, related ${other.identifier}.`,
+    );
+
+    // blocked_by, read from the blocked issue, removes the blocks the other holds.
+    const removed = await call("unrelate_issues", { issue: other.identifier, relation: "blocked_by", other: issue.identifier.toLowerCase() });
+    expect(removed.error, removed.text).toBe(false);
+    expect(removed.text).toBe(`Removed "${other.identifier} blocked by ${issue.identifier}".`);
+    expect(await relations(issue.identifier)).toEqual([expect.objectContaining({ type: "related" })]);
+
+    const gone = await call("unrelate_issues", { issue: issue.identifier, relation: "blocks", other: other.identifier });
+    expect(gone.error).toBe(true);
+    expect(gone.text).toContain(`Its relations: related ${other.identifier}.`);
+    expect((await call("unrelate_issues", { issue: issue.identifier, relation: "related", other: other.identifier })).error).toBe(false);
+    const none = await call("unrelate_issues", { issue: issue.identifier, relation: "related", other: other.identifier });
+    expect(none.text).toContain("Its relations: none.");
+  });
+
+  it("removes relations only between issues the key can see", async () => {
+    const { t, owner, org, eng, issue } = await seed();
+    const ops = await createTeam(owner, org, "OPS");
+    const outside = (await owner.post(`${org}/teams/${ops.id}/issues`, { title: "Rotate the keys" })).body;
+    expect((await owner.post(`${org}/issues/${issue.identifier}/relations`, { type: "blocks", issue: outside.identifier })).status).toBe(201);
+    const ferro = await runner(t.baseUrl, owner, org, [eng.id, ops.id]);
+    const agent = (await owner.get(`${org}/agents/${ferro.id}`)).body as { version: number };
+    await owner.patch(`${org}/agents/${ferro.id}`, { version: agent.version, grants: ["delete"] });
+    const narrow = await owner.post(`${org}/agents/${ferro.id}/api-keys`, { name: "eng", teamIds: [eng.id] });
+    const { call } = await mcpClient(t.baseUrl, narrow.body.secret);
+
+    const refused = await call("unrelate_issues", { issue: issue.identifier, relation: "blocks", other: outside.identifier });
+    expect(refused.error).toBe(true);
+    expect((await owner.get(`${org}/issues/${issue.identifier}/relations`)).body).toHaveLength(1);
   });
 });

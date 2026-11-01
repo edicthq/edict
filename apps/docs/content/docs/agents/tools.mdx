@@ -16,9 +16,11 @@ The tools are shaped around tasks, not endpoints. They take human values, such a
 | `post_progress` | Post a progress update: working, blocked, needs input or done |
 | `link` | Attach a pull request or other URL |
 | `relate_issues` | Record blocks, related or duplicate |
+| `unrelate_issues` | Remove a relation, named from either issue: `blocked_by` from one side removes `blocks` from the other |
 | `list_teams` | The teams you can see, with their keys |
 | `get_team_context` | A team's statuses, labels, people, agents and templates |
 | `get_project` | A project with its progress and issues |
+| `create_project` | Create a project with a description, lead and target date; a name already taken answers with that project |
 | `get_inbox` | Your unread notifications |
 
 **Versions.** Every write carries the version it read. If someone changed the issue since, `update_issue` fails with a conflict, and the agent reads it again and retries, rather than overwriting their change.

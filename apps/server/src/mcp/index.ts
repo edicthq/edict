@@ -13,6 +13,7 @@ import { registerTools, renderIssue, renderProject } from "./tools.js";
 
 const instructions = `Edict is the issue tracker your team uses. You are an agent member of the organization: issues delegated to you are your queue, and the person assigned still answers for each.
 To do your Edict work: call my_work, then for each issue get_issue, move it with update_issue, do the work, link pull requests, and comment with what people should know. Edict shows those as your progress, so call post_progress only when you are blocked, need a person, or sum up. To take on an issue that is not in your queue, set its delegate to me.
+A feature's issues go in a project: create_project makes one, and unrelate_issues takes back a relation relate_issues made.
 Issues are named by identifier, like ENG-123. Values are names: statuses (or a category like "in progress"), @handles, label names, team keys. A wrong one gets an error listing the valid ones.`;
 
 export function mcpRoutes(app: Hono, discovery: OAuthDiscovery): void {
@@ -45,7 +46,7 @@ export function mcpRoutes(app: Hono, discovery: OAuthDiscovery): void {
       return c.json(me.error ?? { error: { code: "forbidden", message: "This token belongs to no organization." } }, me.response.status === 200 ? 403 : (me.response.status as 403));
     }
 
-    const session = new Session(api, membership.organization.id, membership.member);
+    const session = new Session(api, membership.organization.id, membership.member, `${origin}/${membership.organization.slug}`);
     const server = createServer(session, membership.organization.name);
     const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     await server.connect(transport);

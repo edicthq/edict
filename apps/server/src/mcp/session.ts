@@ -53,6 +53,9 @@ export class Session {
     readonly api: EdictClient,
     readonly orgId: string,
     readonly me: Member,
+    // Where the organization's pages are in the web app, like
+    // https://edict.example.com/acme.
+    readonly web: string,
   ) {}
 
   get path() {

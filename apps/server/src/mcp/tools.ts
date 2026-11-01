@@ -27,6 +27,7 @@ const issueArg = z.string();
 const priorityArg = z.enum(["urgent", "high", "medium", "low", "none"]);
 const stateArg = z.enum(["working", "blocked", "needs_input", "done"]);
 const linkArg = z.object({ url: z.string().url(), title: z.string().optional() });
+const relationArg = z.enum(["blocks", "blocked_by", "related", "duplicate_of", "duplicated_by"]);
 
 // One line per issue, for lists.
 async function line(session: Session, issue: Issue): Promise<string> {
@@ -415,7 +416,7 @@ function registerAll(server: Pick<McpServer, "registerTool">, session: Session):
       description: "Record that an issue blocks, relates to or duplicates another.",
       inputSchema: {
         issue: issueArg,
-        relation: z.enum(["blocks", "blocked_by", "related", "duplicate_of", "duplicated_by"]),
+        relation: relationArg,
         other: z.string(),
       },
     },
@@ -427,6 +428,32 @@ function registerAll(server: Pick<McpServer, "registerTool">, session: Session):
         }),
       );
       return `${issue} ${relation.replace("_", " ")} ${other}.`;
+    }),
+  );
+
+  server.registerTool(
+    "unrelate_issues",
+    {
+      description: "Remove a relation, named from either issue.",
+      inputSchema: { issue: issueArg, relation: relationArg, other: z.string() },
+    },
+    tool(async ({ issue, relation, other }) => {
+      const [from, to] = await Promise.all([session.issue(issue), session.issue(other)]);
+      const path = { ...session.path, issueRef: from.id };
+      // Read from the issue named first, so blocked_by finds the blocks the
+      // other issue holds, and duplicated_by its duplicate_of.
+      const relations = await ok(session.api.GET("/organizations/{orgId}/issues/{issueRef}/relations", { params: { path } }));
+      const found = relations.find((r) => r.type === relation && r.issue.id === to.id);
+      if (!found) {
+        const has = relations.map((r) => `${r.type.replace("_", " ")} ${r.issue.identifier}`).join(", ") || "none";
+        throw new ToolError(`${from.identifier} has no "${relation.replace("_", " ")}" relation to ${to.identifier}. Its relations: ${has}.`);
+      }
+      await ok(
+        session.api.DELETE("/organizations/{orgId}/issues/{issueRef}/relations/{relationId}", {
+          params: { path: { ...path, relationId: found.id } },
+        }),
+      );
+      return `Removed "${from.identifier} ${relation.replace("_", " ")} ${to.identifier}".`;
     }),
   );
 
@@ -511,5 +538,56 @@ function registerAll(server: Pick<McpServer, "registerTool">, session: Session):
       inputSchema: { project: z.string().describe("Project slug or name") },
     },
     tool(async ({ project }) => renderProject(session, project)),
+  );
+
+  server.registerTool(
+    "create_project",
+    {
+      description: "Create a project for issues from any team, or get the one with that name.",
+      inputSchema: {
+        name: z.string(),
+        description: z.string().optional().describe("Markdown"),
+        lead: z.string().optional().describe("@handle"),
+        target_date: z.string().optional().describe("2027-01-31"),
+      },
+    },
+    tool(async (args) => {
+      const url = (slug: string) => `${session.web}/projects/${slug}`;
+      // Retrying a create must not make a second project.
+      const existing = (await session.projects()).find((p) => p.name.trim().toLowerCase() === args.name.trim().toLowerCase());
+      if (existing) {
+        return `Project ${existing.name} (${existing.slug}) already exists: ${url(existing.slug)}`;
+      }
+      let targetDate: string | null = null;
+      if (args.target_date) {
+        const date = new Date(args.target_date);
+        if (Number.isNaN(date.getTime())) throw new ToolError(`target_date "${args.target_date}" is not a date. Give one like 2027-01-31.`);
+        targetDate = date.toISOString();
+      }
+      const created = await ok(
+        session.api.POST("/organizations/{orgId}/projects", {
+          params: { path: session.path },
+          body: {
+            name: args.name,
+            description: args.description ?? "",
+            leadId: args.lead ? (await session.member(args.lead, "human", "lead")).id : null,
+            startDate: null,
+            targetDate,
+          },
+        }),
+      );
+      // A key narrowed to some teams sees a project only once it holds an
+      // issue in one of them, so it could neither use this one nor find it
+      // again on a retry.
+      const seen = await session.api.GET("/organizations/{orgId}/projects/{projectRef}", {
+        params: { path: { ...session.path, projectRef: created.id } },
+      });
+      if (!seen.response.ok) {
+        throw new ToolError(
+          `Created project ${created.name} (${created.slug}), but your API key is narrowed to some teams and sees a project only once it holds an issue in one of them, so you cannot add issues to it. Do not retry: ask a person to add an issue to it, or use a key that is not narrowed.`,
+        );
+      }
+      return `Created project ${created.name} (${created.slug}): ${url(created.slug)}`;
+    }),
   );
 }

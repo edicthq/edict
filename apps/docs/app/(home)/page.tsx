@@ -70,6 +70,8 @@ const writes = [
   ['comment', 'Markdown, like everyone else'],
   ['link', 'A pull request or any URL'],
   ['relate_issues', 'Blocks, related, duplicate of'],
+  ['unrelate_issues', 'Takes a relation back'],
+  ['create_project', 'A goal for issues from any team'],
   ['post_progress', 'Only when blocked, needing you, or done'],
 ] as const;
 
@@ -288,7 +290,7 @@ function Mcp() {
 
         <Reveal className="mt-14 sm:mt-20">
           <div className="flex items-baseline gap-3">
-            <h3 className="text-[19px] font-semibold tracking-[-0.01em]">Thirteen tools, shaped like tasks</h3>
+            <h3 className="text-[19px] font-semibold tracking-[-0.01em]">Fifteen tools, shaped like tasks</h3>
             <span className="hidden text-[14px] text-l-ink-3 sm:inline">Plus prompts like “do my Edict work” and “triage my inbox”.</span>
           </div>
           <div className="mt-5 grid gap-4 md:grid-cols-2">

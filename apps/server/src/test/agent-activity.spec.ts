@@ -174,6 +174,12 @@ describe("Claude Code hooks", () => {
     expect(await progress()).toMatchObject([{ source: "hook", state: "working", message: "Picked up" }]);
   });
 
+  it("ties the session through unrelate_issues, which names an issue too", async () => {
+    const { tool, issue, progress } = await hooked();
+    await tool("mcp__edict__unrelate_issues", { issue: issue.identifier, relation: "blocks", other: "ENG-9" });
+    expect(await progress()).toMatchObject([{ source: "hook", state: "working", message: "Picked up" }]);
+  });
+
   it("does not tie the session to an issue delegated to someone else", async () => {
     const { owner, org, eng, tool, send, progress } = await hooked();
     const loose = (await owner.post(`${org}/teams/${eng.id}/issues`, { title: "Somebody else's" })).body;

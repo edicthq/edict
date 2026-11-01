@@ -28,7 +28,7 @@ const claudeCode = createRoute({
 
 // The Edict tools whose `issue` argument ties a session to an issue. A tool
 // is mcp__<server>__<tool>, and people name the server as they like.
-const issueTools = new Set(["get_issue", "update_issue", "comment", "post_progress", "link", "relate_issues"]);
+const issueTools = new Set(["get_issue", "update_issue", "comment", "post_progress", "link", "relate_issues", "unrelate_issues"]);
 
 const DONE_MESSAGE = 600;
 // Sessions nobody has heard from in this long are dropped as others are tied.
