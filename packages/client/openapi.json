@@ -3209,6 +3209,36 @@
           "1001+"
         ]
       },
+      "TestEmail": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string"
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "smtp",
+              "resend"
+            ]
+          },
+          "sent": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "to",
+          "transport",
+          "sent",
+          "error"
+        ]
+      },
       "InstanceUsers": {
         "type": "object",
         "properties": {
@@ -11564,6 +11594,57 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UpdateCheck"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the schema",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller's role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/instance/test-email": {
+      "post": {
+        "tags": [
+          "Instance"
+        ],
+        "summary": "Send a test email to yourself",
+        "description": "Instance admins only. Sends a short email to the signed-in admin's own address through the instance's transport. A refused email still answers 200, with sent false and the provider's message in error. Without email set up, 400.",
+        "responses": {
+          "200": {
+            "description": "Where the email went, and whether the provider took it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestEmail"
                 }
               }
             }

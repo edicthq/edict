@@ -94,6 +94,7 @@ describe("OpenAPI document", () => {
       "PATCH /organizations/{orgId}/teams/{teamId}/statuses/{statusId}",
       "PATCH /organizations/{orgId}/teams/{teamId}/templates/{templateId}",
       "PATCH /organizations/{orgId}/webhooks/{webhookId}",
+      "POST /instance/test-email",
       "POST /instance/update-check",
       "POST /invites/{token}/accept",
       "POST /oauth/organization",
@@ -166,6 +167,19 @@ describe("OpenAPI document", () => {
     const email = doc.components.schemas.InstanceStatus.properties.email;
     expect(email.required).toEqual(["configured", "transport", "from"]);
     expect(email.properties.transport).toEqual({ type: ["string", "null"], enum: ["smtp", "resend", null] });
+  });
+
+  it("describes the test email's answer, and that only instance admins may send it", async () => {
+    const t = await startTestServer();
+    const doc = (await (await fetch(`${t.baseUrl}/api/v1/openapi.json`)).json()) as {
+      paths: Record<string, { post: { responses: Record<string, unknown> } }>;
+      components: { schemas: { TestEmail: { properties: Record<string, unknown>; required: string[] } } };
+    };
+    expect(Object.keys(doc.paths["/instance/test-email"]!.post.responses).sort()).toEqual(["200", "400", "401", "403"]);
+    const schema = doc.components.schemas.TestEmail;
+    expect(schema.required).toEqual(["to", "transport", "sent", "error"]);
+    expect(schema.properties.transport).toEqual({ type: "string", enum: ["smtp", "resend"] });
+    expect(schema.properties.error).toEqual({ type: ["string", "null"] });
   });
 
   it("matches the document packages/client was generated from", async () => {

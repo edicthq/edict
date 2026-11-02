@@ -115,6 +115,29 @@ describe("email through Resend's API", () => {
     await expect(mailer.send({ to: "mia@example.com", subject: "Hi", text: "Hi", html: "<p>Hi</p>" })).rejects.toThrow(/502/);
   });
 
+  it("the instance admin's test email goes through it, and shows its refusal", async () => {
+    const ok = await fakeResend();
+    const t = await startTestServer({ resend: { apiKey: API_KEY, url: ok.url, from: FROM } });
+    const admin = await signUpAs(t.baseUrl, "Admin");
+    const res = await admin.post("/instance/test-email");
+    expect(res.body).toEqual({ to: "admin@example.com", transport: "resend", sent: true, error: null });
+    const request = await ok.waitFor("admin@example.com", /can send email/);
+    expect(request.body).toMatchObject({ from: FROM, to: ["admin@example.com"] });
+    expect(request.body.text).toMatch(/through Resend's API/);
+
+    const refusing = await fakeResend({ status: 403, body: { statusCode: 403, name: "validation_error", message: "The mail.example.com domain is not verified." } });
+    const t2 = await startTestServer({ resend: { apiKey: API_KEY, url: refusing.url, from: FROM } });
+    const admin2 = await signUpAs(t2.baseUrl, "Admin");
+    const refused = await admin2.post("/instance/test-email");
+    expect(refused.status).toBe(200);
+    expect(refused.body).toEqual({
+      to: "admin@example.com",
+      transport: "resend",
+      sent: false,
+      error: "Resend refused the email (403): The mail.example.com domain is not verified.",
+    });
+  });
+
   it("a refused invite email keeps the invite as a link to share by hand", async () => {
     const resend = await fakeResend({
       status: 422,
@@ -164,6 +187,12 @@ describe("email settings", () => {
     const config = readConfig({ ...base, RESEND_API_KEY: API_KEY, EMAIL_FROM: FROM });
     expect(config).toMatchObject({ resendApiKey: API_KEY, emailFrom: FROM });
     expect(config.smtpUrl).toBeUndefined();
+  });
+
+  it("reads RESEND_API_URL, for a stand-in of Resend's API", () => {
+    const config = readConfig({ ...base, RESEND_API_KEY: API_KEY, EMAIL_FROM: FROM, RESEND_API_URL: "http://127.0.0.1:9" });
+    expect(config.resendApiUrl).toBe("http://127.0.0.1:9");
+    expect(readConfig({ ...base, RESEND_API_KEY: API_KEY, EMAIL_FROM: FROM }).resendApiUrl).toBeUndefined();
   });
 
   it("refuses RESEND_API_KEY and SMTP_URL together", () => {

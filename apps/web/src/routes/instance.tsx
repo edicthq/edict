@@ -5,7 +5,7 @@ import { SettingRow, SettingsCard, SettingsFrame, SettingsLead } from "../compon
 import { FormError } from "../components/shell.js";
 import { SettingsCardSkeleton } from "../components/skeletons.js";
 import { ago } from "../lib/issues.js";
-import { useCheckForUpdate, useInstance, useInstanceStatus, useInstanceUsers, useUpdateInstance } from "../lib/queries.js";
+import { useCheckForUpdate, useInstance, useInstanceStatus, useInstanceUsers, useSendTestEmail, useUpdateInstance } from "../lib/queries.js";
 
 const modes: { value: SignUpMode; label: string; description: string }[] = [
   { value: "open", label: "Open", description: "Anyone who can reach this instance can sign up." },
@@ -104,11 +104,11 @@ function InstanceStatusSection() {
     [
       "Email",
       status.data.email.configured ? (
-        `Sends from ${status.data.email.from ?? "the configured sender"}`
+        <EmailSetup key="email" transport={status.data.email.transport} from={status.data.email.from} />
       ) : (
         <>
-          Off. Invites are links to share by hand, and there is no password reset. Set <Code>SMTP_URL</Code> and{" "}
-          <Code>EMAIL_FROM</Code> to turn it on.
+          Off. Invites are links to share by hand, and there is no password reset. Set <Code>SMTP_URL</Code> or{" "}
+          <Code>RESEND_API_KEY</Code>, and <Code>EMAIL_FROM</Code>, to turn it on.
         </>
       ),
     ],
@@ -135,6 +135,35 @@ function InstanceStatusSection() {
         ))}
       </dl>
     </SettingsCard>
+  );
+}
+
+const transportNames = { smtp: "over SMTP", resend: "through Resend" } as const;
+
+// Which transport email goes out through, and a test email to the signed-in
+// admin that says where it went or why the provider refused it.
+function EmailSetup({ transport, from }: { transport: "smtp" | "resend" | null; from: string | null }) {
+  const test = useSendTestEmail();
+  const result = test.data;
+  return (
+    <div className="flex flex-col items-start gap-2">
+      <span>
+        Sends {transport ? `${transportNames[transport]} ` : ""}from {from ?? "the configured sender"}
+      </span>
+      <Button type="button" disabled={test.isPending} onClick={() => test.mutate()}>
+        {test.isPending ? "Sending…" : "Send test email"}
+      </Button>
+      <p aria-live="polite" className="text-ink-2">
+        {result?.sent ? `Sent to ${result.to}. Check that inbox.` : ""}
+      </p>
+      <FormError
+        message={
+          result && !result.sent
+            ? `The test email to ${result.to} didn't go out: ${result.error ?? "the provider gave no reason."}`
+            : test.error?.message
+        }
+      />
+    </div>
   );
 }
 

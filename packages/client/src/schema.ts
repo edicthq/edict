@@ -7254,6 +7254,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/instance/test-email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a test email to yourself
+         * @description Instance admins only. Sends a short email to the signed-in admin's own address through the instance's transport. A refused email still answers 200, with sent false and the provider's message in error. Without email set up, 400.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Where the email went, and whether the provider took it */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TestEmail"];
+                    };
+                };
+                /** @description The request does not match the schema */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The caller's role does not allow this */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/instance/users": {
         parameters: {
             query?: never;
@@ -8204,6 +8270,13 @@ export interface components {
         };
         /** @enum {string} */
         UserCountBucket: "1" | "2-10" | "11-50" | "51-200" | "201-1000" | "1001+";
+        TestEmail: {
+            to: string;
+            /** @enum {string} */
+            transport: "smtp" | "resend";
+            sent: boolean;
+            error: string | null;
+        };
         InstanceUsers: {
             users: components["schemas"]["InstanceUser"][];
             total: number;

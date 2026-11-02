@@ -105,6 +105,7 @@ export function readConfig(env: NodeJS.ProcessEnv): ServerConfig {
     maxAttachmentBytes: readAttachmentMax(env.ATTACHMENT_MAX_BYTES),
     smtpUrl,
     resendApiKey,
+    resendApiUrl: env.RESEND_API_URL || undefined,
     emailFrom,
     authRateLimit: env.AUTH_RATE_LIMIT !== "off",
     jobs: env.JOBS !== "off",

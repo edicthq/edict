@@ -269,6 +269,12 @@ export function useUpdateInstance() {
 }
 
 // Asks GitHub for the latest release now, as the daily check does.
+// Emails the signed-in instance admin, to check that email works. A refused
+// email answers with sent false and the provider's error.
+export function useSendTestEmail() {
+  return useMutation({ mutationFn: () => unwrap(api.POST("/instance/test-email")) });
+}
+
 export function useCheckForUpdate() {
   const client = useQueryClient();
   return useMutation({

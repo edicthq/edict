@@ -63,6 +63,8 @@ EMAIL_FROM=Edict <edict@mail.example.com>
 
 Edict refuses to start when both `RESEND_API_KEY` and `SMTP_URL` are set, or when `EMAIL_FROM` is missing. If Resend refuses an email, for example because the domain is not verified yet, the invite still works as a link you share yourself, and the server log says why.
 
+To check that email goes out, over SMTP or through Resend, open **Instance settings** and press **Send test email** under Setup. It emails you, the signed-in instance admin, and shows the provider's error right there if the email is refused.
+
 ## Upgrade
 
 ```sh

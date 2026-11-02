@@ -594,6 +594,19 @@ export const InstanceStatus = z
   })
   .meta({ id: "InstanceStatus" });
 
+// What sending a test email to the signed-in instance admin did. A refused
+// email is an answer, not an error: error carries the provider's message.
+export const TestEmail = z
+  .object({
+    // The address it went to: the instance admin's own.
+    to: z.string(),
+    transport: z.enum(["smtp", "resend"]),
+    sent: z.boolean(),
+    error: z.string().nullable(),
+  })
+  .meta({ id: "TestEmail" });
+export type TestEmail = z.infer<typeof TestEmail>;
+
 export const InstanceUser = z
   .object({
     id: z.string(),
