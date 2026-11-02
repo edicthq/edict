@@ -31,7 +31,7 @@ That runs the `ghcr.io/edicthq/edict` image (amd64 or arm64) with Postgres on ht
 
 Upgrade with `docker compose pull && docker compose up -d`; migrations run on boot. The image tag follows `EDICT_VERSION`: `1` (the default) takes every 1.x release, `1.4` only its patches, and `1.4.2` stays put. Until 1.0 is out there is no `1` yet, so set `EDICT_VERSION=latest`. To run your own changes, build from a checkout with `docker compose -f docker/compose.yml -f docker/compose.build.yml up --build`.
 
-**Email with Resend.** Many hosts block outbound SMTP ports, so Edict can also send through [Resend](https://resend.com)'s HTTPS API. In Resend, add and verify the domain you send from, then create an API key with sending access. Set `RESEND_API_KEY` to the key and `EMAIL_FROM` to an address on the verified domain, like `Edict <edict@mail.example.com>`, and leave `SMTP_URL` empty: Edict refuses to start with both.
+**Email with Resend.** Many hosts block outbound SMTP ports, so Edict can also send through [Resend](https://resend.com)'s HTTPS API. In Resend, add and verify the domain you send from, then create an API key with sending access. Set `RESEND_API_KEY` to the key and `EMAIL_FROM` to an address on the verified domain, like `Edict <edict@mail.example.com>`, and leave `SMTP_URL` empty: Edict refuses to start with both. Then press **Send test email** in Instance settings. The [email docs](apps/docs/content/docs/email.mdx) walk through the DNS records, SMTP and what to do when email does not arrive.
 
 **Development.** Node 22, pnpm and Docker. Copy `apps/server/.env.example` to `apps/server/.env`, then:
 

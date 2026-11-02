@@ -1,0 +1,81 @@
+---
+title: Email
+description: Send invites, sign-in links, verification and password resets over SMTP or through Resend.
+---
+
+Email is optional. Postgres is the only service Edict needs, and an instance without email works: invites are links you copy and share yourself.
+
+## What email turns on
+
+| Email | Sent when | Without email |
+|---|---|---|
+| Invite | An admin invites someone to an organization by address | The invite is a link you copy and send yourself |
+| Verify your email | Someone signs up with a password, or asks for the link again | No verification, and no banner asking for it |
+| Sign in to Edict | Someone signs in with a magic link | Magic link sign-in is off |
+| Reset your password | Someone presses **Forgot password** | There is no password reset |
+| Edict can send email | An instance admin presses **Send test email** | The Email row says Off |
+
+The domain sign-up mode needs email too, because Edict verifies that an address really is at the domain. Verification never blocks sign-in: someone who has not clicked the link yet still gets in and sees a banner that can send it again.
+
+When email is on, signing up and **Forgot password** both end on a **Check your inbox** screen that names the address and can send the email again after a minute. A verification link opens **Email verified**, then goes on to where the person was headed.
+
+## Pick a transport
+
+Edict sends from `EMAIL_FROM` through one of two transports:
+
+- **SMTP** (`SMTP_URL`), for any provider that speaks SMTP: Postmark, Amazon SES, Mailgun, Resend, your own relay.
+- **Resend's HTTPS API** (`RESEND_API_KEY`), for hosts that block outbound SMTP ports, as DigitalOcean and Hetzner do on new machines. It only needs outbound HTTPS.
+
+Set one of them, not both. Edict refuses to start, and says why, when both are set or when either is set without `EMAIL_FROM`.
+
+## Email with Resend
+
+1. **Add a domain.** In Resend, open **Domains**, press **Add Domain** and enter the domain you send from. A subdomain such as `mail.example.com` keeps Edict's sending reputation apart from your main domain's.
+2. **Add the DNS records.** Resend shows a DKIM record (a `TXT` record at `resend._domainkey`) and SPF records (an `MX` and a `TXT` record on its return-path subdomain). Add them at your DNS provider exactly as shown, then press **Verify DNS Records**. Verification usually takes minutes and can take up to a day while DNS propagates. A DMARC record is optional but helps email reach inboxes.
+3. **Create an API key.** Open **API Keys**, press **Create API Key**, choose **Sending access**, and limit it to the domain from step 1. A sending key can send email and nothing else, which is all Edict needs. Resend shows the key once.
+4. **Set the key and the sender.** `EMAIL_FROM` must be an address on the verified domain. The address does not need a mailbox behind it.
+
+   ```sh title=".env"
+   RESEND_API_KEY=re_...
+   EMAIL_FROM=Edict <edict@mail.example.com>
+   SMTP_URL=
+   ```
+
+5. **Restart Edict** with `docker compose up -d`, then [send a test email](#send-a-test-email).
+
+Resend also speaks SMTP, if you would rather keep one transport everywhere: `SMTP_URL=smtps://resend:re_...@smtp.resend.com:465`, with the same key and the same verified domain.
+
+## Email over SMTP
+
+Set `SMTP_URL` to your provider's URL, with the user and password in it, and `EMAIL_FROM` to a sender your provider accepts:
+
+```sh title=".env"
+SMTP_URL=smtps://user:password@smtp.example.com:465
+EMAIL_FROM=Edict <edict@example.com>
+```
+
+`smtps://` on port 465 connects over TLS from the start. `smtp://` on port 587 upgrades to TLS when the provider offers it. A password with characters such as `@`, `:` or `/` must be percent-encoded in the URL, so `@` becomes `%40`.
+
+## Send a test email
+
+Open **Instance settings** as an instance admin. The **Email** row under Setup says how Edict sends (over SMTP or through Resend's API) and from which address. Press **Send test email**: Edict emails you, the signed-in instance admin, and shows either the address it went to or the provider's own error, right there.
+
+The page calls `POST /api/v1/instance/test-email`, which answers `{ to, transport, sent, error }`, or a 400 when the instance has no email set up.
+
+## When email does not arrive
+
+| You see | Do |
+|---|---|
+| Edict does not start: `RESEND_API_KEY and SMTP_URL are both set` | Unset one of them. |
+| Edict does not start: `… is set but EMAIL_FROM is not` | Set `EMAIL_FROM` to a sender like `Edict <edict@mail.example.com>`. |
+| `Resend refused the email (403)`, saying the domain is not verified | Finish step 2 above, or make `EMAIL_FROM` use the domain you verified. |
+| `Resend refused the email (401)` or `(400)`, saying the API key is invalid | Create a new sending key and set it again. Keys are shown once, so a copied key can be cut short. |
+| Resend says you can only send testing emails to your own address | `EMAIL_FROM` is on Resend's shared test domain. Use your own verified domain. |
+| The test email is sent but never shows up | Look in spam, and in your provider's logs (Resend's **Emails** page). Add a DMARC record if you have none. |
+| The Email row says **Off** | Edict has no email set up. Check the settings and restart it. |
+
+A refused email never breaks the action that sent it: an invite still works as a link you copy, and the server log says why the email was refused.
+
+## Email in development
+
+`pnpm dev:services` starts [Mailpit](https://mailpit.axllent.org) beside Postgres, and the `.env` copied from `apps/server/.env.example` points `SMTP_URL` at it (`smtp://localhost:2525`). Every email the server sends lands in the inbox at http://localhost:8025, and nothing leaves your machine. Remove `SMTP_URL` and `EMAIL_FROM` from `.env` to run without email.

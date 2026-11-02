@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures.js";
 
-// Pages stand in as skeletons while they load (EDI-3): nothing for the first
+// Pages stand in as skeletons while they load: nothing for the first
 // 150 ms, then blocks that fade in and pulse, then a crossfade into the rows;
 // under reduced motion they appear and leave at once and stand still. Screen
 // readers hear a status, and no "Loading…" text is left.

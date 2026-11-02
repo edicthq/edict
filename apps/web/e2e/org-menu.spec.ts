@@ -3,7 +3,7 @@ import { expect, test } from "./fixtures.js";
 
 // Named to run after m1-exit, which needs the instance fresh.
 // The organization button's menu floats over the page, outside the sidebar
-// that used to clip it, and works from the keyboard (EDI-4). The consent
+// that used to clip it, and works from the keyboard. The consent
 // page's organization picker fills the card, and so does its list.
 
 const LONG_NAME = "The Extraordinarily Long Named Organization of Northern Engineering Excellence";
