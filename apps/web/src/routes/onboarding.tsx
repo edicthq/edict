@@ -5,14 +5,16 @@ import { Navigate, useNavigate } from "react-router";
 import type { z } from "zod";
 import { CreateOrganization } from "@edicthq/schema";
 import { Button, Field, Input } from "@edicthq/ui";
-import { AuthShell, FormError, Loading } from "../components/shell.js";
+import { AuthShell, FormError } from "../components/shell.js";
+import { AppSkeleton } from "../components/skeletons.js";
 import { ApiFailure } from "../lib/api.js";
 import { useCreateOrganization, useJoinable, useJoinOrganization, useMemberships } from "../lib/queries.js";
 
 // Home: the first organization the user belongs to, or onboarding.
 export function Home() {
   const memberships = useMemberships();
-  if (memberships.isPending) return <Loading />;
+  // Most people land in their organization, so the wait looks like the app.
+  if (memberships.isPending) return <AppSkeleton />;
   const first = memberships.data?.[0];
   return <Navigate to={first ? `/${first.organization.slug}` : "/new"} replace />;
 }

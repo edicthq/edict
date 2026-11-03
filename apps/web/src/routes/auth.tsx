@@ -7,6 +7,7 @@ import { z } from "zod";
 import { Button, Field, Input, PasswordInput } from "@edicthq/ui";
 import { AuthShell, FormError } from "../components/shell.js";
 import { authClient } from "../lib/auth.js";
+import { verifiedCallback } from "../lib/email-flow.js";
 import { keys, useInstance } from "../lib/queries.js";
 
 // Where to go once signed in: back to the invite that sent them here, or home.
@@ -114,15 +115,16 @@ export function SignUp() {
 
   const onSubmit = form.handleSubmit(async (values) => {
     setFailure(null);
-    // With email set up, the verification link brings them back to where they
-    // were going, such as the invite page.
-    const { error } = await authClient.signUp.email({ ...values, callbackURL: next });
+    // With email set up, the verification link lands on "Email verified",
+    // which brings them back to where they were going, such as the invite page.
+    const { error } = await authClient.signUp.email({ ...values, callbackURL: verifiedCallback(next) });
     if (error) {
       setFailure(error.message ?? "Signing up failed. Try again.");
       return;
     }
     await queryClient.invalidateQueries({ queryKey: keys.instance });
-    navigate(next, { replace: true });
+    // The link is on its way; they can go on into Edict from there.
+    navigate(instance.data?.sendsEmail ? `/check-inbox?next=${encodeURIComponent(next)}` : next, { replace: true });
   });
 
   return (

@@ -27,17 +27,22 @@ curl -fsSLO https://github.com/edicthq/edict/releases/latest/download/postgres-i
 docker compose up -d
 ```
 
-That runs the `ghcr.io/edicthq/edict` image (amd64 or arm64) with Postgres on http://localhost:3000. The first person to sign up becomes the instance admin. Set `BETTER_AUTH_URL` to the URL people use to reach it, and optionally `SMTP_URL` and `EMAIL_FROM` for invites, verification, sign-in links and password resets. Google, GitHub and any OpenID Connect provider turn on with their client ids. Edict connects to Postgres as its own role, which owns the database but is not a superuser; `postgres-init.sh` creates it on the first start. `compose.yml` describes each setting.
+That runs the `ghcr.io/edicthq/edict` image (amd64 or arm64) with Postgres on http://localhost:3000. The first person to sign up becomes the instance admin. Set `BETTER_AUTH_URL` to the URL people use to reach it, and optionally `SMTP_URL` (or `RESEND_API_KEY`) and `EMAIL_FROM` for invites, verification, sign-in links and password resets. Google, GitHub and any OpenID Connect provider turn on with their client ids. Edict connects to Postgres as its own role, which owns the database but is not a superuser; `postgres-init.sh` creates it on the first start. `compose.yml` describes each setting.
 
 Upgrade with `docker compose pull && docker compose up -d`; migrations run on boot. The image tag follows `EDICT_VERSION`: `1` (the default) takes every 1.x release, `1.4` only its patches, and `1.4.2` stays put. Until 1.0 is out there is no `1` yet, so set `EDICT_VERSION=latest`. To run your own changes, build from a checkout with `docker compose -f docker/compose.yml -f docker/compose.build.yml up --build`.
 
-**Development.** Node 22 and pnpm. Start a Postgres, copy `apps/server/.env.example` to `apps/server/.env`, then:
+**Email with Resend.** Many hosts block outbound SMTP ports, so Edict can also send through [Resend](https://resend.com)'s HTTPS API. In Resend, add and verify the domain you send from, then create an API key with sending access. Set `RESEND_API_KEY` to the key and `EMAIL_FROM` to an address on the verified domain, like `Edict <edict@mail.example.com>`, and leave `SMTP_URL` empty: Edict refuses to start with both. Then press **Send test email** in Instance settings. The [email docs](apps/docs/content/docs/email.mdx) walk through the DNS records, SMTP and what to do when email does not arrive.
+
+**Development.** Node 22, pnpm and Docker. Copy `apps/server/.env.example` to `apps/server/.env`, then:
 
 ```sh
 pnpm install
-pnpm dev        # API on :3000, web app on http://localhost:5173
-pnpm test       # server tests against real Postgres (needs Docker)
+pnpm dev:services   # Postgres on :5433 and Mailpit, in Docker
+pnpm dev            # API on :3000, web app on http://localhost:5173
+pnpm test           # server tests against real Postgres (needs Docker)
 ```
+
+**Local email with Mailpit.** `pnpm dev:services` also starts [Mailpit](https://mailpit.axllent.org), which catches every email the server sends: the copied `.env` points `SMTP_URL` at it (`smtp://localhost:2525`). Sign up, then open the inbox at http://localhost:8025 for the verification link; invites, sign-in links and password resets land there too. Nothing leaves your machine. `docker compose -f docker/compose.dev.yml down` stops both services.
 
 After changing a schema in `packages/schema`, run `pnpm api:generate` to update the OpenAPI document and `packages/client`. Releases are cut by pushing a tag; [`docs/releasing.md`](docs/releasing.md) has the steps.
 

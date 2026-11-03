@@ -1,9 +1,10 @@
 import { Lock } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router";
 import type { Team } from "@edicthq/client";
-import { Avatar, Badge, Button, SelectMenu, TeamKey, cn } from "@edicthq/ui";
+import { Avatar, Badge, Button, SelectMenu, Skeleton, SkeletonGroup, TeamKey, cn } from "@edicthq/ui";
 import { SettingRow, SettingsCard } from "../components/settings-frame.js";
-import { EmptyState, FormError, Loading, PageBody, PageColumn, PageHeader } from "../components/shell.js";
+import { EmptyState, FormError, PageBody, PageColumn, PageHeader } from "../components/shell.js";
+import { PageBarSkeleton, SettingsCardSkeleton, range } from "../components/skeletons.js";
 import { roleLabel } from "../lib/labels.js";
 import { useToast } from "../components/toast.js";
 import { useOfferUndo } from "../components/undo.js";
@@ -58,6 +59,46 @@ function Stack({ names, kind, label, className }: { names: string[]; kind: "huma
   );
 }
 
+// The teams table while it loads: its header, then rows of a key and a name,
+// the counts and the faces of members and agents.
+function TeamsSkeleton() {
+  return (
+    <SkeletonGroup label="Loading teams" className="pt-1">
+      <div className={cn(teamGrid, "h-9")}>
+        <Skeleton className="w-10" />
+        <Skeleton className="ms-auto w-8" />
+        <Skeleton className="ms-auto w-16 max-md:hidden" />
+        <Skeleton className="ms-auto w-16 max-md:hidden" />
+        <span className="ps-4 max-sm:hidden">
+          <Skeleton className="w-14" />
+        </span>
+        <Skeleton className="w-12 max-lg:hidden" />
+      </div>
+      <div className="flex flex-col gap-px">
+        {[0, 1, 2].map((row) => (
+          <div key={row} className={cn(teamGrid, "min-h-12 py-1.5")}>
+            <span className="flex min-w-0 items-center gap-2.5">
+              <Skeleton className="h-[18.5px] w-9 rounded-xs" />
+              <Skeleton className="h-3.5" style={{ width: `${30 + ((row * 17) % 25)}%` }} />
+            </span>
+            <Skeleton className="ms-auto w-4" />
+            <Skeleton className="ms-auto w-4 max-md:hidden" />
+            <Skeleton className="ms-auto w-4 max-md:hidden" />
+            <span className="flex gap-1 ps-4 max-sm:hidden">
+              {range(3 - row).map((face) => (
+                <Skeleton key={face} className="size-[22px] rounded-full" />
+              ))}
+            </span>
+            <span className="flex gap-1 max-lg:hidden">
+              <Skeleton className="size-[22px] rounded-[6px]" />
+            </span>
+          </div>
+        ))}
+      </div>
+    </SkeletonGroup>
+  );
+}
+
 export function TeamsPage() {
   const { orgId, canManage, slug, openCreateTeam } = useOrg();
   const teams = useTeams(orgId);
@@ -79,7 +120,7 @@ export function TeamsPage() {
       />
       <PageBody>
         {teams.isPending ? (
-          <Loading label="Loading teams" />
+          <TeamsSkeleton />
         ) : teams.data?.length ? (
           <div className="pt-1">
             <div aria-hidden="true" className={cn(teamGrid, "h-9 text-sm font-medium text-ink-2")}>
@@ -158,7 +199,16 @@ export function TeamMembersPage() {
   const remove = useRemoveTeamMember(orgId, teamId);
 
   const team = teams.data?.find((t) => t.id === teamId);
-  if (teams.isPending || teamMembers.isPending) return <Loading />;
+  if (teams.isPending || teamMembers.isPending) {
+    return (
+      <SkeletonGroup label="Loading the team's members">
+        <PageBarSkeleton lead actions={1} />
+        <PageColumn className="flex max-w-[760px] flex-col gap-8">
+          <SettingsCardSkeleton kind="person" />
+        </PageColumn>
+      </SkeletonGroup>
+    );
+  }
   if (!team) {
     return (
       <PageBody className="pt-6">

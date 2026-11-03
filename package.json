@@ -13,6 +13,7 @@
     "release": "node scripts/release.mjs",
     "test": "turbo run test",
     "dev": "turbo run dev --parallel",
+    "dev:services": "docker compose -f docker/compose.dev.yml up -d --wait",
     "db:generate": "pnpm --filter @edicthq/db generate",
     "api:generate": "pnpm --filter @edicthq/server openapi && pnpm --filter @edicthq/client generate",
     "e2e": "turbo run e2e"

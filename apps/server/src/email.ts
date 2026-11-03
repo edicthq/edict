@@ -7,22 +7,60 @@ export interface EmailMessage {
   html: string;
 }
 
+// How an instance sends email: over SMTP, or through Resend's HTTP API.
+export type EmailTransport = "smtp" | "resend";
+
 // Sends one email or throws. Email is optional (Postgres is the only required
 // service), so callers treat a missing mailer and a failed send alike: the
 // person gets a link to share by hand.
 export interface Mailer {
+  transport: EmailTransport;
   send: (message: EmailMessage) => Promise<void>;
 }
 
-// Any provider that speaks SMTP: Resend, Postmark, SES, Mailgun or a local
-// relay. url is like smtps://user:password@smtp.example.com:465.
+// Any provider that speaks SMTP: Postmark, SES, Mailgun, Resend or a local
+// relay like Mailpit. url is like smtps://user:password@smtp.example.com:465.
 export function createSmtpMailer(url: string, from: string): Mailer {
   const transport = createTransport(url);
   return {
+    transport: "smtp",
     send: async (message) => {
       await transport.sendMail({ from, ...message });
     },
   };
+}
+
+export const RESEND_API_URL = "https://api.resend.com";
+
+// Resend over HTTPS, for hosts that block outbound SMTP ports. apiUrl is
+// Resend's API; tests point it at a stand-in.
+export function createResendMailer(apiKey: string, from: string, apiUrl = RESEND_API_URL): Mailer {
+  const endpoint = new URL("/emails", apiUrl).toString();
+  return {
+    transport: "resend",
+    send: async ({ to, subject, text, html }) => {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+        body: JSON.stringify({ from, to: [to], subject, text, html }),
+      });
+      if (!res.ok) {
+        throw new Error(`Resend refused the email (${res.status}): ${await resendError(res)}`);
+      }
+    },
+  };
+}
+
+// Resend answers a refusal with { statusCode, name, message }.
+async function resendError(res: Response): Promise<string> {
+  const raw = await res.text();
+  try {
+    const body = JSON.parse(raw) as { message?: unknown };
+    if (typeof body.message === "string" && body.message) return body.message;
+  } catch {
+    // Not JSON: a proxy's error page, say.
+  }
+  return raw.trim().slice(0, 200) || res.statusText || "no message";
 }
 
 function escapeHtml(value: string): string {
@@ -35,14 +73,18 @@ function escapeHtml(value: string): string {
 }
 
 // One layout for every email: the message, one ink button, a quiet footnote.
-function layout({ body, action, url, footnote }: { body: string; action: string; url: string; footnote: string }): string {
+// An email with nothing to do, like the test email, has no button.
+function layout({ body, action, url, footnote }: { body: string; action?: string; url?: string; footnote: string }): string {
+  const button =
+    action && url
+      ? `\n      <p style="margin:0 0 24px"><a href="${escapeHtml(url)}" style="display:inline-block;padding:10px 16px;border-radius:6px;background:#161b22;color:#fefeff;text-decoration:none;font-weight:600">${action}</a></p>`
+      : "";
   return `<!doctype html>
 <html lang="en">
   <body style="margin:0;padding:32px 16px;background:#f8f9fb;color:#161b22;font:14px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
     <div style="max-width:480px;margin:0 auto">
       <p style="margin:0 0 24px;font-weight:600">Edict</p>
-      <p style="margin:0 0 24px">${body}</p>
-      <p style="margin:0 0 24px"><a href="${escapeHtml(url)}" style="display:inline-block;padding:10px 16px;border-radius:6px;background:#161b22;color:#fefeff;text-decoration:none;font-weight:600">${action}</a></p>
+      <p style="margin:0 0 24px">${body}</p>${button}
       <p style="margin:0;color:#565b63;font-size:13px">${footnote}</p>
     </div>
   </body>
@@ -120,6 +162,24 @@ export function magicLinkEmail({ to, url }: { to: string; url: string }): EmailM
       body: `Sign in to Edict as ${escapeHtml(to)}.`,
       action: "Sign in",
       url,
+      footnote,
+    }),
+  };
+}
+
+const transportNames = { smtp: "over SMTP", resend: "through Resend's API" } as const;
+
+// What an instance admin sends themselves from the instance page, to check
+// that email reaches an inbox.
+export function testEmail({ to, transport }: { to: string; transport: EmailTransport }): EmailMessage {
+  const how = transportNames[transport];
+  const footnote = "You sent this from the instance page in Edict. Nothing else needs doing.";
+  return {
+    to,
+    subject: "Edict can send email",
+    text: [`This test email reached ${to}, sent ${how}. Invites, sign-in links and password resets go out the same way.`, "", footnote].join("\n"),
+    html: layout({
+      body: `This test email reached ${escapeHtml(to)}, sent ${how}. Invites, sign-in links and password resets go out the same way.`,
       footnote,
     }),
   };

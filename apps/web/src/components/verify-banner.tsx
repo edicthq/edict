@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@edicthq/ui";
 import { authClient, useSession } from "../lib/auth.js";
+import { verifiedCallback } from "../lib/email-flow.js";
 import { useInstance } from "../lib/queries.js";
 
 // Shown until the signed-in person verifies their email, when the instance
@@ -22,7 +23,7 @@ export function VerifyBanner() {
         className="ms-auto"
         disabled={sent}
         onClick={async () => {
-          await authClient.sendVerificationEmail({ email: user.email, callbackURL: window.location.pathname });
+          await authClient.sendVerificationEmail({ email: user.email, callbackURL: verifiedCallback(window.location.pathname) });
           setSent(true);
         }}
       >

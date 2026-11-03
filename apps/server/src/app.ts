@@ -8,7 +8,7 @@ import { createDatabase, createPool, migrateToLatest } from "@edicthq/db";
 import { consentOrganization, createApi, fileRoutes } from "./api/index.js";
 import { DEFAULT_AGENT_LIMITS, RequestLimiter } from "./api/rate-limit.js";
 import { createAuth, type EdictAuth } from "./auth.js";
-import { createSmtpMailer, type Mailer } from "./email.js";
+import { createResendMailer, createSmtpMailer, type Mailer } from "./email.js";
 import type { ServerConfig } from "./env.js";
 import { ensureInstanceSettings } from "./instance.js";
 import { mcpRoutes } from "./mcp/index.js";
@@ -37,16 +37,22 @@ export interface App {
 }
 
 export interface AppOptions {
-  // Overrides the SMTP mailer from config. Tests pass one that records.
+  // Overrides the mailer from config. Tests pass one that records.
   mailer?: Mailer;
+}
+
+// The mailer the config names: Resend's API, SMTP, or none.
+function mailerFrom(config: ServerConfig): Mailer | undefined {
+  if (!config.emailFrom) return undefined;
+  if (config.resendApiKey) return createResendMailer(config.resendApiKey, config.emailFrom, config.resendApiUrl);
+  if (config.smtpUrl) return createSmtpMailer(config.smtpUrl, config.emailFrom);
+  return undefined;
 }
 
 export function createApp(config: ServerConfig, options: AppOptions = {}): App {
   const pool = createPool(config.databaseUrl);
   const db = createDatabase(pool);
-  const mailer =
-    options.mailer ??
-    (config.smtpUrl && config.emailFrom ? createSmtpMailer(config.smtpUrl, config.emailFrom) : undefined);
+  const mailer = options.mailer ?? mailerFrom(config);
 
   const telemetryUrl = config.telemetryUrl ?? TELEMETRY_URL;
 

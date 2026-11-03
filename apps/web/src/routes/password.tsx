@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { z } from "zod";
 import { Button, Field, Input, PasswordInput } from "@edicthq/ui";
+import { ResendButton } from "../components/resend-button.js";
 import { AuthShell, FormError } from "../components/shell.js";
 import { authClient } from "../lib/auth.js";
 
@@ -17,9 +18,11 @@ export function ForgotPassword() {
   const [failure, setFailure] = useState<string | null>(null);
   const form = useForm({ resolver: zodResolver(EmailForm), defaultValues: { email: params.get("email") ?? "" } });
 
+  const send = (email: string) => authClient.requestPasswordReset({ email, redirectTo: "/reset-password" });
+
   const onSubmit = form.handleSubmit(async ({ email }) => {
     setFailure(null);
-    const { error } = await authClient.requestPasswordReset({ email, redirectTo: "/reset-password" });
+    const { error } = await send(email);
     if (error) {
       setFailure(error.message ?? "Sending the link failed. Try again.");
       return;
@@ -30,12 +33,20 @@ export function ForgotPassword() {
   if (sentTo) {
     return (
       <AuthShell
-        title="Check your email"
-        lead={`If ${sentTo} signed up for Edict, a link to choose a new password is on its way. It works for one hour.`}
+        title="Check your inbox"
+        lead={
+          <>
+            If <span className="font-semibold text-ink">{sentTo}</span> signed up for Edict, a link to choose a new
+            password is on its way. It works for one hour.
+          </>
+        }
       >
-        <Link to="/sign-in" className={`text-ui ${link}`}>
-          Back to sign in
-        </Link>
+        <ResendButton send={() => send(sentTo)} />
+        <p className="mt-6 text-ui text-ink-2">
+          <Link to="/sign-in" className={link}>
+            Back to sign in
+          </Link>
+        </p>
       </AuthShell>
     );
   }

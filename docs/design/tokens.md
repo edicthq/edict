@@ -27,6 +27,7 @@ These tokens move into `packages/ui` before any product UI is built. OKLCH is th
 | `hover` | Hover, selected row, code background, segmented control | `ink` at 5.5% | white at 6% |
 | `line` | Hairline borders, dividers | `ink` at 10% | white at 7.5% |
 | `line-strong` | Control borders, label outlines, inactive delegate bar | `ink` at 17% | white at 14% |
+| `skeleton` | Blocks of a loading skeleton | `ink` at 7.5% | white at 7% |
 | `focus` | The focus ring, the list cursor | `ink` at 45% | `ink` at 40% |
 | `focus-soft` | The halo around a focused field | `ink` at 10% | `ink` at 8% |
 | `glow` | The light at the top of sign-in pages | white at 90% | white at 4.5% |
@@ -165,7 +166,7 @@ Three levels. The window is `rail`. The page is a panel on it, inset 8px on a wi
 
 ## Motion
 
-Motion is functional: it shows where something came from, where it went and what just changed. It is quick, it runs once, and it never asks to be watched. Only a live agent run loops.
+Motion is functional: it shows where something came from, where it went and what just changed. It is quick, it runs once, and it never asks to be watched. Only a live agent run loops, and a loading skeleton's gentle pulse.
 
 | Token | Value | Use |
 |---|---|---|
@@ -181,6 +182,7 @@ Motion is functional: it shows where something came from, where it went and what
 | `blink-live` | 1.6s loop | Dot in the "Working" badge |
 | `thinking` | 1.2s loop, 150ms stagger | Three dots under the last update while the agent works |
 | `stream` | about 110 characters a second | A new progress update types itself in, with a caret in `agent` |
+| `skeleton-pulse` | 1.6s loop, opacity 1 to 0.5 | The blocks of a loading skeleton, in step across skeletons |
 
 What moves, and how (`packages/ui/src/tokens.css`):
 
@@ -190,10 +192,11 @@ What moves, and how (`packages/ui/src/tokens.css`):
 - **Rows** take hover at once and fade it out on `duration-fast`, so moving down a list leaves a short trail. A row that arrives, or moves into another group, eases down 4px with a fading wash. A status icon that changes pops from 0.6. Neither plays on first render, and a change of view (filter, grouping) moves nothing.
 - **Sign-in, sign-up and setup** pages rise in part by part, 40ms apart, the first time they show.
 - **The phone's drawer** slides in from the leading edge over a fading scrim.
+- **Loading skeletons** (`SkeletonGroup`, blocks in the `skeleton` color) stand in for a page or list shaped like it. They stay invisible for the first 150ms, so a fast load never flashes, then fade in on `duration-slow` and pulse; a skeleton that takes another's place shows at once. When the content arrives, a copy of the skeleton on its background fades out over it on `duration-slow`. No shimmer sweeps across them.
 
 Transitions name their properties, never `all`. Animations run once when something appears or changes, never on every render. Layers that leave stay mounted for their exit only (`usePresence`).
 
-With `prefers-reduced-motion: reduce`, distances and scales drop to zero (`--motion: 0`), so slides and pops become plain fades, layers leave at once, loops stop, and updates appear whole. The e2e suite runs that way.
+With `prefers-reduced-motion: reduce`, distances and scales drop to zero (`--motion: 0`), so slides and pops become plain fades, layers leave at once, loops stop, updates appear whole, and skeletons still wait 150ms but then appear, stand still and leave at once. The e2e suite runs that way.
 
 ## Components these tokens imply
 

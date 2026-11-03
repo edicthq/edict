@@ -26,6 +26,8 @@
   --hover: oklch(0.22 0.02 260 / 0.055);
   --line: oklch(0.22 0.02 260 / 0.1);
   --line-strong: oklch(0.22 0.02 260 / 0.17);
+  /* A skeleton's blocks while a page loads: ink at low alpha, like hover. */
+  --skeleton: oklch(0.22 0.02 260 / 0.075);
   --focus: oklch(0.22 0.016 260 / 0.45);
   --focus-soft: oklch(0.22 0.016 260 / 0.1);
   --glow: oklch(1 0 0 / 0.9);
@@ -88,6 +90,7 @@
     --hover: oklch(1 0 0 / 0.06);
     --line: oklch(1 0 0 / 0.075);
     --line-strong: oklch(1 0 0 / 0.14);
+    --skeleton: oklch(1 0 0 / 0.07);
     --focus: oklch(0.95 0.004 255 / 0.4);
     --focus-soft: oklch(0.95 0.004 255 / 0.08);
     --glow: oklch(1 0 0 / 0.045);
@@ -132,6 +135,7 @@
       --hover: oklch(1 0 0 / 0.06);
       --line: oklch(1 0 0 / 0.075);
       --line-strong: oklch(1 0 0 / 0.14);
+      --skeleton: oklch(1 0 0 / 0.07);
     --focus: oklch(0.95 0.004 255 / 0.4);
     --focus-soft: oklch(0.95 0.004 255 / 0.08);
     --glow: oklch(1 0 0 / 0.045);
@@ -210,6 +214,7 @@
   --color-hover: var(--hover);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
+  --color-skeleton: var(--skeleton);
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
@@ -457,3 +462,43 @@ dialog.motion-dialog:not([open])::backdrop {
 .stagger > :nth-child(3) { animation-delay: 80ms; }
 .stagger > :nth-child(4) { animation-delay: 120ms; }
 .stagger > :nth-child(n + 5) { animation-delay: 160ms; }
+
+/* Skeletons stand in for a page while it loads (SkeletonGroup). Invisible for
+   the first 150 ms (skeleton-timing.ts), then they fade in, their blocks
+   pulse gently in step with every other skeleton, and a copy fades out over
+   the content that replaces them. Under reduced motion they appear and leave
+   at once and stand still. */
+.skeleton {
+  opacity: 0;
+}
+.skeleton[data-shown] {
+  opacity: 1;
+}
+.skeleton[data-shown="fade"] {
+  transition: opacity var(--duration-slow) var(--ease-enter);
+}
+.skeleton-block {
+  background-color: var(--skeleton);
+  animation: skeleton-pulse 1.6s ease-in-out var(--skeleton-phase, 0ms) infinite;
+}
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+.skeleton[data-skeleton-leaving] {
+  animation: skeleton-out var(--duration-slow) var(--ease-standard) forwards;
+}
+@keyframes skeleton-out {
+  to {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-block {
+    animation: none;
+  }
+  .skeleton[data-shown] {
+    transition: none;
+  }
+}

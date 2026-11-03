@@ -27,10 +27,14 @@ export interface ServerConfig {
   // Background jobs such as the trash purge. On unless JOBS=off; tests run
   // them by hand.
   jobs?: boolean;
-  // Outgoing email. Both or neither: without them invites are links to share
-  // by hand.
+  // Outgoing email, over SMTP or through Resend's API: one of smtpUrl and
+  // resendApiKey, with emailFrom. Without them invites are links to share by
+  // hand.
   smtpUrl?: string;
+  resendApiKey?: string;
   emailFrom?: string;
+  // Resend's API. RESEND_API_URL by default; tests point it at a stand-in.
+  resendApiUrl?: string;
   // Better Auth's per-IP rate limit on sign-in and sign-up (three requests
   // over ten seconds by default). Off only for tests that create several
   // users from one address, like the browser end-to-end suite.
@@ -82,11 +86,7 @@ export function readConfig(env: NodeJS.ProcessEnv): ServerConfig {
     throw new ConfigError("BETTER_AUTH_URL is not set. Set it to the URL people reach Edict at, like https://edict.example.com.");
   }
 
-  const smtpUrl = env.SMTP_URL || undefined;
-  const emailFrom = env.EMAIL_FROM || undefined;
-  if (smtpUrl && !emailFrom) {
-    throw new ConfigError('SMTP_URL is set but EMAIL_FROM is not. Set it to the sender, like "Edict <edict@example.com>".');
-  }
+  const { smtpUrl, resendApiKey, emailFrom } = readEmail(env);
 
   return {
     port,
@@ -104,6 +104,8 @@ export function readConfig(env: NodeJS.ProcessEnv): ServerConfig {
     s3: readS3(env),
     maxAttachmentBytes: readAttachmentMax(env.ATTACHMENT_MAX_BYTES),
     smtpUrl,
+    resendApiKey,
+    resendApiUrl: env.RESEND_API_URL || undefined,
     emailFrom,
     authRateLimit: env.AUTH_RATE_LIMIT !== "off",
     jobs: env.JOBS !== "off",
@@ -116,6 +118,25 @@ export function readConfig(env: NodeJS.ProcessEnv): ServerConfig {
       issuesPerHour: readLimit("AGENT_ISSUES_PER_HOUR", env.AGENT_ISSUES_PER_HOUR, DEFAULT_AGENT_LIMITS.issuesPerHour),
     },
   };
+}
+
+// Email goes over SMTP or through Resend's API, never both, and always from
+// EMAIL_FROM.
+function readEmail(env: NodeJS.ProcessEnv): Pick<ServerConfig, "smtpUrl" | "resendApiKey" | "emailFrom"> {
+  const smtpUrl = env.SMTP_URL || undefined;
+  const resendApiKey = env.RESEND_API_KEY || undefined;
+  const emailFrom = env.EMAIL_FROM || undefined;
+  if (smtpUrl && resendApiKey) {
+    throw new ConfigError("RESEND_API_KEY and SMTP_URL are both set. Email goes through one of them: unset the other.");
+  }
+  const sender = 'Set it to the sender, like "Edict <edict@example.com>".';
+  if (resendApiKey && !emailFrom) {
+    throw new ConfigError(`RESEND_API_KEY is set but EMAIL_FROM is not. ${sender} Its domain must be verified in Resend.`);
+  }
+  if (smtpUrl && !emailFrom) {
+    throw new ConfigError(`SMTP_URL is set but EMAIL_FROM is not. ${sender}`);
+  }
+  return { smtpUrl, resendApiKey, emailFrom };
 }
 
 // A provider is on when both its id and its secret are set.

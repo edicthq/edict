@@ -1,7 +1,8 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { asc, count, sql } from "drizzle-orm";
 import { user } from "@edicthq/db";
-import { InstanceSettings, InstanceStatus, InstanceUsers, UpdateCheck, UpdateInstanceSettings } from "@edicthq/schema";
+import { InstanceSettings, InstanceStatus, InstanceUsers, TestEmail, UpdateCheck, UpdateInstanceSettings } from "@edicthq/schema";
+import { testEmail } from "../email.js";
 import { VERSION } from "../version.js";
 import type { SignInProviders } from "../env.js";
 import { changeInstanceSettings, hasUsers, readInstanceSettings } from "../instance.js";
@@ -35,6 +36,19 @@ const runUpdateCheck = createRoute({
   description: "Instance admins only. Asks GitHub for the latest release, as the daily check does. Refused while the update check is off.",
   responses: {
     200: json(UpdateCheck, "What the check found"),
+    ...errors("invalid_request", "unauthorized", "forbidden"),
+  },
+});
+
+const sendTestEmail = createRoute({
+  method: "post",
+  path: "/instance/test-email",
+  tags: ["Instance"],
+  summary: "Send a test email to yourself",
+  description:
+    "Instance admins only. Sends a short email to the signed-in admin's own address through the instance's transport. A refused email still answers 200, with sent false and the provider's message in error. Without email set up, 400.",
+  responses: {
+    200: json(TestEmail, "Where the email went, and whether the provider took it"),
     ...errors("invalid_request", "unauthorized", "forbidden"),
   },
 });
@@ -97,7 +111,11 @@ export function instanceRoutes(deps: InstanceDeps) {
     const settings = await readInstanceSettings(deps.db);
     return c.json(
       {
-        email: { configured: Boolean(deps.mailer), from: deps.instanceInfo?.emailFrom ?? null },
+        email: {
+          configured: Boolean(deps.mailer),
+          transport: deps.mailer?.transport ?? null,
+          from: deps.instanceInfo?.emailFrom ?? null,
+        },
         storage: deps.instanceInfo?.storage ?? { kind: "disk" as const, location: "" },
         version: VERSION,
         updates: updateCheckOf(settings),
@@ -113,6 +131,21 @@ export function instanceRoutes(deps: InstanceDeps) {
       throw invalid("The update check is off. Turn it on first.");
     }
     return c.json(await checkForUpdate(deps.db, deps.releasesUrl ?? RELEASES_URL), 200);
+  });
+
+  app.openapi(sendTestEmail, async (c) => {
+    const admin = requireInstanceAdmin(c);
+    if (!deps.mailer) {
+      throw invalid("This instance has no email set up. Set SMTP_URL or RESEND_API_KEY, and EMAIL_FROM, then restart Edict.");
+    }
+    const { transport } = deps.mailer;
+    try {
+      await deps.mailer.send(testEmail({ to: admin.email, transport }));
+      return c.json({ to: admin.email, transport, sent: true, error: null }, 200);
+    } catch (error) {
+      const message = error instanceof Error && error.message ? error.message : String(error);
+      return c.json({ to: admin.email, transport, sent: false, error: message }, 200);
+    }
   });
 
   // Users are the instance's, not an organization's: an instance admin reads
@@ -159,7 +192,7 @@ export function instanceRoutes(deps: InstanceDeps) {
     }
     const input = c.req.valid("json");
     if (input.signUpMode === "domain" && !deps.mailer) {
-      throw invalid("The domain sign-up mode needs email, so Edict can verify that an address really is at the domain. Set SMTP_URL first.");
+      throw invalid("The domain sign-up mode needs email, so Edict can verify that an address really is at the domain. Set SMTP_URL or RESEND_API_KEY first.");
     }
     if (input.signUpMode === "domain" && !(input.signUpDomains ?? (await readInstanceSettings(deps.db)).signUpDomains).length) {
       throw invalid("Name at least one domain for the domain sign-up mode.");

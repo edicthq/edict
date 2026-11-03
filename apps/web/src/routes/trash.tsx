@@ -1,6 +1,7 @@
 import type { TrashedIssue, TrashedTeam } from "@edicthq/client";
 import { Avatar, Button, TeamKey } from "@edicthq/ui";
-import { EmptyState, GroupHeader, Loading, PageColumn, PageHeader, rowClass } from "../components/shell.js";
+import { EmptyState, GroupHeader, PageColumn, PageHeader, rowClass } from "../components/shell.js";
+import { RowsSkeleton } from "../components/skeletons.js";
 import { useOfferUndo } from "../components/undo.js";
 import { useToast } from "../components/toast.js";
 import { ago } from "../lib/issues.js";
@@ -32,7 +33,7 @@ export function TrashPage() {
           </section>
         ) : null}
         {trash.isPending ? (
-          <Loading label="Loading the trash" />
+          <RowsSkeleton label="Loading the trash" rows={4} identifier meta end="button" />
         ) : trash.data?.length ? (
           <ul aria-label="Trashed issues" className="flex flex-col gap-px">
             {trash.data.map((issue) => (

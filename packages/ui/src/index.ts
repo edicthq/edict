@@ -1,3 +1,4 @@
+export { ActionMenu, actionMenuItemClass } from "./action-menu.js";
 export { Avatar } from "./avatar.js";
 export { Badge, Count, ProgressBar, ProgressBadge, ProjectStatusBadge, TeamKey, type AgentState } from "./badge.js";
 export { Button, Kbd, buttonClass, type ButtonProps } from "./button.js";
@@ -9,5 +10,7 @@ export { LogoMark } from "./logo.js";
 export { PriorityIcon, StatusIcon } from "./issue-icons.js";
 export { Menu, type MenuItem } from "./menu.js";
 export { useChangeCount, usePresence } from "./presence.js";
+export { Skeleton, SkeletonGroup } from "./skeleton.js";
+export { SKELETON_DELAY_MS, createSkeletonClock, skeletonClock, type SkeletonClock } from "./skeleton-timing.js";
 export { Tabs, type TabItem } from "./tabs.js";
 export { LabelDot, LabelPill } from "./label.js";

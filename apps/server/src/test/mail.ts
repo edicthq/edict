@@ -4,6 +4,7 @@ import type { EmailMessage, Mailer } from "../email.js";
 export function recordingMailer() {
   const sent: EmailMessage[] = [];
   const mailer: Mailer = {
+    transport: "smtp",
     send: async (message) => {
       sent.push(message);
     },

@@ -1,13 +1,6 @@
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useAnchoredPlacement } from "./anchor.js";
 import { cn } from "./cn.js";
 import { usePresence } from "./presence.js";
 
@@ -21,18 +14,8 @@ export interface MenuItem<T extends string> {
   detail?: string;
 }
 
-const GAP = 4;
-const MARGIN = 8;
 const WIDTH = 240;
 const MAX_HEIGHT = 288;
-
-interface Placement {
-  left: number;
-  top: number;
-  maxHeight: number;
-  // Where it grows from: the corner nearest the trigger.
-  origin: string;
-}
 
 // A picker that opens under its trigger with a filter field, like the
 // prototype's "Change status…". Arrows move, Enter picks, Escape closes and
@@ -45,6 +28,8 @@ interface Placement {
 // scrolling panel an absolutely positioned menu is clipped by the nearest
 // overflow box, which cut the bottom of the status picker off under the
 // dialog's footer. It flips above the trigger when the space below runs out.
+// With `matchTriggerWidth` the panel is as wide as the trigger, for a picker
+// that fills its row; otherwise it is 240px.
 export function Menu<T extends string>({
   label,
   items,
@@ -59,6 +44,7 @@ export function Menu<T extends string>({
   align = "start",
   side = "bottom",
   filter = true,
+  matchTriggerWidth = false,
   className,
 }: {
   label: string;
@@ -81,6 +67,7 @@ export function Menu<T extends string>({
   // A short fixed list, like roles, has no filter field to show. The field
   // stays, out of sight, to take the arrow keys and type-ahead.
   filter?: boolean;
+  matchTriggerWidth?: boolean;
   className?: string;
 }) {
   const [ownOpen, setOwnOpen] = useState(false);
@@ -91,7 +78,6 @@ export function Menu<T extends string>({
   };
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
-  const [placement, setPlacement] = useState<Placement | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -105,31 +91,6 @@ export function Menu<T extends string>({
     ? [...matches, { value: createValue, label: `Create “${query.trim()}”` }]
     : matches;
   const isSelected = (item: MenuItem<T>) => (multiple ? (values ?? []).includes(item.value) : item.value === value);
-
-  const place = useCallback(() => {
-    const rect = triggerRef.current?.getBoundingClientRect();
-    const panel = panelRef.current;
-    if (!rect || !panel) return;
-    // The panel is already capped by the max height of the previous pass.
-    const height = panel.offsetHeight;
-    const below = window.innerHeight - rect.bottom - GAP - MARGIN;
-    const above = rect.top - GAP - MARGIN;
-    const flip = side === "top" ? above > 0 : height > below && above > below;
-    const maxHeight = Math.max(120, Math.min(MAX_HEIGHT, flip ? above : below));
-    const left = Math.min(
-      Math.max(MARGIN, align === "end" ? rect.right - WIDTH : rect.left),
-      window.innerWidth - WIDTH - MARGIN,
-    );
-    const top = flip
-      ? Math.max(MARGIN, rect.top - GAP - Math.min(height, maxHeight))
-      : rect.bottom + GAP;
-    const origin = `${flip ? "bottom" : "top"} ${align === "end" ? "right" : "left"}`;
-    setPlacement((current) =>
-      current && current.left === left && current.top === top && current.maxHeight === maxHeight && current.origin === origin
-        ? current
-        : { left, top, maxHeight, origin },
-    );
-  }, [align, side]);
 
   // Resets only when it opens.
   // biome-ignore lint/correctness/useExhaustiveDependencies: see above
@@ -145,22 +106,18 @@ export function Menu<T extends string>({
     return () => document.removeEventListener("pointerdown", onPointer);
   }, [open]);
 
-  // Measure after the panel mounts, and keep it anchored while the page or the
-  // dialog behind it scrolls. The filter changing the row count changes the
-  // height, so it measures again then.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the row count changes the panel height
-  useLayoutEffect(() => {
-    // Closing keeps the placement, so the panel fades out where it was.
-    if (!open) return;
-    place();
-    const onScroll = () => place();
-    window.addEventListener("resize", onScroll);
-    window.addEventListener("scroll", onScroll, true);
-    return () => {
-      window.removeEventListener("resize", onScroll);
-      window.removeEventListener("scroll", onScroll, true);
-    };
-  }, [open, place, shown.length]);
+  // Measured after the panel mounts, and again when the filter changes the
+  // row count, which changes the height.
+  const placement = useAnchoredPlacement({
+    open,
+    trigger: triggerRef,
+    panel: panelRef,
+    align,
+    side,
+    width: matchTriggerWidth ? "trigger" : WIDTH,
+    maxHeight: MAX_HEIGHT,
+    remeasure: shown.length,
+  });
 
   // Focus moves into the filter once the panel is placed and visible:
   // autoFocus would fire while it is still hidden for measuring, and fail.
@@ -206,7 +163,7 @@ export function Menu<T extends string>({
       inert={presence.leaving || undefined}
       aria-hidden={presence.leaving || undefined}
       style={{
-        width: WIDTH,
+        width: placement?.width ?? WIDTH,
         maxHeight: placement?.maxHeight ?? MAX_HEIGHT,
         left: placement?.left ?? 0,
         top: placement?.top ?? 0,

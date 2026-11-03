@@ -2,11 +2,13 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { DbProvider } from "@tanstack/react-db";
 import { Link, Navigate, Outlet, RouterProvider, createBrowserRouter, useLocation } from "react-router";
 import { db, queryClient } from "./lib/db.js";
-import { AuthShell, Loading } from "./components/shell.js";
+import { AuthShell } from "./components/shell.js";
+import { AppSkeleton, AuthSkeleton } from "./components/skeletons.js";
 import { ToastProvider } from "./components/toast.js";
 import { useSession } from "./lib/auth.js";
 import { useInstance } from "./lib/queries.js";
 import { SignIn, SignUp } from "./routes/auth.js";
+import { CheckInbox, EmailVerified } from "./routes/email.js";
 import { InstancePage } from "./routes/instance.js";
 import { InvitePage } from "./routes/invite.js";
 import { IssueLink, TeamIssuesPage } from "./routes/issues.js";
@@ -23,11 +25,18 @@ import { ProjectDetailPage, ProjectsPage } from "./routes/projects.js";
 import { MyIssuesPage } from "./routes/my-issues.js";
 import { InboxPage } from "./routes/inbox.js";
 
+const authStylePaths = new Set(["/new", "/oauth/consent", "/check-inbox"]);
+
 // Pages for signed-in users. Others go to sign-in, or to sign-up on a fresh instance.
 function SignedIn() {
   const session = useSession();
   const instance = useInstance();
-  if (session.isPending || (!session.data && instance.isPending)) return <Loading />;
+  const location = useLocation();
+  if (session.isPending || (!session.data && instance.isPending)) {
+    // Creating an organization and approving a client are sign-in style pages;
+    // everything else opens in the app's frame.
+    return authStylePaths.has(location.pathname) ? <AuthSkeleton /> : <AppSkeleton />;
+  }
   if (!session.data) {
     // A fresh instance has no one to sign in yet: its first visitor sets it up.
     return <Navigate to={instance.data?.setUp === false ? "/sign-up" : "/sign-in"} replace />;
@@ -39,7 +48,7 @@ function SignedIn() {
 function SignedOut() {
   const session = useSession();
   const location = useLocation();
-  if (session.isPending) return <Loading />;
+  if (session.isPending) return <AuthSkeleton />;
   if (session.data && !new URLSearchParams(location.search).has("invite")) return <Navigate to="/" replace />;
   return <Outlet />;
 }
@@ -66,11 +75,14 @@ const router = createBrowserRouter([
   // Readable signed out: it offers sign-up or sign-in.
   { path: "/invite/:token", element: <InvitePage /> },
   { path: "/reset-password", element: <ResetPassword /> },
+  // Where a verification link lands, signed in or not.
+  { path: "/email-verified", element: <EmailVerified /> },
   {
     element: <SignedIn />,
     children: [
       { path: "/", element: <Home /> },
       { path: "/new", element: <NewOrganization /> },
+      { path: "/check-inbox", element: <CheckInbox /> },
       { path: "/oauth/consent", element: <ConsentPage /> },
       {
         path: "/:slug",

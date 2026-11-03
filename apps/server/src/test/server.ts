@@ -49,6 +49,9 @@ export async function startTestServer(
     trustedProxies?: string[];
     webDir?: string;
     mailer?: Mailer;
+    // Email from config, the way production builds its mailer.
+    smtp?: { url: string; from: string };
+    resend?: { apiKey: string; url: string; from: string };
     // Where attachments are stored (ADR 0020). A fresh directory each test.
     dataDir?: string;
     // Store attachments in this bucket instead of dataDir.
@@ -89,6 +92,10 @@ export async function startTestServer(
     signIn: options.signIn,
     releasesUrl: options.releasesUrl ?? "http://127.0.0.1:9/releases/latest",
     telemetryUrl: options.telemetryUrl ?? "http://127.0.0.1:9/v1/ping",
+    smtpUrl: options.smtp?.url,
+    resendApiKey: options.resend?.apiKey,
+    resendApiUrl: options.resend?.url,
+    emailFrom: options.smtp?.from ?? options.resend?.from,
   }, { mailer: options.mailer });
   await app.start();
 

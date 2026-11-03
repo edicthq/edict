@@ -1,7 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router";
 import type { Agent, Issue, Label, Member, Priority, SavedViewQuery, Status, Team } from "@edicthq/client";
-import { Avatar, Button, Checkbox, Dialog, Kbd, LabelPill, Menu, PriorityIcon, StatusIcon, TeamKey, cn, usePresence } from "@edicthq/ui";
+import {
+  Avatar,
+  Button,
+  Checkbox,
+  Dialog,
+  Kbd,
+  LabelPill,
+  Menu,
+  PriorityIcon,
+  Skeleton,
+  SkeletonGroup,
+  StatusIcon,
+  TeamKey,
+  cn,
+  usePresence,
+} from "@edicthq/ui";
 import type { MenuItem } from "@edicthq/ui";
 import { ArrowDown, ArrowUp, Bookmark, Columns3, ListFilter, Rows3, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { CreateIssueDialog } from "../components/create-issue-dialog.js";
@@ -10,7 +25,8 @@ import { IssuePeek, type PeekMenu } from "../components/issue-peek.js";
 import { desktopShell, openSwitcher } from "../lib/desktop.js";
 import { useNarrow } from "../lib/narrow.js";
 import { rememberIssue } from "../lib/recent.js";
-import { EmptyState, Loading, PageBody, PageHeader } from "../components/shell.js";
+import { EmptyState, PageBody, PageHeader } from "../components/shell.js";
+import { IssueBoardSkeleton, IssueListSkeleton, TeamIssuesSkeleton } from "../components/skeletons.js";
 import { AgentMark, IssuePeople, IssueRowCells, issueRowClass, liveClass } from "../components/issue-row.js";
 import { useToast } from "../components/toast.js";
 import { useOfferUndo } from "../components/undo.js";
@@ -66,8 +82,9 @@ export function TeamIssuesPage() {
   const { orgId } = useOrg();
   const teams = useTeams(orgId);
   const team = teams.data?.find((t) => t.id === teamId);
+  const [params] = useSearchParams();
 
-  if (teams.isPending) return <Loading />;
+  if (teams.isPending) return <TeamIssuesSkeleton view={params.get("view") === "board" ? "board" : "list"} />;
   if (!team) {
     return (
       <PageBody className="pt-6">
@@ -747,7 +764,11 @@ function TeamIssues({ team }: { team: Team }) {
 
       <div className="min-h-0 flex-1 overflow-auto" id="issues">
         {loading ? (
-          <Loading label="Loading issues" />
+          view === "board" ? (
+            <IssueBoardSkeleton />
+          ) : (
+            <IssueListSkeleton />
+          )
         ) : issues.data?.length === 0 ? (
           <PageBody>
             <EmptyState
@@ -1285,7 +1306,8 @@ export function IssueLink() {
   const { issueRef = "" } = useParams();
   const { orgId, slug } = useOrg();
   const issue = useIssue(orgId, issueRef);
-  if (issue.isPending) return <Loading label="Finding the issue" />;
+  // It opens over its team's list, so the wait looks like that list.
+  if (issue.isPending) return <TeamIssuesSkeleton view="list" label="Finding the issue" />;
   if (!issue.data) {
     return (
       <PageBody className="pt-6">
@@ -1325,7 +1347,17 @@ function ArchivedIssues({ orgId, team, onOpen }: { orgId: string; team: Team; on
         <>
           <h2 className="px-3 pb-1 text-sm font-semibold text-ink-2">Archived</h2>
           {archived.isPending ? (
-            <Loading label="Loading archived issues" />
+            <SkeletonGroup label="Loading archived issues" className="flex flex-col gap-px">
+              {["58%", "44%", "66%"].map((width) => (
+                <div key={width} className="flex min-h-9 items-center gap-3 px-4">
+                  <Skeleton className="w-[58px] shrink-0" />
+                  <span className="flex min-w-0 flex-1">
+                    <Skeleton className="h-3.5" style={{ width }} />
+                  </span>
+                  <Skeleton className="w-24" />
+                </div>
+              ))}
+            </SkeletonGroup>
           ) : list.length === 0 ? (
             <p className="px-3 text-ui text-ink-2">Nothing is archived in {team.key} yet.</p>
           ) : (

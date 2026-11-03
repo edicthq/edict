@@ -3,13 +3,14 @@ import { MarkdownEditor } from "../components/markdown-editor.js";
 import { Markdown, plainText } from "../components/markdown.js";
 import { Link, useNavigate, useParams } from "react-router";
 import type { Agent, Issue, Label, Member, ProjectStatus, Status, StatusCategory } from "@edicthq/client";
-import { Avatar, Button, Menu, ProgressBar, ProjectStatusBadge, StatusIcon, Tabs, cn } from "@edicthq/ui";
+import { Avatar, Button, Menu, ProgressBar, ProjectStatusBadge, Skeleton, SkeletonGroup, StatusIcon, Tabs, cn } from "@edicthq/ui";
 import { Calendar, ChevronRight, FolderKanban, Plus, Trash2 } from "lucide-react";
 import { CreateProjectDialog } from "../components/create-project-dialog.js";
 import { DateMenu, formatDay } from "../components/date-menu.js";
 import { NoAssignee, chipClass } from "../components/issue-fields.js";
 import { IssueRowLink } from "../components/issue-row.js";
-import { EmptyState, Loading, PageBody, PageHeader } from "../components/shell.js";
+import { EmptyState, PageBody, PageHeader } from "../components/shell.js";
+import { GroupBandSkeleton, IssueRowSkeleton, range } from "../components/skeletons.js";
 import {
   useAgents,
   useDeleteProject,
@@ -64,7 +65,7 @@ export function ProjectsPage() {
 
       <PageBody>
         {projects.isPending ? (
-          <Loading label="Loading projects" />
+          <ProjectsSkeleton />
         ) : projects.data?.length ? (
           <div className="flex flex-col gap-4">
             <Tabs
@@ -186,7 +187,7 @@ export function ProjectDetailPage() {
   const humans = (members.data ?? []).filter((m) => m.kind === "human");
   const lead = humans.find((m) => m.id === project?.leadId);
 
-  if (projectQuery.isPending) return <Loading label="Loading project" />;
+  if (projectQuery.isPending) return <ProjectSkeleton />;
   if (!project) {
     return (
       <PageBody className="pt-6">
@@ -416,7 +417,9 @@ export function ProjectDetailPage() {
 
         {/* Cross-team issues, open ones first. */}
         {issuesQuery.isPending ? (
-          <Loading label="Loading issues" />
+          <SkeletonGroup label="Loading the project's issues">
+            <ProjectIssuesBody />
+          </SkeletonGroup>
         ) : issues.length ? (
           <ProjectIssues
             issues={issues}
@@ -434,6 +437,107 @@ export function ProjectDetailPage() {
         )}
       </PageBody>
     </>
+  );
+}
+
+// The projects list while it loads: the status tabs, then a card per
+// project with its name, a line about it and its progress.
+function ProjectsSkeleton() {
+  return (
+    <SkeletonGroup label="Loading projects" className="flex flex-col gap-4">
+      <div className="flex items-center gap-1 border-b border-line px-0.5">
+        {["w-8", "w-12", "w-[72px]"].map((width) => (
+          <span key={width} className="flex h-8 items-center px-2.5">
+            <Skeleton className={width} />
+          </span>
+        ))}
+      </div>
+      <div className="flex flex-col gap-2">
+        {[0, 1, 2].map((card) => (
+          <div key={card} className="flex flex-col gap-3 rounded-md border border-line bg-surface px-3 py-4">
+            <div className="flex items-center gap-2.5">
+              <Skeleton className="h-4" style={{ width: `${110 + card * 36}px` }} />
+              <Skeleton className="w-14" />
+              <Skeleton className="h-5 w-[72px] rounded-full" />
+              <Skeleton className="ms-auto size-[22px] rounded-full" />
+              <Skeleton className="w-16" />
+            </div>
+            <Skeleton className="my-[3px] h-3" style={{ width: card === 1 ? "38%" : "56%" }} />
+            <div className="flex items-center gap-3 pt-1">
+              <Skeleton className="h-1.5 w-48 max-w-full rounded-full" />
+              <Skeleton className="w-7" />
+              <Skeleton className="w-20" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </SkeletonGroup>
+  );
+}
+
+// A project's page while it loads: its bar with the field chips, the
+// progress card with a tile per status category, the description and the
+// issues.
+function ProjectSkeleton() {
+  return (
+    <SkeletonGroup label="Loading the project">
+      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-line ps-6 pe-4">
+        <Skeleton className="w-14" />
+        <Skeleton className="size-2.5 rounded-xs" />
+        <Skeleton className="h-3.5 w-36" />
+        <div className="flex-1" />
+        <span className="flex items-center gap-2 max-sm:hidden">
+          <Skeleton className="h-7 w-[68px] rounded-full" />
+          <Skeleton className="h-7 w-[72px] rounded-full" />
+          <Skeleton className="h-7 w-[108px] rounded-full" />
+        </span>
+      </div>
+      <PageBody className="flex flex-col gap-6 pt-5">
+        <div className="flex flex-col gap-4 rounded-md border border-line bg-surface px-3 py-4">
+          <div className="flex items-center justify-between gap-2">
+            <Skeleton className="w-16" />
+            <Skeleton className="w-40" />
+          </div>
+          <Skeleton className="h-2 rounded-full" />
+          <div className="grid grid-cols-2 gap-2 pt-1 sm:grid-cols-5">
+            {[0, 1, 2, 3, 4].map((tile) => (
+              <div key={tile} className="flex flex-col gap-1 rounded-sm border border-line px-3 py-2.5">
+                <span className="flex h-[17px] items-center gap-1.5">
+                  <Skeleton className="size-3.5 rounded-full" />
+                  <Skeleton className="w-14" />
+                </span>
+                <span className="flex h-[22px] items-center">
+                  <Skeleton className="h-4 w-5" />
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="flex h-[17px] items-center justify-between px-3">
+          <Skeleton className="w-20" />
+          <Skeleton className="w-24" />
+        </div>
+        <ProjectIssuesBody />
+      </PageBody>
+    </SkeletonGroup>
+  );
+}
+
+// A project's issues: a category's band and its rows, as ProjectIssues has them.
+function ProjectIssuesBody() {
+  return (
+    <div className="flex flex-col gap-3">
+      {([[3, 0], [2, 1]] as const).map(([rows, group]) => (
+        <div key={group}>
+          <GroupBandSkeleton width={group ? "w-10" : "w-20"} />
+          <div className="mt-1 flex flex-col gap-px">
+            {range(rows).map((row) => (
+              <IssueRowSkeleton key={row} index={row + group * 3} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 

@@ -68,7 +68,9 @@ export const Switch = forwardRef<HTMLInputElement, InputProps>(function Switch({
 });
 
 // Picks one of a few values from the app's menu, where a native <select>
-// would open the system's. The trigger shows the current value.
+// would open the system's. The trigger shows the current value. With
+// `fullWidth` the trigger fills its container and the list is as wide as the
+// trigger; a long value truncates either way.
 export function SelectMenu<T extends string>({
   label,
   value,
@@ -77,6 +79,7 @@ export function SelectMenu<T extends string>({
   disabled,
   className,
   align = "start",
+  fullWidth = false,
 }: {
   // What it sets, for the menu and screen readers: "Role of Maya".
   label: string;
@@ -86,6 +89,7 @@ export function SelectMenu<T extends string>({
   disabled?: boolean;
   className?: string;
   align?: "start" | "end";
+  fullWidth?: boolean;
 }) {
   const current = options.find((option) => option.value === value);
   return (
@@ -96,6 +100,8 @@ export function SelectMenu<T extends string>({
       onSelect={onChange}
       filter={options.length > 7}
       align={align}
+      matchTriggerWidth={fullWidth}
+      className={fullWidth ? "flex w-full" : undefined}
       trigger={(props) => (
         <button
           {...props}
@@ -105,11 +111,12 @@ export function SelectMenu<T extends string>({
           className={cn(
             "hover-fade inline-flex h-7 items-center gap-1.5 rounded-sm ps-2.5 pe-1.5 text-ui text-ink shadow-[inset_0_0_0_1px_var(--line-strong)] hover:bg-hover disabled:opacity-50",
             "aria-expanded:bg-hover",
+            fullWidth && "h-9 w-full min-w-0",
             className,
           )}
         >
           {current?.icon}
-          <span className="truncate">{current?.label ?? value}</span>
+          <span className="min-w-0 truncate">{current?.label ?? value}</span>
           <svg viewBox="0 0 12 12" aria-hidden="true" className="ms-auto size-3 shrink-0 text-ink-2">
             <path d="M3.5 4.75 6 2.5l2.5 2.25M3.5 7.25 6 9.5l2.5-2.25" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
           </svg>

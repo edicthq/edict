@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Avatar, Badge, Button } from "@edicthq/ui";
-import { AuthShell, FormError, Loading } from "../components/shell.js";
+import { AuthShell, FormError } from "../components/shell.js";
+import { AuthSkeleton } from "../components/skeletons.js";
 import { ApiFailure } from "../lib/api.js";
 import { authClient, useSession } from "../lib/auth.js";
 import { useAcceptInvite, useInstance, useInvitePreview } from "../lib/queries.js";
@@ -16,7 +17,7 @@ export function InvitePage() {
   const instance = useInstance();
   const [resent, setResent] = useState(false);
 
-  if (preview.isPending || session.isPending) return <Loading />;
+  if (preview.isPending || session.isPending) return <AuthSkeleton label="Loading the invite" />;
 
   if (preview.isError) {
     const expired = preview.error instanceof ApiFailure && preview.error.code === "gone";

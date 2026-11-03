@@ -52,7 +52,7 @@ Each team names its own statuses, and every status maps to one fixed category: B
 | Member | Work in every public team and the private teams they belong to |
 | Guest | Work only in the teams they were invited to |
 
-Invites go out as email links, or as copyable links when SMTP is off. An optional domain rule lets anyone with a matching verified email join.
+Invites go out as email links, or as copyable links when email is off. An optional domain rule lets anyone with a matching verified email join.
 
 ### Safety nets
 
@@ -215,12 +215,13 @@ Every tenant-owned row carries `org_id`. One data-access layer enforces it on ev
 ### Human authentication
 
 - Email and password, magic link, Google and GitHub OAuth, generic OIDC (Authentik, Keycloak).
-- SMTP is optional. Without it, invites become copyable links and magic links turn off.
+- Email is optional and goes out over SMTP (`SMTP_URL`) or through Resend's HTTPS API (`RESEND_API_KEY`), one or the other, from `EMAIL_FROM`. Without it, invites become copyable links and magic links turn off.
+- In development, `pnpm dev:services` starts Postgres and Mailpit, and `.env.example` sends email to Mailpit, so every email lands in its local inbox.
 - The first user to sign up becomes the instance admin.
 
 ### Instance admin
 
-Sign-up mode (open, invite-only, domain), SMTP, storage, the user list, the update check and telemetry. The update check reads GitHub releases and can be turned off.
+Sign-up mode (open, invite-only, domain), email (SMTP or Resend), storage, the user list, the update check and telemetry. The update check reads GitHub releases and can be turned off.
 
 ### Telemetry
 

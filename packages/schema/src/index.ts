@@ -576,7 +576,13 @@ export type Telemetry = z.infer<typeof Telemetry>;
 // How the instance is set up, for its admins.
 export const InstanceStatus = z
   .object({
-    email: z.object({ configured: z.boolean(), from: z.string().nullable() }),
+    email: z.object({
+      configured: z.boolean(),
+      // How it goes out: over SMTP (SMTP_URL) or through Resend's API
+      // (RESEND_API_KEY). Null without email.
+      transport: z.enum(["smtp", "resend"]).nullable(),
+      from: z.string().nullable(),
+    }),
     storage: z.object({
       kind: z.enum(["disk", "s3"]),
       // The directory, or the bucket and its endpoint.
@@ -587,6 +593,19 @@ export const InstanceStatus = z
     telemetry: Telemetry,
   })
   .meta({ id: "InstanceStatus" });
+
+// What sending a test email to the signed-in instance admin did. A refused
+// email is an answer, not an error: error carries the provider's message.
+export const TestEmail = z
+  .object({
+    // The address it went to: the instance admin's own.
+    to: z.string(),
+    transport: z.enum(["smtp", "resend"]),
+    sent: z.boolean(),
+    error: z.string().nullable(),
+  })
+  .meta({ id: "TestEmail" });
+export type TestEmail = z.infer<typeof TestEmail>;
 
 export const InstanceUser = z
   .object({

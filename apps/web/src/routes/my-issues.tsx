@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { Tabs } from "@edicthq/ui";
+import { SkeletonGroup, Tabs } from "@edicthq/ui";
 import { CircleCheck } from "lucide-react";
 import { IssueRowLink } from "../components/issue-row.js";
-import { EmptyState, Loading, PageBody, PageHeader } from "../components/shell.js";
+import { EmptyState, PageBody, PageHeader } from "../components/shell.js";
+import { IssueRowSkeleton } from "../components/skeletons.js";
 import { useAgents, useMembers, useMyWork, useOrgIssueContext, useTeams } from "../lib/queries.js";
 import { useOrg } from "./org.js";
 
@@ -57,7 +58,11 @@ export function MyIssuesPage() {
         />
 
         {myWork.isPending ? (
-          <Loading label="Loading your work" />
+          <SkeletonGroup label="Loading your work" className="flex flex-col gap-px">
+            {[0, 1, 2, 3, 4, 5].map((row) => (
+              <IssueRowSkeleton key={row} index={row} />
+            ))}
+          </SkeletonGroup>
         ) : filtered.length ? (
           <ul className="flex flex-col gap-px">
             {filtered.map((issue) => (
